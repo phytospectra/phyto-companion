@@ -10,7 +10,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from phyto_shared.exceptions import (
@@ -19,6 +19,9 @@ from phyto_shared.exceptions import (
     InvalidInputError,
 )
 from phyto_shared.provenance import ProvenanceBuilder, sha256_dict
+
+from auth.config import AuthConfig
+from auth.install import install_auth
 
 from . import __version__
 from .admet_prediction import ADMETResult, predict_admet
@@ -45,12 +48,7 @@ DISCLAIMER = (
     "Experimental validation is required."
 )
 
-app = FastAPI(
-    title="PhytoCompanion Pharmacology Service",
-    version=__version__,
-    description="Targets, pathways, network pharmacology, synergy, "
-    "knowledge graph, literature, ADMET.",
-)
+router = APIRouter()
 
 
 class _Runtime:
@@ -201,12 +199,7 @@ class ADMETResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@app.get("/health")
-def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "pharmacology", "version": __version__}
-
-
-@app.post("/pharmacology/targets", response_model=TargetsResponse)
+@router.post("/pharmacology/targets", response_model=TargetsResponse)
 def targets(request: TargetsRequest) -> TargetsResponse:
     predictions: list[TargetPrediction] = []
     gaps: list[str] = []
@@ -249,7 +242,7 @@ def targets(request: TargetsRequest) -> TargetsResponse:
     )
 
 
-@app.post("/pharmacology/network", response_model=NetworkResponse)
+@router.post("/pharmacology/network", response_model=NetworkResponse)
 def network(request: NetworkRequest) -> NetworkResponse:
     per_compound: dict[str, list[TargetPrediction]] = {
         compound_ik: [p for p in request.predictions if p.compound_ik == compound_ik]
@@ -267,7 +260,7 @@ def network(request: NetworkRequest) -> NetworkResponse:
     )
 
 
-@app.post("/pharmacology/hypothesis", response_model=HypothesisResponse)
+@router.post("/pharmacology/hypothesis", response_model=HypothesisResponse)
 def hypothesis(request: HypothesisRequest) -> HypothesisResponse:
     per_compound: dict[str, list[TargetPrediction]] = {
         compound_ik: [p for p in request.predictions if p.compound_ik == compound_ik]
@@ -283,7 +276,7 @@ def hypothesis(request: HypothesisRequest) -> HypothesisResponse:
     )
 
 
-@app.post("/pharmacology/synergy", response_model=SynergyResponse)
+@router.post("/pharmacology/synergy", response_model=SynergyResponse)
 def synergy(request: SynergyRequest) -> SynergyResponse:
     per_compound: dict[str, list[TargetPrediction]] = {
         compound_ik: [p for p in request.predictions if p.compound_ik == compound_ik]
@@ -301,7 +294,7 @@ def synergy(request: SynergyRequest) -> SynergyResponse:
     )
 
 
-@app.post("/pharmacology/knowledge", response_model=KnowledgeResponse)
+@router.post("/pharmacology/knowledge", response_model=KnowledgeResponse)
 def knowledge(request: KnowledgeRequest) -> KnowledgeResponse:
     runtime = get_runtime()
     imported: dict[str, int] = {}
@@ -325,7 +318,7 @@ def knowledge(request: KnowledgeRequest) -> KnowledgeResponse:
     )
 
 
-@app.post("/pharmacology/literature", response_model=LiteratureResponse)
+@router.post("/pharmacology/literature", response_model=LiteratureResponse)
 def literature(request: LiteratureRequest) -> LiteratureResponse:
     if not request.query and not request.compound_ik:
         raise HTTPException(
@@ -342,9 +335,43 @@ def literature(request: LiteratureRequest) -> LiteratureResponse:
     )
 
 
-@app.post("/pharmacology/admet", response_model=ADMETResponse)
+@router.post("/pharmacology/admet", response_model=ADMETResponse)
 def admet(request: ADMETRequest) -> ADMETResponse:
     return ADMETResponse(
         result=predict_admet(request.smiles),
         provenance_manifest_id=_manifest(request),
     )
+
+
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+
+def create_app(config: AuthConfig | None = None) -> FastAPI:
+    """Build the service app with the token layer installed.
+
+    Middleware is installed before routes are added so no endpoint can be
+    registered outside the metering boundary.
+    """
+    application = FastAPI(
+        title="PhytoCompanion Pharmacology Service",
+        version=__version__,
+        description="Targets, pathways, network pharmacology, synergy, knowledge graph, literature, ADMET.",
+    )
+    cfg = install_auth(application, config)
+    application.include_router(router)
+
+    @application.get("/health")
+    def health() -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "service": "pharmacology",
+            "version": __version__,
+            "dry_run": cfg.dry_run,
+        }
+
+    return application
+
+
+app = create_app()

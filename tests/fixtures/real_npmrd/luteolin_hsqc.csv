@@ -1,0 +1,15 @@
+# Luteolin HSQC (1H/13C) reference table -- TEST FIXTURE.
+# Flavone aglycone, formula C15H10O6, solvent DMSO-d6.
+# Hand-curated from standard published assignments for luteolin in
+# DMSO-d6 (the values commonly reported across flavonoid isolation papers
+# and NP-MRD-style spectral tables), rounded to 2 dp.  Luteolin is a
+# flavone: C-3 is protonated, giving the diagnostic H-3 cross-peak that
+# distinguishes it from its isomer kaempferol (a flavonol).
+# Curated for ranking tests; not an authoritative database record.
+position,dH,dC
+H-3,6.68,102.9
+H-6,6.19,98.8
+H-8,6.44,94.0
+H-2',7.41,113.4
+H-5',6.89,115.9
+H-6',7.43,118.9

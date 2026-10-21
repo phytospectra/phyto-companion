@@ -152,7 +152,7 @@ is the experimentation/fallback provider:
 |---|---|
 | `PHYTO_LLM_PROVIDER` | Deployment default: `vertex`, `openrouter` or `local`. Defaults to `vertex` under `PHYTO_ENV=cloud`, otherwise `local` (offline mock). |
 | `OPENROUTER_API_KEY` | OpenRouter key. Required only when that provider is selected; supplied by Secret Manager in production. |
-| `OPENROUTER_MODEL` | Model slug, default `qwen/qwen3-4b:free`. |
+| `OPENROUTER_MODEL` | Model slug, default `google/gemma-4-31b-it:free`. |
 | `VERTEX_ENDPOINT_ID`, `GOOGLE_CLOUD_PROJECT` | Vertex endpoint and project (the fine-tuned Qwen 2.5 7B + QLoRA deployment). |
 
 Any request may override the default with a `provider` field. Grounding rules and the

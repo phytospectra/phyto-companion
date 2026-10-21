@@ -126,6 +126,64 @@ class TestFailureModes:
 
 
 # ---------------------------------------------------------------------------
+# Small-pool failure analysis (ADR-0037)
+# ---------------------------------------------------------------------------
+
+
+class TestSmallPoolAnalysis:
+    def test_identifies_the_six_small_pool_failures(self, ctx, per_compound, failures):
+        sp = ctx.small_pool_section(per_compound, failures)
+        assert sp["bucket_n"] == 29
+        assert sp["bucket_failures"] == 6
+        assert sp["bucket_rate_pct"] == pytest.approx(20.7, abs=0.1)
+        assert len(sp["cases"]) == 6
+
+    def test_margins_and_verdict_split(self, ctx, per_compound, failures):
+        sp = ctx.small_pool_section(per_compound, failures)
+        margins = sorted(c["margin"] for c in sp["cases"])
+        assert margins == pytest.approx(
+            [0.013, 0.055, 0.127, 0.146, 0.168, 0.290], abs=0.001
+        )
+        assert sp["below_confirmed"] == 2
+        assert sp["below_tentative"] == 1
+
+    def test_every_failure_is_a_constitutional_isomer(self, ctx, per_compound, failures):
+        pytest.importorskip("rdkit")
+        sp = ctx.small_pool_section(per_compound, failures)
+        for case in sp["cases"]:
+            assert case["same_formula"] is True
+            assert case["same_ring_count"] is True
+        # Five of six also pass the close-isomer Tanimoto threshold.
+        assert sp["isomers"] == 5
+
+    def test_rare_formula_hypothesis_is_refuted(self, ctx, per_compound, failures):
+        sp = ctx.small_pool_section(per_compound, failures)
+        # Formula multiplicity is the same in both groups.
+        assert sp["mean_formula_freq_small"] == pytest.approx(
+            sp["mean_formula_freq_large"], abs=0.15
+        )
+
+    def test_molecule_size_is_the_driver(self, ctx, per_compound, failures):
+        sp = ctx.small_pool_section(per_compound, failures)
+        strata = {s["stratum"]: s for s in sp["strata"]}
+        large = next(s for k, s in strata.items() if k.startswith("large"))
+        small = next(s for k, s in strata.items() if k.startswith("small"))
+        large_rates = {c["pool"]: c["rate_pct"] for c in large["cells"]}
+        small_rates = {c["pool"]: c["rate_pct"] for c in small["cells"]}
+        # Large molecules fail at every pool size; small ones barely at all.
+        assert min(large_rates.values()) > 10.0
+        assert max(small_rates.values()) <= 12.5
+        # The bucket is enriched in large molecules and glycosides.
+        assert sp["median_heavy_small"] > sp["median_heavy_all"]
+        assert sp["glycoside_share_small"] > sp["glycoside_share_all"]
+
+    def test_heavy_atom_count_parses_formulas(self, ctx):
+        assert ctx.heavy_atom_count("C6H14O12P2") == 20
+        assert ctx.heavy_atom_count("C71H116O35") == 106
+        assert ctx.heavy_atom_count("H2O") == 1
+
+
+# ---------------------------------------------------------------------------
 # Part B: localisation audit -- the <=2-site flag
 # ---------------------------------------------------------------------------
 
@@ -190,10 +248,21 @@ class TestReportContent:
             "Summary",
             "Candidate-set size distribution",
             "Top-1 accuracy by candidate-set size",
+            "Why small pools are harder",
             "Failure modes",
             "Site-localisation benchmark audit",
         ]:
             assert heading in report
+
+    def test_small_pool_section_states_mixed_conclusion(self, report):
+        assert "neither explanation as posed is the dominant one" in report
+        assert "rare formula" in report and "does not hold" in report
+        assert "molecule size" in report
+
+    def test_summary_carries_small_pool_finding(self, report):
+        summary = report[report.index("## Summary") : report.index("## 0.")]
+        assert "2 were near-ties" in summary
+        assert "4 were genuine retrieval errors" in summary
 
     def test_does_not_present_889_as_standalone_claim(self, report):
         cite = report[report.index("## 5.") :]

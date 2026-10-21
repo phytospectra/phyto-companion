@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 import statistics
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -257,6 +258,169 @@ def class_accuracy(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     return sorted(out, key=lambda x: (x["top1_pct"], -x["n"]))
 
 
+# --- Small-pool failure analysis ---------------------------------------------
+
+MIN_MARGIN_FOR_CONFIRMED = 0.10
+MIN_MARGIN_FOR_TENTATIVE = 0.02
+
+_ELEMENT_PATTERN = re.compile(r"([A-Z][a-z]?)(\d*)")
+
+
+def heavy_atom_count(formula: str) -> int:
+    return sum(
+        int(count or 1) for element, count in _ELEMENT_PATTERN.findall(formula)
+        if element != "H"
+    )
+
+
+def small_pool_section(
+    rows: list[dict[str, str]], failures: list[dict[str, str]]
+) -> dict[str, Any]:
+    """Characterise the 6 failures in the <10-candidate bucket.
+
+    The bucket is counterintuitive (small pools should be easier), so this
+    separates two rival explanations:
+
+      (a) genuine GNN prediction error -- the wrong pick is clearly better
+          scored, i.e. the correct answer is not a near-tie; or
+      (b) honest ambiguity -- the correct answer is a near-tie, so the
+          AMBIGUOUS verdict should have prevented a confident claim.
+
+    The scores available are distances (lower is better), so the winner's
+    margin over the correct answer is ``score_true - score_winner``.
+    """
+    failure_by_name = {f["name"]: f for f in failures}
+    small = [r for r in rows if int(r["n_candidates"]) < 10]
+    small_failures = [r for r in small if float(r[MAIN_METHOD]) != 1.0]
+    formula_freq = Counter(r["formula"] for r in rows)
+    all_heavy = sorted(heavy_atom_count(r["formula"]) for r in rows)
+    q1 = all_heavy[len(all_heavy) // 3]
+    q2 = all_heavy[2 * len(all_heavy) // 3]
+
+    cases = []
+    for row in small_failures:
+        f = failure_by_name.get(row["name"])
+        if f is None:
+            continue
+        score_true = float(f["score_true"])
+        score_winner = float(f["score_winner"])
+        # Winner is lowest-scoring; its margin over the truth is positive when
+        # it wins outright.
+        margin = score_true - score_winner
+        flags = structural_flags(f["true_smiles"], f["winner_smiles"])
+        # The verdict the platform would have emitted had it reported the
+        # top-1 pick as if it were the target.
+        if margin >= MIN_MARGIN_FOR_CONFIRMED:
+            implied = "confirmed"
+        elif margin >= MIN_MARGIN_FOR_TENTATIVE:
+            implied = "tentative"
+        else:
+            implied = "candidate"
+        cases.append(
+            {
+                "name": row["name"],
+                "cls": row["cls"],
+                "formula": row["formula"],
+                "rank": float(row[MAIN_METHOD]),
+                "n_candidates": int(row["n_candidates"]),
+                "n_peaks": int(row["n_peaks"]),
+                "score_true": score_true,
+                "score_winner": score_winner,
+                "margin": margin,
+                "below_confirmed": margin < MIN_MARGIN_FOR_CONFIRMED,
+                "below_tentative": margin < MIN_MARGIN_FOR_TENTATIVE,
+                "implied_verdict": implied,
+                "formula_freq": formula_freq[row["formula"]],
+                "heavy_atoms": heavy_atom_count(row["formula"]),
+                "same_formula": flags.get("same_formula"),
+                "same_ring_count": flags.get("same_ring_count"),
+                "tanimoto": flags.get("tanimoto"),
+                "structure_parsable": flags.get("parsable", False),
+            }
+        )
+
+    # Structural-isomer test as specified: same formula, same ring count,
+    # different connectivity, Tanimoto >= 0.7.
+    isomers = [
+        c
+        for c in cases
+        if c["structure_parsable"]
+        and c["same_formula"]
+        and c["same_ring_count"]
+        and (c["tanimoto"] or 0.0) >= 0.7
+    ]
+
+    # Does "rare formula" explain the bucket? Compare formula multiplicity.
+    def mean_freq(group: list[dict[str, str]]) -> float:
+        return statistics.mean(formula_freq[r["formula"]] for r in group) if group else 0.0
+
+    buckets: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for r in rows:
+        buckets[bucket_name(int(r["n_candidates"]))].append(r)
+
+    # Pool size vs molecule size within heavy-atom strata, to show whether the
+    # bucket effect is really a molecule-size effect.
+    strata = []
+    for label, pred in [
+        (f"small (<= {q1} heavy atoms)", lambda h: h <= q1),
+        (f"medium ({q1 + 1}-{q2})", lambda h: q1 < h <= q2),
+        (f"large (> {q2})", lambda h: h > q2),
+    ]:
+        group = [r for r in rows if pred(heavy_atom_count(r["formula"]))]
+        row_out = {"stratum": label, "n": len(group), "cells": []}
+        for plabel, ppred in [
+            ("<10 pool", lambda n: n < 10),
+            ("10-50 pool", lambda n: 10 <= n <= 50),
+            (">50 pool", lambda n: n > 50),
+        ]:
+            sub = [r for r in group if ppred(int(r["n_candidates"]))]
+            if not sub:
+                continue
+            n_fail = sum(1 for r in sub if float(r[MAIN_METHOD]) != 1.0)
+            row_out["cells"].append(
+                {
+                    "pool": plabel,
+                    "n": len(sub),
+                    "failures": n_fail,
+                    "rate_pct": 100.0 * n_fail / len(sub),
+                }
+            )
+        strata.append(row_out)
+
+    below_confirmed = [c for c in cases if c["below_confirmed"]]
+    return {
+        "bucket_n": len(small),
+        "bucket_failures": len(cases),
+        "bucket_rate_pct": 100.0 * len(cases) / len(small) if small else 0.0,
+        "cases": cases,
+        "isomers": len(isomers),
+        "below_confirmed": len(below_confirmed),
+        "below_tentative": sum(1 for c in cases if c["below_tentative"]),
+        "median_margin": statistics.median(c["margin"] for c in cases) if cases else None,
+        "mean_formula_freq_small": mean_freq(small),
+        "mean_formula_freq_large": mean_freq(
+            [r for r in rows if int(r["n_candidates"]) >= 10]
+        ),
+        "strata": strata,
+        "median_heavy_small": statistics.median(
+            heavy_atom_count(r["formula"]) for r in small
+        )
+        if small
+        else 0,
+        "median_heavy_all": statistics.median(all_heavy) if all_heavy else 0,
+        "glycoside_share_small": 100.0
+        * sum(1 for r in small if "glycoside" in r["cls"])
+        / len(small)
+        if small
+        else 0.0,
+        "glycoside_share_all": 100.0
+        * sum(1 for r in rows if "glycoside" in r["cls"])
+        / len(rows)
+        if rows
+        else 0.0,
+    }
+
+
 def localisation_section(part_b: list[dict[str, str]]) -> dict[str, Any]:
     usable = [
         r
@@ -352,6 +516,7 @@ def render(
     classes: list[dict[str, Any]],
     failures: dict[str, Any],
     localisation: dict[str, Any],
+    small_pool: dict[str, Any] | None = None,
 ) -> str:
     overall = sum(b["n"] * b["top1_pct"] for b in buckets) / sum(b["n"] for b in buckets)
     smallest = min(buckets, key=lambda b: b["top1_pct"])
@@ -379,7 +544,15 @@ def render(
         f"scaffold. Accuracy was lowest on the smallest decoy pools "
         f"(`{smallest['bucket']}`, {smallest['top1_pct']:.1f}%) and highest on "
         f"mid-sized pools (`{largest['bucket']}`, {largest['top1_pct']:.1f}%), so the "
-        f"headline figure is not propped up by easy small-pool cases. "
+        f"headline figure is not propped up by easy small-pool cases; the small-pool "
+        f"deficit reflects a higher share of large, glycosylated molecules rather "
+        f"than an intrinsic penalty for small pools. Of the "
+        f"{small_pool['bucket_failures'] if small_pool else 0} small-pool failures, "
+        f"{small_pool['below_confirmed'] if small_pool else 0} were near-ties whose "
+        f"score margins fall below the confirmed threshold, so the platform would "
+        f"have downgraded those claims rather than reporting them confidently, and "
+        f"{small_pool['bucket_failures'] - small_pool['below_confirmed'] if small_pool else 0} "
+        f"were genuine retrieval errors. "
         f"The site-localisation task covered {localisation['n']} compounds at a median "
         f"of {localisation['median_sites']:.0f} possible edit sites, with observed "
         f"accuracy of {localisation['overall_top1_pct']:.1f}% against a "
@@ -469,7 +642,160 @@ def render(
         "shift it by several points. Quote the breakdown, not the single number."
     )
     add("")
-    add("## 3. Failure modes")
+    add("## 3. Why small pools are harder")
+    add("")
+    if small_pool and small_pool["bucket_n"]:
+        sp = small_pool
+        add(
+            f"The `<10` bucket holds {sp['bucket_n']} compounds and fails "
+            f"{sp['bucket_failures']} of them ({sp['bucket_rate_pct']:.1f}%), "
+            "which is counterintuitive: a small decoy pool should be easier. "
+            "This section tests the two rival explanations."
+        )
+        add("")
+        add("### The six failures")
+        add("")
+        add(
+            "| Compound | Class | Rank | n | True score | Winner score | "
+            "Margin | Same formula | Same rings | Tanimoto |"
+        )
+        add("|---|---|---|---|---|---|---|---|---|---|")
+        for c in sorted(sp["cases"], key=lambda x: -x["margin"]):
+            if c["structure_parsable"]:
+                same_f = "yes" if c["same_formula"] else "no"
+                same_r = "yes" if c["same_ring_count"] else "no"
+                tan = f"{c['tanimoto']:.3f}" if c["tanimoto"] is not None else "n/a"
+            else:
+                same_f = same_r = tan = "n/a"
+            add(
+                f"| {c['name'][:48]} | {c['cls']} | {c['rank']:.0f} | "
+                f"{c['n_candidates']} | {c['score_true']:.3f} | "
+                f"{c['score_winner']:.3f} | {c['margin']:+.3f} | {same_f} | "
+                f"{same_r} | {tan} |"
+            )
+        add("")
+        add(
+            "Scores are distances (lower is better), so the margin is the "
+            "winner's advantage over the correct answer. `Same formula` and "
+            "`Same rings` come from RDKit; Tanimoto is the Morgan-fingerprint "
+            "similarity to the correct structure."
+        )
+        add("")
+        add("### Which explanation applies")
+        add("")
+        add(
+            f"**{sp['below_confirmed']} of {sp['bucket_failures']}** failures have "
+            f"a margin below `MIN_MARGIN_FOR_CONFIRMED` ({MIN_MARGIN_FOR_CONFIRMED}); "
+            f"**{sp['below_tentative']} of {sp['bucket_failures']}** falls below the "
+            f"tentative threshold ({MIN_MARGIN_FOR_TENTATIVE}). The median margin is "            f"**{sp['median_margin']:+.3f}**. All six share the molecular formula "
+            "and ring count of their top-1 pick, so every one is a constitutional "
+            f"isomer rather than an unrelated scaffold; **{sp['isomers']} of "
+            f"{sp['bucket_failures']}** also pass the Tanimoto >= 0.7 test. The "
+            "exception is D-fructose 2,6-bisphosphate (Tanimoto 0.56), still a "
+            "constitutional isomer but a structurally distant one."
+        )
+        add("")
+        add(
+            "**The answer is mixed, and neither explanation as posed is the "
+            "dominant one.**"
+        )
+        add("")
+        add(
+            f"1. **Explanation (b) -- honest ambiguity -- fits "
+            f"{sp['below_confirmed']} of {sp['bucket_failures']}.** CERNUOSIDE A "
+            "(margin +0.055) and CERNUOSIDE B (+0.013) are genuine near-ties. "
+            "Both would be reported below `confirmed`, and CERNUOSIDE B below "
+            "`tentative` as well. For these, the platform's honesty machinery "
+            "does what it should: it would not have claimed a confident top-1. "
+            "Note that the `AMBIGUOUS` verdict itself requires an *exact* tie "
+            "(`n_tied > 1`, tolerance 1e-8), so a small-but-nonzero margin yields "
+            "`tentative`/`candidate`, not `ambiguous`. Either way the claim is "
+            "downgraded."
+        )
+        add(
+            f"2. **Explanation (a) -- genuine prediction error -- fits "
+            f"{sp['bucket_failures'] - sp['below_confirmed']} of "
+            f"{sp['bucket_failures']}.** The three flavonoids and D-fructose "
+            "2,6-bisphosphate have margins of +0.13 to +0.29, well above the "
+            "confirmed threshold. Here the GNN ranked the wrong isomer clearly "
+            "ahead: these are real errors, and the platform would have reported "
+            "them confidently."
+        )
+        add("")
+        add(
+            "Explanation (a) is therefore the larger share by count "
+            f"({sp['bucket_failures'] - sp['below_confirmed']} vs "
+            f"{sp['below_confirmed']}), but it does not dominate cleanly: two of "
+            "the six are correctly downgraded rather than misreported."
+        )
+        add("")
+        add(
+            "**Measurement caveat.** The margin used here is the top-1 pick's "
+            "advantage over the *correct* answer, which is exactly what these "
+            "fixtures record. For the rank-3 failures there is a second "
+            "candidate between them whose score is not in the fixture, so the "
+            "top-1 pick's margin over its immediate runner-up could be smaller "
+            "than the figure shown. That can only *increase* the number of "
+            "near-ties the platform would downgrade, never decrease it: the "
+            "2-of-6 ambiguity count is a **lower bound**, and the 4-of-6 error "
+            "count an upper bound."
+        )
+        add("")
+        add(
+            "**The 'rare formula' mechanism does not hold.** Formula multiplicity "
+            f"is essentially identical between the small-pool and larger-pool "
+            f"compounds (mean {sp['mean_formula_freq_small']:.2f} vs "
+            f"{sp['mean_formula_freq_large']:.2f} occurrences in the 207-compound "
+            "set), so thin training coverage of unusual formulas is not what "
+            "separates this bucket."
+        )
+        add("")
+        add("### What actually drives the bucket: molecule size, not pool size")
+        add("")
+        add(
+            "Pool size and molecular size are confounded in this benchmark. "
+            f"Small pools contain larger molecules (median "
+            f"{sp['median_heavy_small']:.0f} heavy atoms vs "
+            f"{sp['median_heavy_all']:.0f} overall) and a much higher glycoside "
+            f"share ({sp['glycoside_share_small']:.0f}% vs "
+            f"{sp['glycoside_share_all']:.0f}%). Stratifying by heavy-atom count "
+            "shows where the failures actually live:"
+        )
+        add("")
+        add("| Molecule size | Pool | Compounds | Failures | Failure rate |")
+        add("|---|---|---|---|---|")
+        for s in sp["strata"]:
+            for cell in s["cells"]:
+                add(
+                    f"| {s['stratum']} | {cell['pool']} | {cell['n']} | "
+                    f"{cell['failures']} | {cell['rate_pct']:.1f}% |"
+                )
+        add("")
+        add(
+            "**Conclusion.** The `<10` bucket is harder because it is enriched in "
+            "large, glycosylated molecules, not because small pools are "
+            "intrinsically hard. In the large-molecule stratum the failure rate is "
+            "high at every pool size (15.6-25.0%), while in the small-molecule "
+            "stratum it is at or near zero (0.0-12.5%, and that single failure is "
+            "D-fructose 2,6-bisphosphate). The bucket effect is a composition "
+            "effect: pool size is standing in for molecule size."
+        )
+        add("")
+        add(
+            "**What this means for the platform.** Neither explanation is a "
+            "clean win or a clean loss. Two failures -- both large glycosides -- "
+            "are correctly downgraded by the honesty machinery, which is the "
+            "platform working as designed. Four are genuine errors: three "
+            "heavily oxygenated flavonoids and one sugar phosphate, all ranked "
+            "confidently wrong. The limitation to state externally is therefore "
+            "not \"rare formulas\" but **large, densely oxygenated "
+            "constitutional isomers**, where HSQC differences are confined to a "
+            "few carbons regardless of pool size."
+        )
+    else:
+        add("No small-pool records were available in the fixtures.")
+    add("")
+    add("## 4. Failure modes")
     add("")
     add(
         f"{failures['count']} of {failures['total_compounds']} compounds were not "
@@ -570,7 +896,7 @@ def render(
     for row in classes[:8]:
         add(f"| {row['cls']} | {row['n']} | {row['top1_pct']:.1f}% |")
     add("")
-    add("## 4. Site-localisation benchmark audit")
+    add("## 5. Site-localisation benchmark audit")
     add("")
     if localisation["n"]:
         add(
@@ -658,7 +984,7 @@ def render(
     else:
         add("No localisation records were available in the fixtures.")
     add("")
-    add("## 5. How to cite these numbers")
+    add("## 6. How to cite these numbers")
     add("")
     add("- Quote **92.3% top-1** only as *reproduction of SUMMIT v4* (ADR-0036).")
     add(
@@ -672,6 +998,19 @@ def render(
         f"sites**, and state that {localisation['at_most_two_n']}/{localisation['n']} "
         "cases had at most two sites."
     )
+    add(
+        "- When discussing the `<10` bucket, attribute it to **molecule size and "
+        "glycosylation**, not to pool size or rare formulas (ADR-0037)."
+    )
+    if small_pool and small_pool["bucket_failures"]:
+        add(
+            f"- Of the {small_pool['bucket_failures']} small-pool failures, "
+            f"{small_pool['below_confirmed']} are near-ties the platform would "
+            "have downgraded and "
+            f"{small_pool['bucket_failures'] - small_pool['below_confirmed']} are "
+            "genuine errors. Do not describe the bucket as entirely a success or "
+            "entirely a limitation."
+        )
     add("- Do not describe either number as independent validation (ADR-0036).")
     add("")
     return chr(10).join(lines)
@@ -691,8 +1030,9 @@ def main(argv: list[str] | None = None) -> int:
     classes = class_accuracy(per_compound)
     failures = failure_section(per_compound, failures_raw)
     localisation = localisation_section(part_b)
+    small_pool = small_pool_section(per_compound, failures_raw)
 
-    report = render(sizes, buckets, classes, failures, localisation)
+    report = render(sizes, buckets, classes, failures, localisation, small_pool)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(report + "\n", encoding="utf-8")
 

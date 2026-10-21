@@ -533,52 +533,110 @@ def _fixture_path() -> Path | None:
 
 
 class MockNMRSearchClient:
-    """Deterministic candidates derived from the local NP-MRD fixture.
+    """Deterministic candidates derived from the local HSQC fixtures.
 
-    The fixture is a literature-assigned andrographolide HSQC table.  It is
-    returned as one high-coverage hit, plus a small set of deterministic
-    variant records that exercise ranking, tolerance and licence handling
-    without inventing chemistry beyond the fixture's own peaks.
+    Four committed reference tables are loaded at init: andrographolide
+    (diterpene lactone, C20H30O5) plus three flavonoid aglycones --
+    kaempferol and luteolin (isomeric C15H10O6) and quercetin
+    (C15H10O7).  The flavonoid overlap is deliberate: kaempferol and
+    luteolin share a formula and most A/B-ring shifts, so an ambiguous
+    query returns both, which is exactly the situation the ranking and
+    licence logic must survive.
 
-    The variants are labelled ``local-fixture`` with an explicit note that
-    they are derived, so no test or caller can mistake them for genuine
+    Andrographolide additionally contributes two derived variant records
+    (carbon-only and solvent-shifted) that exercise tolerance handling;
+    they are labelled ``local-fixture`` with an explicit note that they
+    are derived, so no test or caller can mistake them for genuine
     database records.
     """
 
     name = "local-fixture"
 
+    #: One entry per committed reference table.  ``file`` is relative to
+    #: the fixture directory; the rest is record metadata.
+    _COMPOUNDS: tuple[dict[str, Any], ...] = (
+        {
+            "file": "andrographolide_hsqc_literature.csv",
+            "database_id": "FIXTURE-ANDROGRAPHOLIDE",
+            "name": "andrographolide (literature-assigned HSQC fixture)",
+            "smiles": "CC12CCC(C1CCC(=C)C2CC(C(=C)CO)O)O",
+            "formula": "C20H30O5",
+            "solvent": "DMSO-d6",
+            "url": "https://np-mrd.org",
+        },
+        {
+            "file": "kaempferol_hsqc.csv",
+            "database_id": "FIXTURE-KAEMPFEROL",
+            "name": "kaempferol (flavonol, literature-assigned HSQC fixture)",
+            "smiles": "C1=CC(=CC=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O",
+            "formula": "C15H10O6",
+            "solvent": "DMSO-d6",
+            "url": "https://np-mrd.org",
+        },
+        {
+            "file": "quercetin_hsqc.csv",
+            "database_id": "FIXTURE-QUERCETIN",
+            "name": "quercetin (flavonol, literature-assigned HSQC fixture)",
+            "smiles": "C1=C(C=C(C(=C1)C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O)O",
+            "formula": "C15H10O7",
+            "solvent": "DMSO-d6",
+            "url": "https://np-mrd.org",
+        },
+        {
+            "file": "luteolin_hsqc.csv",
+            "database_id": "FIXTURE-LUTEOLIN",
+            "name": "luteolin (flavone, literature-assigned HSQC fixture)",
+            "smiles": "C1=CC(=C(C=C1C2=CC(=O)C3=C(C=C(C=C3O2)O)O)O)O",
+            "formula": "C15H10O6",
+            "solvent": "DMSO-d6",
+            "url": "https://np-mrd.org",
+        },
+    )
+
     def __init__(self, fixture_dir: Path | str | None = None) -> None:
         self._fixture_dir = Path(fixture_dir) if fixture_dir else _fixture_path()
+        # Load once: search_by_peaks is called per request, and re-reading
+        # (and re-parsing) four CSVs on every query is waste the caller pays.
+        self._tables: dict[str, list[tuple[float, float]]] = {
+            compound["file"]: self._load_table(compound["file"])
+            for compound in self._COMPOUNDS
+        }
 
-    @property
-    def _primary_table(self) -> list[tuple[float, float]]:
+    def _load_table(self, filename: str) -> list[tuple[float, float]]:
+        """Parse one fixture CSV into (1H ppm, 13C ppm) pairs.
+
+        Lines starting with ``#`` are source/curatorial comments and are
+        skipped, so a fixture can cite its provenance in-file.
+        """
         if self._fixture_dir is None:
             return []
-        path = self._fixture_dir / "andrographolide_hsqc_literature.csv"
+        path = self._fixture_dir / filename
         if not path.is_file():
             return []
         pairs: list[tuple[float, float]] = []
         with path.open(newline="", encoding="utf-8") as handle:
-            for row in csv.DictReader(handle):
+            comment_stripped = (line for line in handle if not line.lstrip().startswith("#"))
+            for row in csv.DictReader(comment_stripped):
                 try:
                     pairs.append((float(row["dH"]), float(row["dC"])))
                 except (KeyError, TypeError, ValueError):
                     continue
         return pairs
 
+    @property
+    def _primary_table(self) -> list[tuple[float, float]]:
+        """The andrographolide table (the original fixture)."""
+        return self._tables.get("andrographolide_hsqc_literature.csv", [])
+
     def _records(self) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        for compound in self._COMPOUNDS:
+            table = self._tables.get(compound["file"], [])
+            if not table:
+                continue
+            records.append({**compound, "pairs": table})
+
         table = self._primary_table
-        records: list[dict[str, Any]] = [
-            {
-                "database_id": "FIXTURE-ANDROGRAPHOLIDE",
-                "name": "andrographolide (literature-assigned HSQC fixture)",
-                "smiles": "CC12CCC(C1CCC(=C)C2CC(C(=C)CO)O)O",
-                "formula": "C20H30O5",
-                "solvent": "DMSO-d6",
-                "pairs": table,
-                "url": "https://np-mrd.org",
-            }
-        ]
         if table:
             records.append(
                 {
@@ -619,21 +677,24 @@ class MockNMRSearchClient:
         for record in self._records():
             if not record["pairs"]:
                 continue
-            hits.append(
-                _hit_from_shift_table(
-                    database="local-fixture",
-                    database_id=record["database_id"],
-                    name=record["name"],
-                    reference=record["pairs"],
-                    query=peaks,
-                    h_tolerance=h_tolerance,
-                    c_tolerance=c_tolerance,
-                    smiles=record["smiles"],
-                    formula=record["formula"],
-                    solvent=record["solvent"],
-                    url=record["url"],
-                )
+            hit = _hit_from_shift_table(
+                database="local-fixture",
+                database_id=record["database_id"],
+                name=record["name"],
+                reference=record["pairs"],
+                query=peaks,
+                h_tolerance=h_tolerance,
+                c_tolerance=c_tolerance,
+                smiles=record["smiles"],
+                formula=record["formula"],
+                solvent=record["solvent"],
+                url=record["url"],
             )
+            # Redundant with rank_hits()'s zero-match filter, but kept as a
+            # client contract: callers should never see zero-match records,
+            # regardless of what downstream ranking does.
+            if hit.match.matched_peaks > 0:
+                hits.append(hit)
         return rank_hits(hits, max_results)
 
     def get_compound_shifts(

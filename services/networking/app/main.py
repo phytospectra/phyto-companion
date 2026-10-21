@@ -15,10 +15,13 @@ from functools import lru_cache
 from typing import Any, Literal
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from phyto_shared.provenance import ProvenanceBuilder, sha256_bytes
+
+from auth.config import AuthConfig
+from auth.install import install_auth
 
 from . import __version__
 from .bioactivity_networking import BioactivityNetwork, correlate_network
@@ -28,11 +31,7 @@ from .gnps_job_manager import GNPSJobManager
 from .network_visualization import network_summary, to_cytoscape_json, to_graphml
 from .nmr_networking import HSQCNetwork, HSQCSpectrum, build_hsqc_network
 
-app = FastAPI(
-    title="PhytoCompanion Networking Service",
-    version=__version__,
-    description="GNPS MS2 networking, HSQC networking, and their fusion.",
-)
+router = APIRouter()
 
 
 class _Runtime:
@@ -194,18 +193,7 @@ def _decode_network(b64: str, network_type: str):
 # ---------------------------------------------------------------------------
 
 
-@app.get("/health")
-def health() -> dict[str, Any]:
-    runtime = get_runtime()
-    return {
-        "status": "ok",
-        "service": "networking",
-        "version": __version__,
-        "gnps_client": type(runtime.client).__name__,
-    }
-
-
-@app.post("/networks/ms2", response_model=MS2SubmitResponse)
+@router.post("/networks/ms2", response_model=MS2SubmitResponse)
 async def submit_ms2(request: MS2SubmitRequest) -> MS2SubmitResponse:
     runtime = get_runtime()
     mgf = _decode(request.mgf_b64)
@@ -246,7 +234,7 @@ async def submit_ms2(request: MS2SubmitRequest) -> MS2SubmitResponse:
     )
 
 
-@app.get("/networks/ms2/{job_handle_id}", response_model=MS2StatusResponse)
+@router.get("/networks/ms2/{job_handle_id}", response_model=MS2StatusResponse)
 async def ms2_status(job_handle_id: str) -> MS2StatusResponse:
     runtime = get_runtime()
     try:
@@ -274,7 +262,7 @@ async def ms2_status(job_handle_id: str) -> MS2StatusResponse:
     )
 
 
-@app.post("/networks/hsqc", response_model=HSQCResponse)
+@router.post("/networks/hsqc", response_model=HSQCResponse)
 def hsqc_network(request: HSQCRequest) -> HSQCResponse:
     network = build_hsqc_network(request.spectra, request.distance_threshold)
     payload = request.model_dump_json().encode()
@@ -284,7 +272,7 @@ def hsqc_network(request: HSQCRequest) -> HSQCResponse:
     )
 
 
-@app.post("/networks/fused", response_model=FusedResponse)
+@router.post("/networks/fused", response_model=FusedResponse)
 async def fused_network(request: FusedRequest) -> FusedResponse:
     runtime = get_runtime()
     try:
@@ -321,7 +309,7 @@ async def fused_network(request: FusedRequest) -> FusedResponse:
     )
 
 
-@app.post("/networks/bioactivity", response_model=BioactivityResponse)
+@router.post("/networks/bioactivity", response_model=BioactivityResponse)
 def bioactivity(request: BioactivityRequest) -> BioactivityResponse:
     network = _decode_network(request.network_b64, "ms2")
     try:
@@ -350,7 +338,7 @@ def bioactivity(request: BioactivityRequest) -> BioactivityResponse:
     )
 
 
-@app.post("/networks/export/cytoscape", response_model=ExportResponse)
+@router.post("/networks/export/cytoscape", response_model=ExportResponse)
 def export_cytoscape(request: ExportRequest) -> ExportResponse:
     network = _decode_network(request.network_b64, request.network_type)
     return ExportResponse(
@@ -359,7 +347,7 @@ def export_cytoscape(request: ExportRequest) -> ExportResponse:
     )
 
 
-@app.post("/networks/export/graphml", response_model=ExportResponse)
+@router.post("/networks/export/graphml", response_model=ExportResponse)
 def export_graphml(request: ExportRequest) -> ExportResponse:
     network = _decode_network(request.network_b64, request.network_type)
     return ExportResponse(
@@ -368,10 +356,46 @@ def export_graphml(request: ExportRequest) -> ExportResponse:
     )
 
 
-@app.post("/networks/summary", response_model=ExportResponse)
+@router.post("/networks/summary", response_model=ExportResponse)
 def export_summary(request: ExportRequest) -> ExportResponse:
     network = _decode_network(request.network_b64, request.network_type)
     return ExportResponse(
         payload=network_summary(network),
         provenance_manifest_id=_manifest("network", _decode(request.network_b64)),
     )
+
+
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+
+def create_app(config: AuthConfig | None = None) -> FastAPI:
+    """Build the service app with the token layer installed.
+
+    Middleware is installed before routes are added so no endpoint can be
+    registered outside the metering boundary.
+    """
+    application = FastAPI(
+        title="PhytoCompanion Networking Service",
+        version=__version__,
+        description="GNPS MS2 networking, HSQC networking, and their fusion.",
+    )
+    cfg = install_auth(application, config)
+    application.include_router(router)
+
+    @application.get("/health")
+    def health() -> dict[str, Any]:
+        runtime = get_runtime()
+        return {
+            "status": "ok",
+            "service": "networking",
+            "version": __version__,
+            "gnps_client": type(runtime.client).__name__,
+            "dry_run": cfg.dry_run,
+        }
+
+    return application
+
+
+app = create_app()

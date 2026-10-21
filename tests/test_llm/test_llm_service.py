@@ -101,10 +101,10 @@ class TestOpenRouterClient:
         with pytest.raises(CloudServiceError, match="OPENROUTER_API_KEY"):
             client.complete("explain", [_paper()], "evidence")
 
-    def test_default_model_is_free_qwen(self, monkeypatch):
+    def test_default_model_is_free_gemma(self, monkeypatch):
         monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
         assert OpenRouterLLMClient(api_key="k").model_id == DEFAULT_OPENROUTER_MODEL
-        assert DEFAULT_OPENROUTER_MODEL == "qwen/qwen3-4b:free"
+        assert DEFAULT_OPENROUTER_MODEL == "google/gemma-4-31b-it:free"
 
     def test_model_is_configurable_by_env(self, monkeypatch):
         monkeypatch.setenv("OPENROUTER_MODEL", "meta-llama/llama-3-8b-instruct")
@@ -117,6 +117,8 @@ class TestOpenRouterClient:
         )
 
     def test_successful_completion_parses_usage_and_model(self):
+        # ``model`` must stay different from DEFAULT_OPENROUTER_MODEL: this
+        # asserts the served upstream is recorded, not the requested slug.
         def handler(request: httpx.Request) -> httpx.Response:
             assert request.url.path.endswith("/chat/completions")
             assert request.headers["Authorization"] == "Bearer test-key"

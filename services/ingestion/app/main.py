@@ -5,21 +5,20 @@ from __future__ import annotations
 import base64
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from phyto_shared.exceptions import InvalidInputError
 from phyto_shared.models import Spectrum
 from phyto_shared.provenance import ProvenanceBuilder, sha256_bytes
 
+from auth.config import AuthConfig
+from auth.install import install_auth
+
 from . import __version__
 from .nmr_parser import parse_hsqc_csv, parse_peak_1d_csv, parse_peak_csv
 
-app = FastAPI(
-    title="PhytoCompanion Ingestion Service",
-    version=__version__,
-    description="Spectral file parsing, validation, and provenance hashing.",
-)
+router = APIRouter()
 
 
 class PeakCSVRequest(BaseModel):
@@ -37,12 +36,7 @@ class SpectrumResponse(BaseModel):
     provenance_manifest_id: str
 
 
-@app.get("/health")
-def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "ingestion", "version": __version__}
-
-
-@app.post("/ingest/peak_csv", response_model=SpectrumResponse)
+@router.post("/ingest/peak_csv", response_model=SpectrumResponse)
 def ingest_peak_csv(request: PeakCSVRequest) -> SpectrumResponse:
     try:
         raw_bytes = base64.b64decode(request.content_b64, validate=True)
@@ -68,3 +62,37 @@ def ingest_peak_csv(request: PeakCSVRequest) -> SpectrumResponse:
         .manifest_hash
     )
     return SpectrumResponse(spectrum=spectrum, provenance_manifest_id=manifest_hash)
+
+
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+
+def create_app(config: AuthConfig | None = None) -> FastAPI:
+    """Build the service app with the token layer installed.
+
+    Middleware is installed before routes are added so no endpoint can be
+    registered outside the metering boundary.
+    """
+    application = FastAPI(
+        title="PhytoCompanion Ingestion Service",
+        version=__version__,
+        description="Spectral file parsing, validation, and provenance hashing.",
+    )
+    cfg = install_auth(application, config)
+    application.include_router(router)
+
+    @application.get("/health")
+    def health() -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "service": "ingestion",
+            "version": __version__,
+            "dry_run": cfg.dry_run,
+        }
+
+    return application
+
+
+app = create_app()

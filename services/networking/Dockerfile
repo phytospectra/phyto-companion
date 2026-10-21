@@ -10,10 +10,16 @@ COPY shared/ /srv/shared/
 COPY services/networking/pyproject.toml /srv/networking/pyproject.toml
 COPY services/networking/app/ /srv/networking/app/
 
-RUN pip install --no-cache-dir /srv/shared fastapi uvicorn httpx numpy scipy pandas networkx matplotlib \
+# The token layer is a shared library imported as ``auth`` by every
+# service. It is staged as /srv/auth (not /srv/auth/app) so the module
+# name matches the import, and /srv is on the path to expose it.
+COPY services/auth/app/ /srv/auth/
+
+RUN pip install --no-cache-dir /srv/shared firebase-admin google-cloud-firestore google-cloud-pubsub fastapi uvicorn httpx numpy scipy pandas networkx matplotlib \
     && pip install --no-cache-dir /srv/networking
 
 ENV PHYTO_ENV=cloud
+ENV PYTHONPATH=/srv
 EXPOSE 8080
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

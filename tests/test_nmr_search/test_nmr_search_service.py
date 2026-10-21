@@ -275,3 +275,106 @@ class TestNMRShiftDB2Parsing:
         client = NMRShiftDB2Client()
         assert client.name == "nmrshiftdb2"
         assert LICENSES["nmrshiftdb2"].commercial_use is True
+
+
+# ---------------------------------------------------------------------------
+# Flavonoid fixtures (kaempferol / quercetin / luteolin)
+# ---------------------------------------------------------------------------
+
+
+def _reference_peaks(database_id: str) -> list[tuple[float, float]]:
+    """Query peaks taken straight from a fixture's reference table."""
+    result = MockNMRSearchClient().get_compound_shifts(
+        name=None, database_id=database_id
+    )
+    assert result is not None, f"fixture {database_id} did not load"
+    return [(h, c) for _label, h, c in result.shifts]
+
+
+class TestFlavonoidFixtures:
+    def _client(self) -> MockNMRSearchClient:
+        return MockNMRSearchClient()
+
+    def test_all_four_compounds_load(self):
+        tables = self._client()._tables
+        assert set(tables) == {
+            "andrographolide_hsqc_literature.csv",
+            "kaempferol_hsqc.csv",
+            "quercetin_hsqc.csv",
+            "luteolin_hsqc.csv",
+        }
+        assert all(len(peaks) > 0 for peaks in tables.values())
+
+    def test_comment_lines_do_not_leak_into_tables(self):
+        # Each flavonoid fixture opens with provenance comments; none of them
+        # may be parsed as a data row.
+        for database_id in ("FIXTURE-KAEMPFEROL", "FIXTURE-LUTEOLIN", "FIXTURE-QUERCETIN"):
+            assert _reference_peaks(database_id), f"{database_id} parsed empty"
+            for h, c in _reference_peaks(database_id):
+                assert 0.0 < h < 12.0
+                assert 0.0 < c < 220.0
+
+    def test_kaempferol_query_returns_kaempferol_top1(self):
+        query = _reference_peaks("FIXTURE-KAEMPFEROL")
+        hits = self._client().search_by_peaks(query, 0.05, 1.0, 10)
+        assert hits, "kaempferol query returned no candidates"
+        assert hits[0].database_id == "FIXTURE-KAEMPFEROL"
+        assert hits[0].match.coverage == 1.0
+
+    def test_luteolin_query_returns_luteolin_top1(self):
+        query = _reference_peaks("FIXTURE-LUTEOLIN")
+        hits = self._client().search_by_peaks(query, 0.05, 1.0, 10)
+        assert hits, "luteolin query returned no candidates"
+        assert hits[0].database_id == "FIXTURE-LUTEOLIN"
+        assert hits[0].match.coverage == 1.0
+
+    def test_quercetin_query_returns_quercetin_top1(self):
+        query = _reference_peaks("FIXTURE-QUERCETIN")
+        hits = self._client().search_by_peaks(query, 0.05, 1.0, 10)
+        assert hits
+        assert hits[0].database_id == "FIXTURE-QUERCETIN"
+
+    def test_isomeric_overlap_returns_both_candidates(self):
+        # Kaempferol and luteolin are C15H10O6 isomers sharing most A/B-ring
+        # shifts: a kaempferol query must surface luteolin as a plausible --
+        # lower-ranked -- candidate rather than suppressing it.
+        query = _reference_peaks("FIXTURE-KAEMPFEROL")
+        hits = self._client().search_by_peaks(query, 0.05, 1.0, 10)
+        ids = [hit.database_id for hit in hits]
+        assert ids[0] == "FIXTURE-KAEMPFEROL"
+        assert "FIXTURE-LUTEOLIN" in ids
+        luteolin = hits[ids.index("FIXTURE-LUTEOLIN")]
+        assert 0.0 < luteolin.match.coverage < 1.0
+
+    def test_ambiguous_mixed_query_returns_both(self):
+        mixed = [
+            _reference_peaks("FIXTURE-KAEMPFEROL")[0],   # H-6 region
+            _reference_peaks("FIXTURE-KAEMPFEROL")[2],   # H-2'/6' region
+            _reference_peaks("FIXTURE-LUTEOLIN")[0],     # H-3 (flavone only)
+            _reference_peaks("FIXTURE-LUTEOLIN")[-1],    # H-6' region
+        ]
+        hits = self._client().search_by_peaks(mixed, 0.05, 1.0, 10)
+        ids = {hit.database_id for hit in hits}
+        assert {"FIXTURE-KAEMPFEROL", "FIXTURE-LUTEOLIN"} <= ids
+
+    def test_records_without_any_matching_peak_are_not_candidates(self):
+        # Aliphatic andrographolide peaks must not surface flavonoid records.
+        hits = self._client().search_by_peaks(FIXTURE_PEAKS, 0.05, 1.0, 10)
+        ids = {hit.database_id for hit in hits}
+        assert ids <= {
+            "FIXTURE-ANDROGRAPHOLIDE",
+            "FIXTURE-ANDROGRAPHOLIDE-13C",
+            "FIXTURE-ANDROGRAPHOLIDE-SHIFTED",
+        }
+
+    def test_compound_shifts_resolves_each_flavonoid(self):
+        for needle, expected in (
+            ("kaempferol", "FIXTURE-KAEMPFEROL"),
+            ("quercetin", "FIXTURE-QUERCETIN"),
+            ("luteolin", "FIXTURE-LUTEOLIN"),
+        ):
+            result = self._client().get_compound_shifts(name=needle, database_id=None)
+            assert result is not None
+            assert result.database_id == expected
+            assert result.shifts
+            assert result.license.commercial_use is False

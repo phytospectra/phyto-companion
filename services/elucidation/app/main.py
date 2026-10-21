@@ -11,13 +11,16 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict
 from rdkit import Chem
 
 from phyto_shared.exceptions import InvalidInputError
 from phyto_shared.models import Candidate, CandidateRank, EvidenceGraph
 from phyto_shared.provenance import ProvenanceBuilder, sha256_dict
+
+from auth.config import AuthConfig
+from auth.install import install_auth
 
 from . import __version__
 from .candidate_ranker import (
@@ -32,11 +35,7 @@ from .shift_predictor import get_shift_predictor
 from .site_localization import SiteLocalization, localize_site
 from .structure_db import MockStructureDB
 
-app = FastAPI(
-    title="PhytoCompanion Elucidation Service",
-    version=__version__,
-    description="Shift prediction, matching, ranking, and novel structure generation.",
-)
+router = APIRouter()
 
 
 class _Runtime:
@@ -137,19 +136,7 @@ def _manifest(payload: BaseModel) -> str:
 # ---------------------------------------------------------------------------
 
 
-@app.get("/health")
-def health() -> dict[str, Any]:
-    runtime = get_runtime()
-    return {
-        "status": "ok",
-        "service": "elucidation",
-        "version": __version__,
-        "predictor": type(runtime.predictor).__name__,
-        "db_size": len(runtime.db._candidates),
-    }
-
-
-@app.post("/elucidate/candidates", response_model=CandidatesResponse)
+@router.post("/elucidate/candidates", response_model=CandidatesResponse)
 def elucidate_candidates(request: CandidatesRequest) -> CandidatesResponse:
     runtime = get_runtime()
     try:
@@ -169,7 +156,7 @@ def elucidate_candidates(request: CandidatesRequest) -> CandidatesResponse:
     )
 
 
-@app.post("/elucidate/novel", response_model=NovelResponse)
+@router.post("/elucidate/novel", response_model=NovelResponse)
 def elucidate_novel(request: NovelRequest) -> NovelResponse:
     runtime = get_runtime()
     parent = runtime.db.candidate_by_inchikey(request.parent_ik)
@@ -196,7 +183,7 @@ def elucidate_novel(request: NovelRequest) -> NovelResponse:
     )
 
 
-@app.post("/elucidate/localize", response_model=LocalizeResponse)
+@router.post("/elucidate/localize", response_model=LocalizeResponse)
 def elucidate_localize(request: LocalizeRequest) -> LocalizeResponse:
     runtime = get_runtime()
     parent = runtime.db.candidate_by_inchikey(request.parent_ik)
@@ -254,9 +241,46 @@ def elucidate_localize(request: LocalizeRequest) -> LocalizeResponse:
     )
 
 
-@app.post("/elucidate/evidence", response_model=EvidenceResponse)
+@router.post("/elucidate/evidence", response_model=EvidenceResponse)
 def elucidate_evidence(request: EvidenceRequest) -> EvidenceResponse:
     graph = build_evidence_graph(request.rank, request.observed)
     return EvidenceResponse(
         evidence_graph=graph, provenance_manifest_id=_manifest(request)
     )
+
+
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+
+def create_app(config: AuthConfig | None = None) -> FastAPI:
+    """Build the service app with the token layer installed.
+
+    Middleware is installed before routes are added so no endpoint can be
+    registered outside the metering boundary.
+    """
+    application = FastAPI(
+        title="PhytoCompanion Elucidation Service",
+        version=__version__,
+        description="Shift prediction, matching, ranking, and novel structure generation.",
+    )
+    cfg = install_auth(application, config)
+    application.include_router(router)
+
+    @application.get("/health")
+    def health() -> dict[str, Any]:
+        runtime = get_runtime()
+        return {
+            "status": "ok",
+            "service": "elucidation",
+            "version": __version__,
+            "predictor": type(runtime.predictor).__name__,
+            "db_size": len(runtime.db._candidates),
+            "dry_run": cfg.dry_run,
+        }
+
+    return application
+
+
+app = create_app()

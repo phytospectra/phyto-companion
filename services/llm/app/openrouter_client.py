@@ -29,10 +29,14 @@ from .clients import LLMCompletion, _estimate_tokens, system_instruction
 
 __all__ = ["OpenRouterLLMClient", "DEFAULT_OPENROUTER_MODEL"]
 
-# A small, free Qwen model: cheap enough to exercise the full pipeline in
-# development without a paid key, and strong enough to follow the citation
-# instruction.  Overridden by OPENROUTER_MODEL.
-DEFAULT_OPENROUTER_MODEL = "qwen/qwen3-4b:free"
+# Instruction-tuned 31B model on OpenRouter's free tier: strong enough to
+# follow the citation instruction and sized for RAG context.
+# Fallback if rate-limited: xingchen-agi/xing4.0-29b-a4b:free
+# OpenRouter's free tier rotates monthly. Verify availability with:
+#   curl -s https://openrouter.ai/api/v1/models | python3 -c \
+#     'import sys,json; [print(m["id"]) for m in json.load(sys.stdin)["data"] if ":free" in m["id"]]'
+# Overridden by OPENROUTER_MODEL.
+DEFAULT_OPENROUTER_MODEL = "google/gemma-4-31b-it:free"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 
 

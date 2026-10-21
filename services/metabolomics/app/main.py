@@ -11,11 +11,14 @@ from functools import lru_cache
 from typing import Any
 
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from phyto_shared.exceptions import InvalidInputError
 from phyto_shared.provenance import ProvenanceBuilder, sha256_dict
+
+from auth.config import AuthConfig
+from auth.install import install_auth
 
 from . import __version__
 from .differential_analysis import compare_groups, dose_response_analysis, time_course_analysis, volcano_plot_data
@@ -33,11 +36,7 @@ from .statistics import (
     univariate_test,
 )
 
-app = FastAPI(
-    title="PhytoCompanion Metabolomics Service",
-    version=__version__,
-    description="Feature detection, normalization, statistics, fusion, enrichment, QC.",
-)
+router = APIRouter()
 
 
 class _Runtime:
@@ -158,17 +157,7 @@ def _labels_for(table: FeatureTable, labels: dict[str, str]) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-@app.get("/health")
-def health() -> dict[str, Any]:
-    return {
-        "status": "ok",
-        "service": "metabolomics",
-        "version": __version__,
-        "detector": type(get_runtime().detector).__name__,
-    }
-
-
-@app.post("/metabolomics/detect", response_model=DetectResponse)
+@router.post("/metabolomics/detect", response_model=DetectResponse)
 def detect(request: DetectRequest) -> DetectResponse:
     from pathlib import Path
 
@@ -184,7 +173,7 @@ def detect(request: DetectRequest) -> DetectResponse:
     )
 
 
-@app.post("/metabolomics/normalize", response_model=TableResponse)
+@router.post("/metabolomics/normalize", response_model=TableResponse)
 def normalize_endpoint(request: NormalizeRequest) -> TableResponse:
     try:
         table = normalize(request.table, request.method, request.params)
@@ -196,7 +185,7 @@ def normalize_endpoint(request: NormalizeRequest) -> TableResponse:
     )
 
 
-@app.post("/metabolomics/qc", response_model=TableResponse | dict)
+@router.post("/metabolomics/qc", response_model=TableResponse | dict)
 def qc_endpoint(request: QCRequest) -> dict[str, Any]:
     try:
         corrected = qc_correction(request.table, request.qc_samples)
@@ -213,7 +202,7 @@ def qc_endpoint(request: QCRequest) -> dict[str, Any]:
     }
 
 
-@app.post("/metabolomics/statistics")
+@router.post("/metabolomics/statistics")
 def statistics_endpoint(request: StatisticsRequest) -> dict[str, Any]:
     labels = _labels_for(request.table, request.labels)
     result: dict[str, Any] = {}
@@ -248,7 +237,7 @@ def statistics_endpoint(request: StatisticsRequest) -> dict[str, Any]:
     return result
 
 
-@app.post("/metabolomics/differential")
+@router.post("/metabolomics/differential")
 def differential_endpoint(request: DifferentialRequest) -> dict[str, Any]:
     try:
         result = compare_groups(
@@ -263,7 +252,7 @@ def differential_endpoint(request: DifferentialRequest) -> dict[str, Any]:
     }
 
 
-@app.post("/metabolomics/fusion")
+@router.post("/metabolomics/fusion")
 def fusion_endpoint(request: BlocksRequest) -> dict[str, Any]:
     blocks = {
         name: np.asarray(block, dtype=float)
@@ -288,7 +277,7 @@ def fusion_endpoint(request: BlocksRequest) -> dict[str, Any]:
     return result
 
 
-@app.post("/metabolomics/enrich")
+@router.post("/metabolomics/enrich")
 def enrich_endpoint(request: EnrichRequest) -> dict[str, Any]:
     try:
         enrichment = enrich_kegg(
@@ -302,3 +291,38 @@ def enrich_endpoint(request: EnrichRequest) -> dict[str, Any]:
         "enrichment": enrichment.model_dump(),
         "provenance_manifest_id": _manifest(request, [enrichment.test]),
     }
+
+
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+
+def create_app(config: AuthConfig | None = None) -> FastAPI:
+    """Build the service app with the token layer installed.
+
+    Middleware is installed before routes are added so no endpoint can be
+    registered outside the metering boundary.
+    """
+    application = FastAPI(
+        title="PhytoCompanion Metabolomics Service",
+        version=__version__,
+        description="Feature detection, normalization, statistics, fusion, enrichment, QC.",
+    )
+    cfg = install_auth(application, config)
+    application.include_router(router)
+
+    @application.get("/health")
+    def health() -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "service": "metabolomics",
+            "version": __version__,
+            "detector": type(get_runtime().detector).__name__,
+            "dry_run": cfg.dry_run,
+        }
+
+    return application
+
+
+app = create_app()

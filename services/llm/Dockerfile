@@ -20,13 +20,19 @@ COPY shared/ /srv/shared/
 COPY services/llm/pyproject.toml /srv/llm/pyproject.toml
 COPY services/llm/app/ /srv/llm/app/
 
-RUN pip install --no-cache-dir /srv/shared fastapi uvicorn httpx \
+# The token layer is a shared library imported as ``auth`` by every
+# service. It is staged as /srv/auth (not /srv/auth/app) so the module
+# name matches the import, and /srv is on the path to expose it.
+COPY services/auth/app/ /srv/auth/
+
+RUN pip install --no-cache-dir /srv/shared firebase-admin google-cloud-firestore google-cloud-pubsub fastapi uvicorn httpx \
         google-cloud-aiplatform \
     && pip install --no-cache-dir /srv/llm
 
 # VERTEX_ENDPOINT_ID / GOOGLE_CLOUD_PROJECT / OPENROUTER_API_KEY come from
 # Secret Manager at runtime (ADR-0032/ADR-0034); no credentials are baked in.
 ENV PHYTO_ENV=cloud
+ENV PYTHONPATH=/srv
 ENV PORT=8080
 EXPOSE 8080
 

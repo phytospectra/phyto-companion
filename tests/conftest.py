@@ -36,6 +36,8 @@ _alias_package("pharmacology", "pharmacology")
 
 _alias_package("ingestion", "ingestion")
 _alias_package("auth", "auth")
+# ``auth`` resolves to services/auth/app, so sibling services import
+# ``auth.config`` / ``auth.install`` exactly as they do in the container.
 _alias_package("billing", "billing")
 _alias_package("literature", "literature")
 _alias_package("llm", "llm")

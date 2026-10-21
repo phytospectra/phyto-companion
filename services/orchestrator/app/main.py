@@ -5,6 +5,16 @@ Local plane: every tool runs through the deterministic mock executor and
 Cloud plane: the same endpoints delegate to the real tool services
 (integrated in Steps 4-6) -- the API surface does not change.
 
+Growth features hosted here (the auth service hosts the account surface):
+
+* Citations: every completed run mints a citable identifier;
+  ``GET /runs/{run_id}/citation`` is free (ADR-0043).
+* Share URLs: HMAC-signed read-only links, unauthenticated
+  ``GET /share/{token}`` with an "Open in Phytospectra" CTA (ADR-0044).
+* Onboarding: ``GET /onboarding/first-story`` (ADR-0045).
+* Cohort analytics: admin endpoints over the audit chain (ADR-0048).
+* Audit export: department-and-above plan gate (ADR-0047).
+
 Run locally::
 
     uvicorn app.main:app --app-dir services/orchestrator --port 8000
@@ -19,25 +29,41 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from phyto_shared.analytics import emit_event
+from phyto_shared.citation import (
+    CitationRecord,
+    MockDOIRegistrar,
+    build_citation_record,
+    doi_from_identifier,
+    mint_analysis_doi,
+)
 from phyto_shared.constants import ToolTier
+from phyto_shared.plans import plan_features
 from phyto_shared.provenance import ProvenanceBuilder, sha256_dict
 from phyto_shared.schemas import AnalysisRequest, AnalysisResponse
+from phyto_shared.share import (
+    ShareTokenManager,
+    share_url_for,
+)
+from phyto_shared.token_pricing import COST_MODEL_VERSION, cost_for_route
+
+from auth.config import AuthConfig
+from auth.install import install_auth
 
 from . import __version__
 from .audit_logger import ChainedAuditLogger
+from .cohort_analytics import InMemoryCohortStore, run_cohort_job
+from .onboarding import first_story_summary
 from .planner_agent import EngineResult, PlannerAgent, TaskGraph, WorkflowEngine
 from .qa_critic_agent import QACriticAgent
+from .rate_limit import DEFAULT_SHARE_RATE_LIMIT, SlidingWindowRateLimiter
 from .tool_registry import DEFAULT_REGISTRY, MockToolExecutor
 from .tool_tiering import ExecutionContext, HumanCheckpoint
 
-app = FastAPI(
-    title="PhytoCompanion Orchestrator",
-    version=__version__,
-    description="Plans, delegates, verifies, and logs analysis workflows.",
-)
+router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
@@ -64,9 +90,23 @@ class _Runtime:
             audit=self.audit,
             qa_critic=QACriticAgent(),  # rule-based verification, no LLM needed
         )
-        # run_id -> {"graph": TaskGraph, "context": ExecutionContext, "result": EngineResult}
+        # run_id -> {"graph", "context", "result", "request", "citation",
+        #            "share_token"}
         self.runs: dict[str, dict[str, Any]] = {}
         self.manifests: dict[str, str] = {}
+        # Share tokens: HMAC-signed read-only links (ADR-0044).  The dev
+        # HMAC key is fine only in dry-run; from_env refuses to mint with
+        # it in production.
+        self.share_manager = ShareTokenManager.from_env()
+        self.rate_limiter = SlidingWindowRateLimiter(
+            max_requests=int(
+                os.environ.get("SHARE_RATE_LIMIT_PER_MIN", str(DEFAULT_SHARE_RATE_LIMIT))
+            )
+        )
+        self.cohort_store = InMemoryCohortStore()
+        # DOI registration is deferred and gated (ADR-0043): without
+        # ZENODO_TOKEN the canonical id is used and this stays None.
+        self.doi_registrar = MockDOIRegistrar() if os.environ.get("PHYTO_DRY_RUN", "1") == "1" else None
 
 
 @lru_cache(maxsize=1)
@@ -101,6 +141,7 @@ class RunStatusResponse(BaseModel):
     task_counts: dict[str, int]
     tasks: list[TaskSummary]
     provenance_manifest_id: str
+    citation: CitationRecord | None = None
 
 
 class ApproveRequest(BaseModel):
@@ -118,6 +159,21 @@ class ApproveResponse(BaseModel):
     status: Literal["complete", "failed", "awaiting_review"]
     awaiting_task_id: str | None
     provenance_manifest_id: str
+    citation: CitationRecord | None = None
+
+
+class ShareCreateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    share_url: str
+    expires_at: str
+    scope: str
+
+
+class ShareCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expires_in_days: int = Field(default=30, ge=1, le=365)
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +208,7 @@ def _run_status_payload(run_id: str, runtime: _Runtime) -> RunStatusResponse:
             for task in graph.tasks
         ],
         provenance_manifest_id=runtime.manifests[run_id],
+        citation=entry.get("citation"),
     )
 
 
@@ -175,25 +232,253 @@ def _status_literal(result: EngineResult) -> Literal[
     return result.status  # engine statuses are already valid API statuses
 
 
+def _request_user(request: Request | None):
+    return getattr(request.state, "user", None) if request is not None else None
+
+
+def _tier_for_plan(plan: str | None) -> str:
+    """Model tier the run's user is routed to (ADR-0046)."""
+    if not plan:
+        return "unknown"
+    return "distilled" if plan_features(plan).distilled_llm else "full"
+
+
+def _analytics_user(request: Request | None) -> str:
+    user = _request_user(request)
+    return user.uid if user is not None else "anonymous-local"
+
+
+def _analytics_plan(request: Request | None) -> str | None:
+    return getattr(request.state, "plan", None) if request is not None else None
+
+
+def _analytics_workspace(request: Request | None) -> str | None:
+    return getattr(request.state, "workspace_id", None) if request is not None else None
+
+
+def _record_run_events(
+    runtime: _Runtime,
+    *,
+    request: Request | None,
+    run_id: str,
+    analysis: AnalysisRequest,
+    result: EngineResult,
+) -> None:
+    """Emit the spec'd cohort events for one run (ADR-0048)."""
+    user_id = _analytics_user(request)
+    plan = _analytics_plan(request)
+    emit_event(
+        runtime.audit,
+        "run_started",
+        user_id=user_id,
+        run_id=run_id,
+        properties={
+            "run_id": run_id,
+            "workspace_id": _analytics_workspace(request),
+            "plan": plan,
+        },
+    )
+    if result.status == "complete":
+        tokens_consumed = (
+            cost_for_route("POST", "/analysis").tokens
+            if cost_for_route("POST", "/analysis")
+            else 0
+        )
+        emit_event(
+            runtime.audit,
+            "run_completed",
+            user_id=user_id,
+            run_id=run_id,
+            properties={
+                "run_id": run_id,
+                "tokens_consumed": tokens_consumed,
+                "model_tier": _tier_for_plan(plan),
+                "cost_usd": result.cost_estimate_usd,
+            },
+        )
+
+
+def _mint_citation(
+    runtime: _Runtime,
+    *,
+    run_id: str,
+    analysis: AnalysisRequest,
+    request: Request | None,
+) -> CitationRecord:
+    """Mint (once per run) the citable identifier (ADR-0043)."""
+    entry = runtime.runs[run_id]
+    if entry.get("citation") is not None:
+        return entry["citation"]
+
+    user = _request_user(request)
+    authors = [user.email or user.uid] if user is not None else ["Anonymous"]
+    title = (
+        f"Phytospectra analysis of sample {analysis.sample_id} "
+        f"({analysis.workflow} workflow)"
+    )
+    chain_head = (
+        runtime.audit.records()[-1]["record_hash"]
+        if runtime.audit.records()
+        else "0" * 64
+    )
+    identifier = mint_analysis_doi(
+        run_id,
+        {
+            "title": title,
+            "authors": authors,
+            "description": f"Provenance manifest {runtime.manifests[run_id]}",
+            "provenance_manifest_hash": runtime.manifests[run_id],
+            "audit_chain_head": chain_head,
+        },
+        registrar=runtime.doi_registrar,
+    )
+    record = build_citation_record(
+        run_id=run_id,
+        title=title,
+        authors=authors,
+        model_version=f"orchestrator:{__version__}",
+        cost_model_version=COST_MODEL_VERSION,
+        provenance_manifest_hash=runtime.manifests[run_id],
+        audit_chain_head=chain_head,
+        doi=doi_from_identifier(identifier),
+    )
+    entry["citation"] = record
+    return record
+
+
+_REDACT_KEYS = frozenset({"user_id", "email", "uid", "actor", "user_email"})
+
+
+def _redact(value: Any) -> Any:
+    """Strip identity fields from a share view (ADR-0044: no user data)."""
+    if isinstance(value, dict):
+        return {
+            key: _redact(item)
+            for key, item in value.items()
+            if key not in _REDACT_KEYS
+        }
+    if isinstance(value, list):
+        return [_redact(item) for item in value]
+    return value
+
+
+_EVIDENCE_OUTPUT_KEYS = frozenset(
+    {"grounding_score", "explanation", "hypothesis", "evidence", "confidence"}
+)
+
+
+def _share_view(run_id: str, runtime: _Runtime) -> dict[str, Any]:
+    """The read-only view a share token unlocks (ADR-0044).
+
+    Sample metadata, task graph, artifacts, citation, evidence panels and
+    the (redacted) audit tail.  Never the user's identity, never raw
+    uploads (the orchestrator never holds them; ingestion does).
+    """
+    entry = runtime.runs[run_id]
+    graph: TaskGraph = entry["graph"]
+    result: EngineResult = entry["result"]
+    analysis: AnalysisRequest = entry["request"]
+
+    tasks = [
+        {
+            "id": task.id,
+            "description": task.description,
+            "tool": task.tool,
+            "status": task.status,
+            "requires_checkpoint": (
+                str(task.requires_checkpoint) if task.requires_checkpoint else None
+            ),
+        }
+        for task in graph.tasks
+    ]
+    artifacts = {
+        task.id: {
+            "tool": task.tool,
+            "status": task.status,
+            "output_keys": sorted(task.output.keys()) if isinstance(task.output, dict) else [],
+        }
+        for task in graph.tasks
+        if task.status == "complete" and task.tool is not None
+    }
+    evidence_panels = [
+        {
+            "task_id": task.id,
+            "tool": task.tool,
+            "output": _redact(task.output),
+        }
+        for task in graph.tasks
+        if isinstance(task.output, dict)
+        and _EVIDENCE_OUTPUT_KEYS & set(task.output.keys())
+    ]
+    audit_tail = [
+        _redact(record)
+        for record in runtime.audit.records()
+        if record.get("run_id") == run_id
+    ][-50:]
+
+    citation = entry.get("citation")
+    return {
+        "run_id": run_id,
+        "status": result.status,
+        "sample": {
+            "sample_id": analysis.sample_id,
+            "workflow": analysis.workflow,
+            "parameters": analysis.parameters,
+            "dry_run": analysis.dry_run,
+        },
+        "task_graph": tasks,
+        "artifacts": artifacts,
+        "evidence_panels": evidence_panels,
+        "audit_tail": audit_tail,
+        "citation": citation.model_dump(mode="json") if citation else None,
+        "note": "read-only shared view; raw uploads are never exposed",
+        "cta": {
+            "label": "Open in Phytospectra",
+            "url": (
+                f"{os.environ.get('PHYTO_APP_BASE_URL', 'https://app.phytospectra.com')}"
+                "/analysis/new"
+            ),
+            "prefill": {
+                "sample_id": analysis.sample_id,
+                "workflow": analysis.workflow,
+            },
+        },
+    }
+
+
+def _require_admin(request: Request) -> None:
+    user = getattr(request.state, "user", None)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    admin_uids = {
+        uid.strip()
+        for uid in os.environ.get("PHYTO_ADMIN_UIDS", "").split(",")
+        if uid.strip()
+    }
+    if user.claims.get("role") != "admin" and user.uid not in admin_uids:
+        raise HTTPException(status_code=403, detail="Admin role required.")
+
+
+def _require_plan(request: Request, minimum: str) -> None:
+    from phyto_shared.plans import plan_at_or_above
+
+    user = getattr(request.state, "user", None)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    plan = getattr(request.state, "plan", None) or user.claims.get("plan")
+    if not plan_at_or_above(plan, minimum):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Requires the {minimum} plan or above (current: {plan or 'free'}).",
+        )
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
 
-@app.get("/health")
-def health() -> dict[str, Any]:
-    runtime = get_runtime()
-    return {
-        "status": "ok",
-        "service": "orchestrator",
-        "version": __version__,
-        "environment": runtime.environment,
-        "registry_size": len(runtime.registry),
-        "audit_records": len(runtime.audit.records()),
-    }
-
-
-@app.get("/tools")
+@router.get("/tools")
 def list_tools(
     tier: int | None = None,
     enabled_in_dry_run: bool | None = None,
@@ -203,8 +488,8 @@ def list_tools(
     return [
         {
             "name": spec.name,
-            "tier": int(spec.tier),
             "description": spec.description,
+            "tier": int(spec.tier),
             "estimated_cost_seconds": spec.estimated_cost_seconds,
             "requires_network": spec.requires_network,
             "requires_gpu": spec.requires_gpu,
@@ -216,8 +501,8 @@ def list_tools(
     ]
 
 
-@app.post("/analysis", response_model=AnalysisResponse, status_code=200)
-def submit_analysis(request: AnalysisRequest) -> AnalysisResponse:
+@router.post("/analysis", response_model=AnalysisResponse, status_code=200)
+def submit_analysis(request: AnalysisRequest, http_request: Request) -> AnalysisResponse:
     runtime = get_runtime()
     run_id = f"run-{uuid.uuid4().hex[:12]}"
     manifest_id = _build_manifest(run_id, request)
@@ -242,7 +527,21 @@ def submit_analysis(request: AnalysisRequest) -> AnalysisResponse:
         actor="api",
     )
     result = runtime.engine.run(graph, context)
-    runtime.runs[run_id] = {"graph": graph, "context": context, "result": result}
+    runtime.runs[run_id] = {
+        "graph": graph,
+        "context": context,
+        "result": result,
+        "request": request,
+        "citation": None,
+        "share_token": None,
+    }
+
+    _record_run_events(runtime, request=http_request, run_id=run_id, analysis=request, result=result)
+    citation = None
+    if result.status == "complete":
+        citation = _mint_citation(
+            runtime, run_id=run_id, analysis=request, request=http_request
+        )
 
     awaiting = result.awaiting_task_id
     return AnalysisResponse(
@@ -260,7 +559,7 @@ def submit_analysis(request: AnalysisRequest) -> AnalysisResponse:
     )
 
 
-@app.get("/runs/{run_id}", response_model=RunStatusResponse)
+@router.get("/runs/{run_id}", response_model=RunStatusResponse)
 def get_run(run_id: str) -> RunStatusResponse:
     runtime = get_runtime()
     if run_id not in runtime.runs:
@@ -268,8 +567,10 @@ def get_run(run_id: str) -> RunStatusResponse:
     return _run_status_payload(run_id, runtime)
 
 
-@app.post("/runs/{run_id}/approve", response_model=ApproveResponse)
-def approve_checkpoint(run_id: str, request: ApproveRequest) -> ApproveResponse:
+@router.post("/runs/{run_id}/approve", response_model=ApproveResponse)
+def approve_checkpoint(
+    run_id: str, request: ApproveRequest, http_request: Request
+) -> ApproveResponse:
     runtime = get_runtime()
     if run_id not in runtime.runs:
         raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
@@ -300,17 +601,216 @@ def approve_checkpoint(run_id: str, request: ApproveRequest) -> ApproveResponse:
         "graph": graph,
         "context": new_context,
         "result": new_result,
+        "request": entry["request"],
+        "citation": entry.get("citation"),
+        "share_token": entry.get("share_token"),
     }
+    entry = runtime.runs[run_id]
+    citation = None
+    if new_result.status == "complete":
+        _record_run_events(
+            runtime,
+            request=http_request,
+            run_id=run_id,
+            analysis=entry["request"],
+            result=new_result,
+        )
+        citation = _mint_citation(
+            runtime, run_id=run_id, analysis=entry["request"], request=http_request
+        )
     return ApproveResponse(
         run_id=run_id,
         approved=request.checkpoint,
         status=new_result.status,
         awaiting_task_id=new_result.awaiting_task_id,
         provenance_manifest_id=runtime.manifests[run_id],
+        citation=citation,
     )
 
 
-@app.get("/audit/verify")
+# -- citations (ADR-0043) ----------------------------------------------------
+
+
+@router.get("/runs/{run_id}/citation")
+def get_citation(run_id: str, http_request: Request) -> dict[str, Any]:
+    """The run's citable record.  Free by design: metering citation
+    retrieval would stop users citing, which is the whole point."""
+    runtime = get_runtime()
+    if run_id not in runtime.runs:
+        raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
+    entry = runtime.runs[run_id]
+    if entry.get("citation") is None:
+        raise HTTPException(
+            status_code=409,
+            detail="run has not completed; citations are minted on completion",
+        )
+    record: CitationRecord = entry["citation"]
+    # The share URL is an alternate access link: surface the current one.
+    record = record.model_copy(update={"share_url": entry.get("share_url")})
+    already_cited = any(
+        r.get("event") == "run_cited" and r.get("run_id") == run_id
+        for r in runtime.audit.records()
+    )
+    if not already_cited:
+        emit_event(
+            runtime.audit,
+            "run_cited",
+            user_id=_analytics_user(http_request),
+            run_id=run_id,
+            properties={"citation_id": record.canonical_id, "run_id": run_id},
+        )
+    return record.model_dump(mode="json")
+
+
+# -- share URLs (ADR-0044) -----------------------------------------------------
+
+
+@router.post("/runs/{run_id}/share", response_model=ShareCreateResponse)
+def create_share(run_id: str, request: ShareCreateRequest) -> ShareCreateResponse:
+    runtime = get_runtime()
+    if run_id not in runtime.runs:
+        raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
+    token, claims = runtime.share_manager.create_token(
+        run_id, expires_in_days=request.expires_in_days
+    )
+    runtime.runs[run_id]["share_token"] = token
+    return ShareCreateResponse(
+        share_url=share_url_for(token),
+        expires_at=claims.expires_at.isoformat(),
+        scope=claims.scope,
+    )
+
+
+@router.delete("/runs/{run_id}/share")
+def revoke_shares(run_id: str) -> dict[str, Any]:
+    runtime = get_runtime()
+    if run_id not in runtime.runs:
+        raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
+    registry = runtime.share_manager.registry
+    revoked = registry.revoke_all(run_id) if registry is not None else 0
+    runtime.runs[run_id]["share_token"] = None
+    return {"run_id": run_id, "revoked": revoked}
+
+
+def _verify_share_token(token: str):
+    from phyto_shared.share import (
+        ExpiredShareTokenError,
+        InvalidShareTokenError,
+        RevokedShareTokenError,
+    )
+
+    runtime = get_runtime()
+    try:
+        claims = runtime.share_manager.verify(token)
+    except ExpiredShareTokenError:
+        raise HTTPException(status_code=410, detail="share token has expired") from None
+    except RevokedShareTokenError:
+        raise HTTPException(status_code=410, detail="share token was revoked") from None
+    except InvalidShareTokenError:
+        raise HTTPException(status_code=404, detail="unknown share token") from None
+    if claims.run_id not in runtime.runs:
+        raise HTTPException(status_code=404, detail="unknown share token")
+    return claims
+
+
+def _rate_limit_share(http_request: Request) -> None:
+    runtime = get_runtime()
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    if not runtime.rate_limiter.allow(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="share read rate limit exceeded; try again in a minute",
+        )
+
+
+@router.get("/share/{share_token}")
+def read_share(share_token: str, http_request: Request) -> dict[str, Any]:
+    """Unauthenticated read-only run view; the signed token is the
+    credential (ADR-0044).  Rate-limited per IP."""
+    _rate_limit_share(http_request)
+    claims = _verify_share_token(share_token)
+    runtime = get_runtime()
+    emit_event(
+        runtime.audit,
+        "run_shared",
+        user_id=_analytics_user(http_request),
+        run_id=claims.run_id,
+        properties={"share_token": claims.token_id, "run_id": claims.run_id},
+    )
+    return _share_view(claims.run_id, runtime)
+
+
+@router.get("/share/{share_token}/artifacts/{name}")
+def read_share_artifact(
+    share_token: str, name: str, http_request: Request
+) -> dict[str, Any]:
+    _rate_limit_share(http_request)
+    claims = _verify_share_token(share_token)
+    runtime = get_runtime()
+    entry = runtime.runs[claims.run_id]
+    graph: TaskGraph = entry["graph"]
+    task = next((t for t in graph.tasks if t.id == name), None)
+    if task is None:
+        raise HTTPException(
+            status_code=404, detail=f"unknown artifact '{name}' for this run"
+        )
+    return {
+        "run_id": claims.run_id,
+        "artifact": name,
+        "tool": task.tool,
+        "status": task.status,
+        "output": _redact(task.output),
+    }
+
+
+# -- onboarding (ADR-0045) ------------------------------------------------------
+
+
+@router.get("/onboarding/first-story")
+def onboarding_first_story() -> dict[str, Any]:
+    return first_story_summary()
+
+
+# -- cohort analytics (ADR-0048) -------------------------------------------------
+
+
+@router.get("/admin/cohorts")
+def admin_cohorts(request: Request) -> dict[str, Any]:
+    _require_admin(request)
+    runtime = get_runtime()
+    cohorts = runtime.cohort_store.all()
+    return {
+        "cohorts": [
+            cohorts[month].model_dump(mode="json") for month in sorted(cohorts)
+        ],
+        "alerts": [alert.model_dump(mode="json") for alert in runtime.cohort_store.alerts()],
+    }
+
+
+@router.post("/admin/cohorts/recompute")
+def admin_cohorts_recompute(request: Request) -> dict[str, Any]:
+    """Run the cohort job over this service's audit chain now (the daily
+    schedule calls the same function)."""
+    _require_admin(request)
+    runtime = get_runtime()
+    return run_cohort_job(runtime.audit.records(), runtime.cohort_store)
+
+
+# -- audit export (department plan, ADR-0047) ------------------------------------
+
+
+@router.get("/audit/export")
+def audit_export(request: Request) -> dict[str, Any]:
+    _require_plan(request, "department")
+    runtime = get_runtime()
+    return {
+        "records": runtime.audit.records(),
+        "count": len(runtime.audit.records()),
+        "chain_valid": runtime.audit.verify_chain(),
+    }
+
+
+@router.get("/audit/verify")
 def verify_audit() -> dict[str, Any]:
     runtime = get_runtime()
     try:
@@ -320,10 +820,48 @@ def verify_audit() -> dict[str, Any]:
     return {"chain_valid": valid, "records": len(runtime.audit.records())}
 
 
-@app.get("/audit/records")
+@router.get("/audit/records")
 def audit_records(run_id: str | None = None) -> list[dict[str, Any]]:
     runtime = get_runtime()
     records = runtime.audit.records()
     if run_id is not None:
         records = [r for r in records if r.get("run_id") == run_id]
     return records
+
+
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+
+def create_app(config: AuthConfig | None = None) -> FastAPI:
+    """Build the service app with the token layer installed.
+
+    Middleware is installed before routes are added so no endpoint can be
+    registered outside the metering boundary.
+    """
+    application = FastAPI(
+        title="PhytoCompanion Orchestrator",
+        version=__version__,
+        description="Plans, delegates, verifies, and logs analysis workflows.",
+    )
+    cfg = install_auth(application, config)
+    application.include_router(router)
+
+    @application.get("/health")
+    def health() -> dict[str, Any]:
+        runtime = get_runtime()
+        return {
+            "status": "ok",
+            "service": "orchestrator",
+            "version": __version__,
+            "environment": runtime.environment,
+            "registry_size": len(runtime.registry),
+            "audit_records": len(runtime.audit.records()),
+            "dry_run": cfg.dry_run,
+        }
+
+    return application
+
+
+app = create_app()

@@ -5,7 +5,7 @@
 
 ## Summary
 
-Top-1 structure retrieval was evaluated on **207 plant natural products** drawn from the SUMMIT v4 benchmark set. Each compound was ranked against a decoy pool of candidate structures whose size varied widely (median 48; interquartile range 16-122; range 5-642). Overall top-1 accuracy was **92.3%** (191/207 compounds), with all misassignments ranked second or third rather than retrieved as an unrelated scaffold. Accuracy was lowest on the smallest decoy pools (`<10`, 79.3%) and highest on mid-sized pools (`50-200`, 95.2%), so the headline figure is not propped up by easy small-pool cases. The site-localisation task covered 36 compounds at a median of 3 possible edit sites, with observed accuracy of 88.9% against a 44.3% chance baseline; however 15/36 (42%) of those compounds offered at most two possible sites, so that baseline is weak. These figures are a **reproduction of the SUMMIT v4 benchmark's own outputs, not an independent held-out validation.**
+Top-1 structure retrieval was evaluated on **207 plant natural products** drawn from the SUMMIT v4 benchmark set. Each compound was ranked against a decoy pool of candidate structures whose size varied widely (median 48; interquartile range 16-122; range 5-642). Overall top-1 accuracy was **92.3%** (191/207 compounds), with all misassignments ranked second or third rather than retrieved as an unrelated scaffold. Accuracy was lowest on the smallest decoy pools (`<10`, 79.3%) and highest on mid-sized pools (`50-200`, 95.2%), so the headline figure is not propped up by easy small-pool cases; the small-pool deficit reflects a higher share of large, glycosylated molecules rather than an intrinsic penalty for small pools. Of the 6 small-pool failures, 2 were near-ties whose score margins fall below the confirmed threshold, so the platform would have downgraded those claims rather than reporting them confidently, and 4 were genuine retrieval errors. The site-localisation task covered 36 compounds at a median of 3 possible edit sites, with observed accuracy of 88.9% against a 44.3% chance baseline; however 15/36 (42%) of those compounds offered at most two possible sites, so that baseline is weak. These figures are a **reproduction of the SUMMIT v4 benchmark's own outputs, not an independent held-out validation.**
 
 ## 0. Reproduction, not independent validation
 
@@ -46,7 +46,59 @@ Accuracy is **not** simply a function of pool size. The weakest bucket is `<10` 
 
 **What this table supports.** The headline is not carried by the easiest pool size: the `<10` bucket holds only 29 compounds and scores *below* the overall figure. **What it does not support.** A uniform-capability reading. The spread between weakest and strongest bucket is 15.9 percentage points, and because the weakest bucket is small a handful of compounds shift it by several points. Quote the breakdown, not the single number.
 
-## 3. Failure modes
+## 3. Why small pools are harder
+
+The `<10` bucket holds 29 compounds and fails 6 of them (20.7%), which is counterintuitive: a small decoy pool should be easier. This section tests the two rival explanations.
+
+### The six failures
+
+| Compound | Class | Rank | n | True score | Winner score | Margin | Same formula | Same rings | Tanimoto |
+|---|---|---|---|---|---|---|---|---|---|
+| D-Fructose 2,6-bisphosphate | other | 2 | 7 | 0.975 | 0.685 | +0.290 | yes | yes | 0.561 |
+| [(2R,3S)-5,7-dihydroxy-2-[3,4,6-trihydroxy-5-oxo | flavonoid | 3 | 9 | 0.837 | 0.669 | +0.168 | yes | yes | 0.779 |
+| (2R,3R)-5,7-Dihydroxy-2-(3,4,6-trihydroxy-5-oxo- | flavonoid | 3 | 9 | 0.766 | 0.620 | +0.146 | yes | yes | 0.779 |
+| 4670-05-7 | flavonoid | 3 | 9 | 0.811 | 0.684 | +0.127 | yes | yes | 0.709 |
+| CERNUOSIDE A | other glycoside | 3 | 7 | 0.633 | 0.578 | +0.055 | yes | yes | 0.919 |
+| CERNUOSIDE B | other glycoside | 2 | 9 | 0.675 | 0.662 | +0.013 | yes | yes | 0.883 |
+
+Scores are distances (lower is better), so the margin is the winner's advantage over the correct answer. `Same formula` and `Same rings` come from RDKit; Tanimoto is the Morgan-fingerprint similarity to the correct structure.
+
+### Which explanation applies
+
+**2 of 6** failures have a margin below `MIN_MARGIN_FOR_CONFIRMED` (0.1); **1 of 6** falls below the tentative threshold (0.02). The median margin is **+0.137**. All six share the molecular formula and ring count of their top-1 pick, so every one is a constitutional isomer rather than an unrelated scaffold; **5 of 6** also pass the Tanimoto >= 0.7 test. The exception is D-fructose 2,6-bisphosphate (Tanimoto 0.56), still a constitutional isomer but a structurally distant one.
+
+**The answer is mixed, and neither explanation as posed is the dominant one.**
+
+1. **Explanation (b) -- honest ambiguity -- fits 2 of 6.** CERNUOSIDE A (margin +0.055) and CERNUOSIDE B (+0.013) are genuine near-ties. Both would be reported below `confirmed`, and CERNUOSIDE B below `tentative` as well. For these, the platform's honesty machinery does what it should: it would not have claimed a confident top-1. Note that the `AMBIGUOUS` verdict itself requires an *exact* tie (`n_tied > 1`, tolerance 1e-8), so a small-but-nonzero margin yields `tentative`/`candidate`, not `ambiguous`. Either way the claim is downgraded.
+2. **Explanation (a) -- genuine prediction error -- fits 4 of 6.** The three flavonoids and D-fructose 2,6-bisphosphate have margins of +0.13 to +0.29, well above the confirmed threshold. Here the GNN ranked the wrong isomer clearly ahead: these are real errors, and the platform would have reported them confidently.
+
+Explanation (a) is therefore the larger share by count (4 vs 2), but it does not dominate cleanly: two of the six are correctly downgraded rather than misreported.
+
+**Measurement caveat.** The margin used here is the top-1 pick's advantage over the *correct* answer, which is exactly what these fixtures record. For the rank-3 failures there is a second candidate between them whose score is not in the fixture, so the top-1 pick's margin over its immediate runner-up could be smaller than the figure shown. That can only *increase* the number of near-ties the platform would downgrade, never decrease it: the 2-of-6 ambiguity count is a **lower bound**, and the 4-of-6 error count an upper bound.
+
+**The 'rare formula' mechanism does not hold.** Formula multiplicity is essentially identical between the small-pool and larger-pool compounds (mean 1.21 vs 1.19 occurrences in the 207-compound set), so thin training coverage of unusual formulas is not what separates this bucket.
+
+### What actually drives the bucket: molecule size, not pool size
+
+Pool size and molecular size are confounded in this benchmark. Small pools contain larger molecules (median 38 heavy atoms vs 28 overall) and a much higher glycoside share (55% vs 29%). Stratifying by heavy-atom count shows where the failures actually live:
+
+| Molecule size | Pool | Compounds | Failures | Failure rate |
+|---|---|---|---|---|
+| small (<= 24 heavy atoms) | <10 pool | 8 | 1 | 12.5% |
+| small (<= 24 heavy atoms) | 10-50 pool | 30 | 0 | 0.0% |
+| small (<= 24 heavy atoms) | >50 pool | 40 | 0 | 0.0% |
+| medium (25-32) | <10 pool | 1 | 0 | 0.0% |
+| medium (25-32) | 10-50 pool | 14 | 0 | 0.0% |
+| medium (25-32) | >50 pool | 49 | 2 | 4.1% |
+| large (> 32) | <10 pool | 20 | 5 | 25.0% |
+| large (> 32) | 10-50 pool | 32 | 5 | 15.6% |
+| large (> 32) | >50 pool | 13 | 3 | 23.1% |
+
+**Conclusion.** The `<10` bucket is harder because it is enriched in large, glycosylated molecules, not because small pools are intrinsically hard. In the large-molecule stratum the failure rate is high at every pool size (15.6-25.0%), while in the small-molecule stratum it is at or near zero (0.0-12.5%, and that single failure is D-fructose 2,6-bisphosphate). The bucket effect is a composition effect: pool size is standing in for molecule size.
+
+**What this means for the platform.** Neither explanation is a clean win or a clean loss. Two failures -- both large glycosides -- are correctly downgraded by the honesty machinery, which is the platform working as designed. Four are genuine errors: three heavily oxygenated flavonoids and one sugar phosphate, all ranked confidently wrong. The limitation to state externally is therefore not "rare formulas" but **large, densely oxygenated constitutional isomers**, where HSQC differences are confined to a few carbons regardless of pool size.
+
+## 4. Failure modes
 
 16 of 207 compounds were not ranked first. Every failure was a **near-miss**: rank 2.0 ×10, rank 3.0 ×6.
 
@@ -107,7 +159,7 @@ The dominant failure mode is therefore **regio-/constitutional isomer discrimina
 | steroid | 20 | 95.0% |
 | terpenoid-like | 25 | 96.0% |
 
-## 4. Site-localisation benchmark audit
+## 5. Site-localisation benchmark audit
 
 The localisation benchmark covers **36 compounds** with a **median of 3 possible edit sites** (IQR 2.0-6.5, range 1-29).
 
@@ -134,10 +186,12 @@ The published 44.3% chance figure is the **mean of 1/n_sites**, which single-sit
 
 **Bottom line.** The defensible claim is that on compounds with more than two candidate sites (21 of 36), top-1 localisation reached 81.0%. The 88.9% figure should never be quoted on its own: it is inflated by 15 near-trivial cases. An 88.9% result on a median 3-site problem is a much weaker signal than the same number on a 10-site problem.
 
-## 5. How to cite these numbers
+## 6. How to cite these numbers
 
 - Quote **92.3% top-1** only as *reproduction of SUMMIT v4* (ADR-0036).
 - Always pair it with **median candidate pool 48** and the bucket breakdown.
 - Do not quote **88.9% localisation** on its own. Quote **81.0% on the 21 compounds with more than two possible sites**, and state that 15/36 cases had at most two sites.
+- When discussing the `<10` bucket, attribute it to **molecule size and glycosylation**, not to pool size or rare formulas (ADR-0037).
+- Of the 6 small-pool failures, 2 are near-ties the platform would have downgraded and 4 are genuine errors. Do not describe the bucket as entirely a success or entirely a limitation.
 - Do not describe either number as independent validation (ADR-0036).
 

@@ -33,7 +33,15 @@ __all__ = [
     "ROUTE_PRICING",
     "cost_for_route",
     "FREE_TIER_SIGNUP_TOKENS",
+    "COST_MODEL_VERSION",
 ]
+
+
+COST_MODEL_VERSION = "1.0.0"
+"""Version of the cost model cited in every analysis citation (ADR-0043).
+
+Bumped when the pricing engine's behaviour changes materially, so a
+citation always names the economics model that produced its numbers."""
 
 
 FREE_TIER_SIGNUP_TOKENS = 50
@@ -66,6 +74,10 @@ ROUTE_PRICING: Mapping[tuple[str, str], RoutePrice] = MappingProxyType(
         # Elucidation (expensive: shift prediction, candidate ranking)
         ("POST", "/elucidate"): RoutePrice(20, "Structure elucidation run"),
         ("POST", "/elucidate/novel"): RoutePrice(50, "Novel structure generation"),
+        # Orchestrated workflow run -- the "one full story" step (ADR-0045).
+        # Priced identically to a direct elucidation run: it IS one, plus
+        # planning and audit.  New route price, not a change to a base price.
+        ("POST", "/analysis"): RoutePrice(20, "Orchestrated analysis run"),
         # Metabolomics
         ("POST", "/metabolomics/features"): RoutePrice(10, "Feature detection"),
         ("POST", "/metabolomics/statistics"): RoutePrice(10, "Statistical analysis"),
@@ -109,10 +121,29 @@ ROUTE_PRICING: Mapping[tuple[str, str], RoutePrice] = MappingProxyType(
 
 
 # Prefix rules for routes carrying a path parameter, checked after exact match.
+# Zero-cost routes below are either reads, account/plan/workspace management,
+# or acquisition surfaces that must never be metered (citation retrieval,
+# ADR-0043; share management, ADR-0044).  Charging for them would kill the
+# loops they exist to start.
 _PREFIX_PRICING: Mapping[tuple[str, str], RoutePrice] = MappingProxyType(
     {
         ("GET", "/runs/"): RoutePrice(0, "Read a stored analysis run"),
+        ("POST", "/runs/"): RoutePrice(
+            0, "Approve a checkpoint or manage sharing (the run was metered)"
+        ),
+        ("DELETE", "/runs/"): RoutePrice(0, "Revoke share tokens for a run"),
         ("GET", "/structures/"): RoutePrice(0, "Read a stored structure"),
+        ("GET", "/onboarding/"): RoutePrice(0, "Guided first-story sequence"),
+        ("GET", "/billing/"): RoutePrice(0, "Read balance and plan state"),
+        ("POST", "/billing/"): RoutePrice(0, "Manage subscriptions and API keys"),
+        ("GET", "/workspaces/"): RoutePrice(0, "Read workspace state and usage"),
+        ("POST", "/workspaces/"): RoutePrice(0, "Manage workspace members and pool"),
+        ("DELETE", "/workspaces/"): RoutePrice(0, "Remove a workspace member"),
+        ("GET", "/admin/"): RoutePrice(0, "Admin analytics (role-gated)"),
+        ("POST", "/admin/"): RoutePrice(0, "Admin actions (role-gated)"),
+        ("GET", "/audit/"): RoutePrice(0, "Audit chain verification and export"),
+        ("POST", "/auth/"): RoutePrice(0, "Record signup for cohort analytics"),
+        ("GET", "/sso/"): RoutePrice(0, "SSO configuration (plan-gated)"),
     }
 )
 

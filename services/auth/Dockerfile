@@ -8,6 +8,7 @@ COPY services/auth/pyproject.toml /srv/auth/pyproject.toml
 COPY services/auth/app/ /srv/auth/app/
 
 RUN pip install --no-cache-dir /srv/shared fastapi uvicorn firebase-admin \
+        google-cloud-firestore google-cloud-pubsub \
     && pip install --no-cache-dir /srv/auth
 
 ENV PHYTO_ENV=cloud

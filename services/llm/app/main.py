@@ -6,6 +6,16 @@ deliberately does NOT declare ``min_length=1``: that would produce a generic
 422, whereas the handler raises a 400 with an explanation the client can act
 on.
 
+GROUNDING GATE (ADR-0046): an output below ``GROUNDING_MIN_SCORE`` or with
+any uncited claim is rejected with 503, for the distilled and full model
+identically.  Distillation must not lower quality below the honesty
+threshold.
+
+MODEL TIERS (ADR-0046): free-plan requests are routed to the distilled
+model; paid plans keep the full model.  The plan comes from the
+middleware's server-side entitlements lookup, never from the request
+body.
+
 Provider selection (ADR-0034): a request may name ``provider``
 (``vertex`` | ``openrouter`` | ``local``).  Omitted means the deployment
 default -- Vertex in the cloud plane, the offline mock locally.
@@ -15,23 +25,24 @@ from __future__ import annotations
 
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
 from phyto_shared.exceptions import CloudServiceError
+from phyto_shared.grounding import GROUNDING_MIN_SCORE
 from phyto_shared.literature_models import LLMRequest, LLMResponse
 from phyto_shared.provenance import ProvenanceBuilder, sha256_dict
+
+from auth.config import AuthConfig
+from auth.install import install_auth
 
 from . import __version__
 from .clients import LLMClient, MockLLMClient, VertexAILLMClient
 from .grounding import compute_grounding, extract_citations
 from .openrouter_client import OpenRouterLLMClient
+from .tiers import MODEL_TIERS, route_client_for_plan
 
-app = FastAPI(
-    title="PhytoCompanion LLM Service",
-    version=__version__,
-    description="Grounded Tier-3 generation. Requires retrieved evidence for every call.",
-)
+router = APIRouter()
 
 
 def _default_provider() -> str:
@@ -111,7 +122,7 @@ def _build_prompt(request: LLMRequest) -> str:
     return prompt
 
 
-def _handle(request: LLMRequest) -> LLMServiceResponse:
+def _handle(request: LLMRequest, plan: str | None = None) -> LLMServiceResponse:
     # Explicit 400 (not the Pydantic 422) so clients get an actionable message.
     if not request.context_papers:
         raise HTTPException(
@@ -124,15 +135,39 @@ def _handle(request: LLMRequest) -> LLMServiceResponse:
 
     prompt = _build_prompt(request)
     try:
-        client = get_llm_client(request.provider)
-        completion = client.complete(request.operation, request.context_papers, prompt)
+        provider_client = get_llm_client(request.provider)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # Tier routing (ADR-0046) applies to the deployment-DEFAULT path only.
+    # An explicitly named provider is honored exactly as named: silently
+    # substituting it would violate the fail-closed provider rule the
+    # platform already tests for (ADR-0034), and the grounding gate below
+    # still applies to whatever model serves the request.
+    if request.provider is None:
+        client, tier = route_client_for_plan(provider_client, plan)
+    else:
+        client, tier = provider_client, "full"
+    try:
+        completion = client.complete(request.operation, request.context_papers, prompt)
     except CloudServiceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     grounding = compute_grounding(completion.text, request.context_papers)
     cited = extract_citations(completion.text)
+
+    # The grounding gate applies identically to both tiers (ADR-0046):
+    # a distilled output that fails the citation contract is rejected.
+    if grounding.claims_uncited > 0 or grounding.score < GROUNDING_MIN_SCORE:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Completion failed the grounding gate (score "
+                f"{grounding.score:.2f} < {GROUNDING_MIN_SCORE}, "
+                f"{grounding.claims_uncited} uncited claim(s)) and was "
+                f"rejected; the {tier} model must meet the same citation "
+                "contract."
+            ),
+        )
 
     response = LLMResponse(
         text=completion.text,
@@ -154,6 +189,8 @@ def _handle(request: LLMRequest) -> LLMServiceResponse:
             {
                 "operation": request.operation,
                 "provider": request.provider or _default_provider(),
+                "model_tier": tier,
+                "plan": plan,
                 "context_paper_count": len(request.context_papers),
                 "grounding_score": grounding.score,
                 "claims_uncited": grounding.claims_uncited,
@@ -167,31 +204,74 @@ def _handle(request: LLMRequest) -> LLMServiceResponse:
     return LLMServiceResponse(response=response, provenance_manifest_id=manifest_id)
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {
-        "status": "ok",
-        "service": "llm",
-        "version": __version__,
-        "plane": os.environ.get("PHYTO_ENV", "local"),
-    }
+def _plan_from(request_obj: Request) -> str | None:
+    """The caller's plan, set server-side by the middleware (never trusted
+    from the request body)."""
+    return getattr(request_obj.state, "plan", None)
 
 
-@app.post("/llm/explain", response_model=LLMServiceResponse)
-def llm_explain(request: LLMRequest) -> LLMServiceResponse:
-    return _handle(request.model_copy(update={"operation": "explain"}))
+@router.post("/llm/explain", response_model=LLMServiceResponse)
+def llm_explain(request: LLMRequest, http_request: Request) -> LLMServiceResponse:
+    return _handle(
+        request.model_copy(update={"operation": "explain"}),
+        plan=_plan_from(http_request),
+    )
 
 
-@app.post("/llm/hypothesize", response_model=LLMServiceResponse)
-def llm_hypothesize(request: LLMRequest) -> LLMServiceResponse:
-    return _handle(request.model_copy(update={"operation": "hypothesize"}))
+@router.post("/llm/hypothesize", response_model=LLMServiceResponse)
+def llm_hypothesize(request: LLMRequest, http_request: Request) -> LLMServiceResponse:
+    return _handle(
+        request.model_copy(update={"operation": "hypothesize"}),
+        plan=_plan_from(http_request),
+    )
 
 
-@app.post("/llm/recommend-experiments", response_model=LLMServiceResponse)
-def llm_recommend_experiments(request: LLMRequest) -> LLMServiceResponse:
-    return _handle(request.model_copy(update={"operation": "recommend_experiments"}))
+@router.post("/llm/recommend-experiments", response_model=LLMServiceResponse)
+def llm_recommend_experiments(
+    request: LLMRequest, http_request: Request
+) -> LLMServiceResponse:
+    return _handle(
+        request.model_copy(update={"operation": "recommend_experiments"}),
+        plan=_plan_from(http_request),
+    )
 
 
-@app.post("/llm/summarize-literature", response_model=LLMServiceResponse)
-def llm_summarize_literature(request: LLMRequest) -> LLMServiceResponse:
-    return _handle(request.model_copy(update={"operation": "summarize_literature"}))
+@router.post("/llm/summarize-literature", response_model=LLMServiceResponse)
+def llm_summarize_literature(
+    request: LLMRequest, http_request: Request
+) -> LLMServiceResponse:
+    return _handle(
+        request.model_copy(update={"operation": "summarize_literature"}),
+        plan=_plan_from(http_request),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+
+def create_app(config: AuthConfig | None = None) -> FastAPI:
+    """Build the service app with the token layer installed."""
+    application = FastAPI(
+        title="PhytoCompanion LLM Service",
+        version=__version__,
+        description="Grounded Tier-3 generation. Requires retrieved evidence for every call.",
+    )
+    cfg = install_auth(application, config)
+    application.include_router(router)
+
+    @application.get("/health")
+    def health() -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "service": "llm",
+            "version": __version__,
+            "plane": os.environ.get("PHYTO_ENV", "local"),
+            "dry_run": cfg.dry_run,
+        }
+
+    return application
+
+
+app = create_app()
