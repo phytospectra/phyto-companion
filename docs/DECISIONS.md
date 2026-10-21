@@ -39,13 +39,27 @@ not silently filled.
 
 ### Verified sequence
 
-Checked programmatically against this file on 2026-10-21:
+Checked programmatically against this file on 2026-10-21, and re-checked on
+2026-10-22 after the growth-and-profit ADRs (0043-0049) were appended:
 
-- Entries present: **0001-0018** and **0024-0040** (35 entries).
-- Missing within the range: **0019, 0020, 0021, 0022, 0023** -- these five only.
+- Entries present: **0001-0018**, **0024-0040**, and **0043-0049**
+  (42 entries).
+- Missing within the range: **0019, 0020, 0021, 0022, 0023** only. The later
+  batch additionally skips **0041, 0042** (see the section note at ADR-0043).
 - No duplicate IDs; entries are in ascending order.
 - No references to ADR-0019..0023 anywhere else in the repository, so the gap
   creates no dangling links.
+
+**Re-verified 2026-10-22, with one claim corrected:** a review request asked
+this note to be changed to say that ADR-0019 and ADR-0023 now exist and only
+0020-0022 are missing. Re-checking the file shows that claim is **wrong**:
+ADR-0019 and ADR-0023 were never written. The file jumps from ADR-0018
+straight to ADR-0024, and the only occurrences of the strings "ADR-0019" and
+"ADR-0023" anywhere in the repository are the two sentences in this note.
+Nothing in the growth-and-profit batch added either ID. The gap is therefore
+still **0019-0023**, and the verified sequence above is the authoritative
+state. Should a future decision genuinely need one of those IDs, the
+"Deferred from original planning" convention described above still applies.
 
 ### Correction to the original planning note
 
@@ -1258,3 +1272,438 @@ imply the values are verified.
 to the token-system integration decision by the time this entry
 was appended; recorded under the next available ID (0040) to keep
 IDs unique. ADR-0039 was likewise already taken.
+
+---
+
+## Growth-and-profit features (ADR-0043 .. ADR-0049)
+
+**Numbering note (recorded 2026-10-21, revised 2026-10-22):** these seven
+entries begin at 0043, not 0041. ADR-0041 and ADR-0042 were never written; per
+this log's append-only rule they are skipped rather than reused. Code comments
+and tests reference 0043--0048 directly, so the gap is intentional and
+load-bearing for the cross-references in this batch. ADR-0049 documents the
+rate limiter that ADR-0044 introduces, because it is a separate module with its
+own enforcement surface.
+
+### ADR-0043: Every completed analysis mints a citable identifier
+
+- **Date:** 2026-10-21
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** Citations are the primary acquisition loop for an academic tool:
+  every published citation reaches exactly the audience the product is for, at
+  zero acquisition cost. But a citation is only useful if a reader can trust and
+  verify it, and only if the author can obtain it without friction. Charging
+  tokens to read a citation would defeat the loop, and registering a DOI with a
+  third party must never be able to fail or block a completed analysis.
+- **Decision:**
+  1. Every run that reaches ``complete`` mints a ``CitationRecord`` once, at
+     completion (also on checkpoint approval that completes a run), and stores
+     it with the run.
+  2. Two identifier forms: the always-available canonical
+     ``phytospectra.run:<run_id>``, and a DOI URL when ``ZENODO_TOKEN`` is
+     configured. DOI registration is metadata-only (no data files) and
+     idempotent per ``run_id`` (dedup key = a Zenodo search on the run_id
+     keyword).
+  3. The record embeds its own provenance: model version, cost-model version,
+     provenance manifest hash, and audit-chain head. A reader can re-derive the
+     manifest hash and verify the chain without trusting the platform.
+  4. ``GET /runs/{run_id}/citation`` is free and unpriced. It returns 409 for a
+     run that has not completed and 404 for an unknown run.
+  5. Registration failures are logged and downgraded to the canonical id; they
+     never raise. The registrar is built from the environment only when a token
+     is present, so the local plane never makes a network call.
+  6. Retrieval emits the ``run_cited`` cohort event at most once per run.
+- **Alternatives considered:** A DOI for every run from day one (rejected: needs
+  a real Zenodo account and turns an optional third party into a hard dependency
+  of completion); a citation generated only on demand (rejected: the chain head
+  and manifest hash would then depend on when the user asked, not on the run);
+  charging for citation retrieval (rejected: it suppresses the loop the feature
+  exists to create).
+- **Consequences:** Citation text (BibTeX + plaintext) is rendered at
+  mint time and stored, so it is stable even if formatting code changes later.
+  The Zenodo path is untested against the live API (only the mock registrar and
+  failure paths are), so the first real deposit must be verified manually.
+  ``run_cited`` counts entry into the citation ledger, not a downstream
+  publication; no data supports claiming the latter. **Known gap:** the
+  citation response is meant to surface the run's active share URL, but
+  ``GET /runs/{run_id}/citation`` reads ``entry.get("share_url")`` while
+  ``POST /runs/{run_id}/share`` stores only ``share_token``. No code path
+  writes ``share_url``, so the field always serialises as ``null`` and the
+  citation cannot advertise the link until that key is populated at share
+  creation.
+
+### ADR-0044: Shareable read-only run URLs (with per-IP rate limiting)
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** Evidence is only persuasive when a colleague can look at it. The
+  natural distribution unit is a link to one run's evidence panel, opened by
+  someone with no account. That link must not require the recipient to trust
+  the sender with credentials, and must not become a route to unauthenticated
+  read of the whole platform. Because the endpoint is unauthenticated by
+  design, it is also the one surface a scraper can hit without an account, so
+  it needs its own request ceiling.
+- **Decision:**
+  1. Share tokens are HMAC-SHA256 signed with ``SHARE_HMAC_KEY``, a separate,
+     lower-privilege credential from the Firebase token. The payload is
+     canonical JSON ``{run_id, scope, iat, exp, jti}`` and the signature covers
+     the payload byte-for-byte, so any edit invalidates the token.
+  2. ``scope`` is ``"read_only"`` by construction and is re-checked on verify;
+     a token whose scope is anything else is rejected. A token grants READ on
+     exactly one ``run_id`` -- it cannot approve a checkpoint, mutate a run, or
+     read a different run.
+  3. Expiry defaults to 30 days and is clamped to ``[1, 365]``; the ceiling
+     means a leaked token cannot grant read access forever. Revocation is by
+     token id (``jti``), and a revocation entry expires no later than the token
+     it kills, so the revocation list cannot grow without bound.
+  4. ``ShareTokenManager.from_env`` uses a clearly-labelled development key
+     only when ``PHYTO_DRY_RUN=1``, and refuses to mint without
+     ``SHARE_HMAC_KEY`` otherwise.
+  5. The public surface is two GET endpoints: ``GET /share/{token}`` (the
+     read-only view) and ``GET /share/{token}/artifacts/{name}`` (one task
+     artifact). Neither exists as a mutating verb, and the orchestrator's
+     approve route is on the authenticated surface only.
+  6. The shared view carries a call to action back into the product
+     (``Open in Phytospectra`` -> ``/analysis/new``) with ``sample_id`` and
+     ``workflow`` prefilled, so a reader can start their own analysis from the
+     evidence they just read. It never exposes the owner's identity or raw
+     uploads.
+  7. ``GET /share/*`` is rate-limited per client IP with a true sliding window,
+     default 60 requests per minute (``SHARE_RATE_LIMIT_PER_MIN`` overrides),
+     returning 429 when exceeded. 60/min is far above human reading pace and
+     far below scraping throughput.
+  8. Share reads are unpriced (0 tokens) in ``ROUTE_PRICING``; charging for
+     them would suppress the distribution loop.
+- **Alternatives considered:** Requiring an account to view a shared run
+  (rejected: kills the zero-friction distribution loop the feature exists for);
+  a random opaque database key instead of a signed token (rejected: verification
+  would require a database read on every view, and the key alone would carry no
+  expiry); JWT with the Firebase key (rejected: a share token must not share the
+  blast radius of the identity credential); unlimited token lifetime (rejected:
+  a leaked link would be permanent).
+- **Consequences:** Revocation is only real when a registry is wired; a manager
+  without one can mint and verify but never revoke. **Known gap:** the
+  orchestrator constructs its manager with ``ShareTokenManager.from_env()`` and
+  passes no registry, so ``DELETE /runs/{run_id}/share`` reports
+  ``revoked: 0`` and a revoked token still verifies. ``InMemoryShareRegistry``
+  and ``FirestoreShareRegistry`` exist and are correct in isolation but are
+  never instantiated in production wiring (grep confirms they appear only under
+  ``tests/``). Wiring the registry is therefore a prerequisite for advertising
+  revocation at all; until then item 3's revocation guarantee is unimplemented
+  at the service boundary. The rate limiter is process-local, so it is correct
+  for the single-instance local plane only; a multi-instance deployment must
+  move the counter to Redis. **TODO:** no Redis-backed limiter exists yet, and
+  the Firestore share registry is not exercised by the local suite (only the
+  in-memory one is). The share-token scope check prevents privilege reuse, but
+  it does not by itself stop a holder from forwarding the link; expiry plus
+  explicit revocation is the mitigation.
+
+### ADR-0045: The guided first story and the monthly allowance
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** Activation is the metric that matters, and a new user holding 50
+  free tokens can burn them on dead ends before ever reaching the value moment
+  (the evidence panel). Two forces have to be reconciled: the sequence should
+  guide a new user through one complete, honest analysis, and the tokens remain
+  the user's, so nothing may be forced. Separately, the free allowance must be
+  a cap on spend that is independent of the token balance -- otherwise a user
+  with a topped-up balance could keep consuming free-tier compute indefinitely.
+- **Decision:**
+  1. ``first_story_steps`` defines an eight-step sequence: upload a sample,
+     run elucidation, view the evidence panel, search reference NMR data,
+     search the literature, request an LLM explanation, build a molecular
+     network, then get the citation and a share link.
+  2. Every step is opt-in. The sequence exists so the UI can prompt toward the
+     value moment; skipping a step leaves those tokens with the user.
+  3. Step costs are DERIVED from ``ROUTE_PRICING`` at call time, never
+     hardcoded, so a price change cannot silently make the documented sequence
+     wrong. Reads that are free by design (evidence, citation) are listed at 0.
+  4. The invariant that is actually asserted is "the full story fits inside the
+     free monthly allowance with buffer to retry", not a fixed token total.
+     With the current price table the sequence costs **41 tokens** of the
+     50-token allowance, leaving a **9-token** retry buffer. (The original
+     planning figure of 37 tokens / 13 buffer predates the frozen base table
+     and no longer matches it; the table wins, because changing prices is out
+     of scope for this decision.)
+  5. ``GET /onboarding/first-story`` is unpriced (0 tokens): it is guidance,
+     and metering it would discourage the very flow it exists to start.
+  6. The monthly allowance is enforced by the auth middleware as a cap on
+     tokens SPENT per calendar month, independent of the balance. A request
+     that would exceed it is refused with 402 even when the balance could cover
+     it, because free-tier compute is the dominant cost term.
+  7. Allowance reset semantics: ``used_this_month`` resets at 00:00 UTC on the
+     first of the next month; the allowance is re-granted by topping the
+     balance UP TO the allowance (``balance = max(balance, allowance)``), so
+     unspent allowance never accumulates and purchased tokens are never
+     revoked. A plan change grants the new plan's allowance immediately, and a
+     later downgrade never takes granted tokens back.
+- **Alternatives considered:** A single "run everything" button that spends the
+  tokens in one call (rejected: hides what each step costs and removes the
+  user's ability to stop); hardcoding the 37-token story (rejected: it would
+  drift from ``ROUTE_PRICING`` and go stale silently); letting the balance
+  override the monthly cap (rejected: reopens the free-tier cost leak);
+  accumulating unspent allowance (rejected: turns the free tier into a savings
+  account and undermines the monthly margin model).
+- **Consequences:** The advertised "37 tokens" is now 41; any UI copy quoting 37
+  must be corrected, and a test pins the invariant against the live pricing
+  table so a future price change that prices the story out of the free tier
+  fails the build. Entitlements exist in an in-memory mock and a Firestore
+  client; the Firestore path is not exercised locally. The allowance is tracked
+  per calendar month with no proration, so a mid-month upgrade gets the full
+  new allowance rather than a pro-rated amount -- acceptable while plans are
+  monthly, and a decision to revisit if annual plans are introduced.
+
+### ADR-0046: Distilled model routing for the free tier, and a read-through query cache
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** Free-tier cost is the dominant term in the margin equation, and
+  two of the most frequent free-tier calls -- LLM explanations and repeat
+  literature/NMR lookups -- are also the ones where cheapness matters least to
+  the user's experience if quality is preserved. Distillation risks lowering
+  output quality exactly at the value moment, and caching risks serving stale
+  or mismatched results.
+- **Decision:**
+  1. ``MODEL_TIERS`` routes the ``free`` plan to a distilled model id
+     (``PHYTO_DISTILLED_MODEL``, default ``qwen2.5-1.5b-instruct-distilled``)
+     and every paid plan to the full model id (``PHYTO_FULL_MODEL``, default
+     ``qwen2.5-7b-instruct-qlora``). ``select_model_tier`` derives the tier
+     from ``PLAN_FEATURES[...].distilled_llm`` so plans and routing cannot
+     disagree.
+  2. Tier routing applies to the deployment-default provider path only. An
+     explicitly named provider is honored exactly as named, because silently
+     substituting it would violate the fail-closed provider rule.
+  3. The QA grounding gate applies IDENTICALLY to both tiers: an output below
+     ``GROUNDING_MIN_SCORE`` or carrying any uncited claim is rejected with
+     503, whichever model produced it. Distillation must not lower quality
+     below the honesty threshold.
+  4. If the distilled model is unavailable (``PHYTO_DISTILLED_DISABLED=1``),
+     free users fall back to the full model and the fallback is logged as a
+     COST ANOMALY, because it quietly reopens the cost leak the tier exists to
+     close.
+  5. Literature and NMR-search results go through a read-through cache
+     (``CACHE_TTL_SECONDS`` = 24h). The key is the SHA256 of the operation plus
+     the normalized query: lowercased, trimmed, whitespace-collapsed, with
+     filter keys sorted. Semantically different queries (different filters,
+     different peaks) do not share an entry.
+  6. A cache hit is free: the endpoint sets ``X-Cache: HIT``, and the auth
+     middleware refunds the reservation because it sees that header. A miss is
+     charged normally and writes the cache. The cached value is the upstream
+     response, so quality is intended to be unchanged. **Known gap:** a miss and
+     a hit validate differently. The miss path constructs ``LiteratureResponse``
+     around already-built ``PaperHit`` objects, and pydantic does not revalidate
+     nested instances, so a response can be served and cached with an
+     out-of-range ``relevance_score`` (raw BM25 sums exceed the field's
+     ``le=1.0`` bound in ``services/literature/app/router.py``). The hit path
+     parses the cached dict and *does* validate, so the same payload that
+     returned 200 on the miss raises ``ValidationError`` on the hit. Until the
+     score is bounded or normalized at the source, the cache is not
+     payload-equivalent across hit and miss.
+- **Alternatives considered:** Serving free users the full model and absorbing
+  the cost (rejected: it is the dominant margin term); routing free users to a
+  stronger-but-slower model instead of a smaller one (rejected: latency at the
+  value moment is its own churn driver); a shorter cache TTL (rejected: 24h
+  absorbs same-day repeat traffic while ensuring a retracted paper stops being
+  served within a day); caching on the raw query string (rejected: trivial
+  whitespace and casing differences would split the cache and erase the
+  savings).
+- **Consequences:** The local plane cannot honestly simulate a worse distilled
+  model, so ``DistilledLLMClient`` subclasses the mock and shares its grounded
+  renderer; the contract under test is routing and the gate, not the distilled
+  weights. **TODO:** no real distilled weights are wired into the local suite,
+  and the gate's behaviour on a genuinely weaker model must be validated before
+  the tier is relied on for quality claims. The Firestore cache is production
+  only and untested locally. Because a cache hit refunds the reservation, a
+  cache stampede can still make N concurrent identical misses pay N times;
+  acceptable at current volume, revisit if it shows up in the cost data.
+
+### ADR-0047: Plan tiers in code, prices in Stripe, and pooled workspaces
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** The product needs a free tier that seeds adoption and
+  institutional tiers that actually pay. If prices live in code, code and
+  Stripe will eventually disagree about what a user bought; if features live
+  only in Stripe, the middleware and the LLM router cannot gate on them
+  without a network call. Classrooms additionally need shared budgets and a
+  teaching-relevant measure of activation, because per-student billing would
+  kill the teaching loop.
+- **Decision:**
+  1. ``PLAN_FEATURES`` is the single source of truth for FEATURES per plan:
+     ``free`` (50 tokens, 1 seat, distilled LLM, no API access), ``pro`` (2,000
+     tokens, 1 seat, full LLM, API access), ``lab`` (10,000 tokens, 10 seats,
+     priority, full LLM, API access), ``department`` (100,000 tokens, 200
+     seats, priority, full LLM, API access, SSO, audit export), and
+     ``enterprise`` (negotiated, marked ``custom``; concrete limits remain TBD
+     until a contract defines them).
+  2. PRICES DO NOT LIVE IN CODE. Prices live in Stripe. ``GET /billing/plans``
+     returns features only, so the pricing page renders from one source and
+     prices are fetched from Stripe. The mock MRR table exists for test/dry-run
+     only and is explicitly not the product's prices.
+  3. Plan order is ``free < pro < lab < department < enterprise`` and gates are
+     expressed as "at or above" (API keys require ``pro``; SSO and audit export
+     require ``department``). An unknown plan raises rather than silently
+     downgrading to free.
+  4. Workspace caps come from ``WORKSPACE_CAPS`` so the pricing page, the API
+     and the middleware cannot disagree: ``classroom`` 30 seats / 5,000 pool
+     tokens per month, ``lab`` 10 / 10,000, ``department`` 200 / 100,000.
+  5. A workspace has a shared pool. A member's request draws from the pool
+     BEFORE their personal balance, and a pool draw bypasses the personal
+     monthly allowance because the pool is the workspace's budget, not the
+     member's. If the pool cannot cover the request, the member falls back to
+     their personal balance.
+  6. Only a lab-or-above plan may create a workspace (classrooms are taught by
+     paying instructors, while the student seat is free -- that is the teaching
+     loop). Members are added by email and resolve to a placeholder uid until
+     the invitee signs in.
+  7. Activation is a completed metered ``POST /analysis`` (``ACTIVATING_OPERATION``),
+     never a sign-in or an invitation. The instructor dashboard reports
+     per-member tokens used, activation, 30-day retention and the seat count.
+  8. Billing: subscribe returns a Stripe Checkout URL; the webhook is idempotent
+     per ``session.id`` (a redelivery returns the stored outcome instead of
+     re-granting), and it emits ``plan_changed`` with the MRR read from the
+     Stripe session.
+- **Alternatives considered:** Prices as constants in ``plans.py`` (rejected:
+  they would drift from Stripe, which is the actual system of record); feature
+  flags fetched from Stripe per request (rejected: adds a network dependency to
+  every gated request); per-student billing for classrooms (rejected: it prices
+  out the teaching loop that seeds institutional adoption); individual quotas
+  for workspace members (rejected: the institution buys a budget, not N
+  individual budgets); counting a sign-in as activation (rejected: it would
+  flatter the dashboard while measuring nothing).
+- **Consequences:** ``enterprise`` exists so entitlement ranking works, but its
+  every concrete limit is TBD; calling ``plan_features("enterprise")`` returns
+  zeros and must not be used to grant real capacity. Workspace pool draws and
+  seat checks are transactional in the Firestore store but only lock-guarded
+  in memory, so the local plane is not a concurrency proof. **Known gaps:** the
+  design above is not yet fully reachable. ``ROUTE_PRICING`` keys workspace
+  creation as ``("POST", "/workspaces/")`` while ``cost_for_route`` strips the
+  slash from the request path only, so a bare ``POST /workspaces`` matches no
+  price and the middleware answers 503 instead of serving the request; and the
+  in-memory invite path calls ``secrets.sha256`` (no such function) instead of
+  ``hashlib.sha256``, so adding a member raises rather than returning a
+  membership. Both are wiring defects, not design changes. **TODO:** the
+  Firestore workspace store is not exercised by the local suite. Pool tokens
+  are granted by the Stripe webhook in production; in dry-run the checkout
+  session is a mock and the test wires the grant separately. A downgrade does
+  not claw back seats already issued, so an oversubscribed workspace after a
+  downgrade needs an explicit reconciliation step.
+
+### ADR-0048: Cohort analytics measure profitability, not just growth
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** Growth is only good if it pays for itself. Signup counts alone
+  cannot distinguish healthy growth from buying users at a loss, and a separate
+  analytics pipeline would drift from -- and could contradict -- the audit
+  trail about what actually happened.
+- **Decision:**
+  1. Five metrics are computed per monthly cohort (UTC ``YYYY-MM``):
+     activation, D30 retention, conversion, gross margin, and contribution per
+     user. Activation requires a ``run_completed`` event intersected with the
+     cohort's signups -- a signup alone never counts. D30 requires activity in
+     ``[signup+25d, signup+35d]``. Conversion counts users whose latest plan is
+     not ``free``, over activated users. Gross margin is
+     ``(revenue - infra) / revenue`` and is ``None`` when revenue is 0
+     (undefined, not silently 0 or -inf). Contribution per user is
+     ``(revenue - infra) / signups``.
+  2. Events are appended to the existing hash-chained audit log as records of
+     ``kind == "analytics_event"``, so they inherit tamper evidence and cannot
+     disagree with the audit trail. Workflow events share some names (the
+     engine logs its own ``run_started``) and are filtered out by ``kind``.
+  3. The event vocabulary is a contract: ``user_signup``, ``run_started``,
+     ``run_completed``, ``run_shared``, ``run_cited``, ``plan_changed``,
+     ``workspace_member_activated``. An unknown event name raises, because a
+     typo would silently vanish from every cohort.
+  4. Two guardrails fire: negative contribution per user always alerts, and
+     rising signups with flat-or-declining contribution per user alerts. Growth
+     is only pursued while contribution per user is positive and rising.
+  5. The job is ``run_cohort_job(records, store)``: compute, persist per-month
+     rows, evaluate guardrails, persist alerts. The daily trigger is the
+     deployment's choice; ``POST /admin/cohorts/recompute`` is the HTTP/test
+     entry point and ``GET /admin/cohorts`` reads the table. Both are
+     admin-only.
+  6. In production the job is fed the union of the per-service audit chains
+     (or their mirrors), since runs, signups and plan changes are raised in
+     different services. The record schema is identical, which is what keeps
+     this a plumbing task rather than a port.
+- **Alternatives considered:** A separate analytics database (rejected: it would
+  duplicate the audit trail and could disagree with it); counting sign-in as
+  activation (rejected: it measures nothing about value); revenue per cohort
+  only, without contribution per user (rejected: a growing cohort can hide
+  worsening unit economics); erroring on zero revenue for gross margin
+  (rejected: an undefined margin is more honest than a fabricated one);
+  tracking only aggregate MRR (rejected: it cannot show whether a cohort pays
+  for its own compute).
+- **Consequences:** The cohort job is only as complete as the records it is
+  given; the local plane feeds it one service's chain, and the cross-service
+  union is a deployment concern that is not yet wired. Revenue is recognised
+  when ``plan_changed`` is emitted (webhook time), not at invoice settlement,
+  so it is a good directional margin signal rather than an accounting figure.
+  Contribution per user is cohort-cumulative in spirit but computed from the
+  events present in the supplied records, so feeding a partial history will
+  understate revenue and overstate losses -- the guardrail should be read as a
+  tripwire, not a P&L. **TODO:** Firestore cohort persistence and the
+  cross-service union are not exercised locally.
+
+### ADR-0049: Rate limiting is enforced per IP on unauthenticated share reads
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** Share URLs are unauthenticated by design (ADR-0044), which makes
+  ``GET /share/*`` the one surface a scraper can hit without an account.
+  Separately, the platform fans out to external indexes whose owners impose
+  their own request ceilings; exceeding those gets the deployment's egress IP
+  throttled or blocked, which degrades every user at once. The limits need to
+  be enforced where the traffic actually originates, with an interface that
+  does not change when the backend moves from process memory to Redis.
+- **Decision:**
+  1. ``SlidingWindowRateLimiter`` implements a true sliding window over the
+     last ``window_seconds`` using a monotonic clock and a per-key deque,
+     guarded by a lock. ``allow(key)`` returns False once the key has
+     ``max_requests`` hits inside the window.
+  2. The limit is **60 requests per minute per client IP**
+     (``DEFAULT_SHARE_RATE_LIMIT``), overridable with
+     ``SHARE_RATE_LIMIT_PER_MIN``. 60/min is far above any human reading pace
+     and far below scraping throughput.
+  3. It is applied to both unauthenticated share endpoints --
+     ``GET /share/{token}`` and ``GET /share/{token}/artifacts/{name}`` -- and
+     refuses with **429** and a retry hint when exceeded. The key is the client
+     IP, because these requests carry no user identity.
+  4. The limiter is process-local and therefore correct for the single-instance
+     local plane only. The ``allow(key)`` interface is deliberately the whole
+     contract so a multi-instance deployment can move the counter to Redis
+     without touching callers (noted in ADR-0044).
+  5. External-provider calls are throttled separately, at the client, to stay
+     inside each provider's published guidance: PubMed 10 req/s with an API key
+     and 3 req/s without, Semantic Scholar 1 req/s, OpenAlex 10 req/s (all
+     minimum-interval gates), and GNPS 5 req/s (async sliding window).
+- **Alternatives considered:** A fixed-window counter (rejected: it allows a
+  double burst across the window boundary); a token bucket (rejected: bursts
+  are exactly what gets an IP throttled, and NCBI's guidance is a steady rate);
+  per-user limits on share reads (rejected: there is no user identity on an
+  unauthenticated request); limiting by share token instead of IP (rejected: it
+  is trivially bypassed by minting or rotating tokens, and one scraper can
+  rotate); a reverse proxy or API-gateway limit only (rejected: it would not be
+  testable in the local plane, and the endpoint's semantics belong with the
+  endpoint).
+- **Consequences:** A shared NAT (a university or a lab behind one egress IP)
+  shares the 60/min budget across everyone behind it, so a large classroom on
+  one IP could hit the ceiling during a synchronized exercise; the limit is
+  configurable, and raising it for known institutional IPs is the intended
+  remedy rather than removing the limit. The in-memory counter resets on
+  process restart and is invisible to sibling instances, so it is not a
+  distributed guarantee. **TODO:** no Redis-backed implementation exists yet;
+  the class is the seam where one would be added. **Difference from the
+  original brief:** this module does **not** rate-limit the LLM endpoint --
+  LLM cost is controlled by the token allowance and the distilled tier
+  (ADR-0045, ADR-0046), not by request rate. The external-API limits described
+  in item 5 live in the literature and networking clients, not in this module.
