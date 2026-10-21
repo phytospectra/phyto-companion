@@ -7,7 +7,11 @@ ledger, mock Stripe.  No network, no GCP credentials.
 
 from __future__ import annotations
 
+import json
+import time
+
 import pytest
+import stripe
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
@@ -19,6 +23,34 @@ from auth.token_balance import MockTokenBalanceClient
 from auth.workspaces import InMemoryWorkspaceStore
 
 AUTH = {"Authorization": "Bearer mock:alice"}
+
+# Test-only signing key. It is not a real Stripe secret and cannot verify a
+# real delivery; it exists so the tests exercise the same HMAC path Stripe
+# uses without touching an account.
+WEBHOOK_SECRET = "whsec_test_0123456789abcdef0123456789abcdef"
+
+
+@pytest.fixture(autouse=True)
+def _webhook_secret(monkeypatch):
+    """Every app built in this module verifies against the test secret."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WEBHOOK_SECRET)
+
+
+def _signed_post(client, event, *, secret: str = WEBHOOK_SECRET):
+    """POST an event the way Stripe does: raw body plus an HMAC header."""
+    payload = json.dumps(event, separators=(",", ":"))
+    timestamp = int(time.time())
+    signature = stripe.WebhookSignature._compute_signature(
+        f"{timestamp}.{payload}", secret
+    )
+    return client.post(
+        "/billing/webhook",
+        content=payload,
+        headers={
+            "Stripe-Signature": f"t={timestamp},v1={signature}",
+            "Content-Type": "application/json",
+        },
+    )
 
 
 def _config(**overrides) -> AuthConfig:
@@ -227,7 +259,7 @@ class TestBilling:
                 }
             },
         }
-        response = client.post("/billing/webhook", json=event)
+        response = _signed_post(client, event)
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
         assert client.entitlements.status("alice").plan == "pro"
@@ -250,8 +282,8 @@ class TestBilling:
                 }
             },
         }
-        first = client.post("/billing/webhook", json=event).json()
-        second = client.post("/billing/webhook", json=event).json()
+        first = _signed_post(client, event).json()
+        second = _signed_post(client, event).json()
         assert first["duplicate"] is False
         assert second["duplicate"] is True
         changes = [
@@ -262,16 +294,14 @@ class TestBilling:
         assert len(changes) == 1
 
     def test_webhook_ignores_other_event_types(self, client):
-        response = client.post(
-            "/billing/webhook",
-            json={"type": "invoice.paid", "data": {"object": {}}},
+        response = _signed_post(
+            client, {"type": "invoice.paid", "data": {"object": {}}}
         )
         assert response.json()["status"] == "ignored"
 
     def test_webhook_malformed_session_is_acknowledged(self, client):
-        response = client.post(
-            "/billing/webhook",
-            json={"type": "checkout.session.completed", "data": {"object": {}}},
+        response = _signed_post(
+            client, {"type": "checkout.session.completed", "data": {"object": {}}}
         )
         assert response.status_code == 200
         assert response.json()["status"] == "malformed"

@@ -97,11 +97,16 @@ def build_token_layer(config: AuthConfig) -> TokenLayer:
     if config.dry_run:
         # Enforced but offline (tests, local plane): deterministic mocks,
         # with the allowance cap active so behaviour matches production.
+        # The entitlements client MUST share the token ledger: the monthly
+        # rollover grant is applied through it (ADR-0045), so without the
+        # ledger every user would start at a zero balance and every priced
+        # request would be refused with 402.
+        mock_tokens = MockTokenBalanceClient()
         return TokenLayer(
             MockFirebaseAuthClient(),
-            MockTokenBalanceClient(),
+            mock_tokens,
             LoggingPublisher(),
-            entitlements=MockEntitlementsClient(),
+            entitlements=MockEntitlementsClient(ledger=mock_tokens),
             workspaces=InMemoryWorkspaceStore(),
         )
     tokens = get_token_balance_client(config.dry_run, config.project_id)

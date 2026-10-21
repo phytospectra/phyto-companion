@@ -42,6 +42,7 @@ __all__ = [
     "ShareTokenManager",
     "ShareRegistry",
     "InMemoryShareRegistry",
+    "FirestoreShareRegistry",
     "share_url_for",
     "app_base_url",
 ]

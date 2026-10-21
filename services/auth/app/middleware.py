@@ -339,8 +339,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         else:
             reason = "served from query cache" if cache_hit else (error or "endpoint failed")
             self._tokens.refund(reservation_id, reason=reason)
-            if self._entitlements is not None:
-                self._entitlements.return_tokens(user_id, reserved)
+            # The allowance is only INCREMENTED on confirm (via ``consume``);
+            # ``check_allowance`` merely checks.  Refunding must therefore
+            # not decrement it: doing so would let a user erase real usage
+            # from earlier requests by making a failing or cache-served call.
 
         event = UsageEvent(
             event_id=str(uuid.uuid4()),

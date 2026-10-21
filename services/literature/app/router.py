@@ -186,8 +186,19 @@ def bm25_rank(
         scored.append((score, hit))
 
     scored.sort(key=lambda pair: (-pair[0], pair[1].title.lower()))
+    # BM25 is an unbounded relevance score; ``PaperHit.relevance_score`` is
+    # declared as a 0..1 field.  Divide by the best score so the ranking is
+    # preserved exactly while the value stays inside the contract (an
+    # unnormalized score could otherwise exceed 1 with multi-term queries
+    # and make the response fail validation on the way back out of the
+    # query cache).
+    best = scored[0][0] if scored and scored[0][0] > 0 else 0.0
     return [
-        hit.model_copy(update={"relevance_score": round(score, 6)})
+        hit.model_copy(
+            update={
+                "relevance_score": round(score / best, 6) if best else 0.0
+            }
+        )
         for score, hit in scored
     ]
 

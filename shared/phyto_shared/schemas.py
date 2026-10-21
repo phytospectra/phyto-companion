@@ -77,6 +77,14 @@ class AnalysisRequest(StrictModel):
         "mechanism_hypothesis",
     ]
     parameters: dict[str, Any] = Field(default_factory=dict)
+    modalities: list[str] = Field(
+        default_factory=list,
+        description="Observation modalities the user actually supplied "
+        "(h_1d, c_1d, hsqc, ms1, ms2). Empty means unspecified: planning is "
+        "then unconstrained and treats every workflow step as possible. "
+        "When set, steps the supplied evidence cannot support are pruned and "
+        "reported instead of being run (ADR-0050).",
+    )
     dry_run: bool = Field(
         default=False,
         description="Validate the workflow graph without executing cloud calls",

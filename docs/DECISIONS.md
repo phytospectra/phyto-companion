@@ -1707,3 +1707,127 @@ own enforcement surface.
   LLM cost is controlled by the token allowance and the distilled tier
   (ADR-0045, ADR-0046), not by request rate. The external-API limits described
   in item 5 live in the literature and networking clients, not in this module.
+
+---
+
+### ADR-0050: Single-modality analyses are first-class, and say what they cannot establish
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** The platform's stated principle is that a user with only NMR data
+  or only MS data must get a complete, honest analysis -- not a degraded one.
+  The code did not honour that. The ranker happened to tolerate missing
+  modalities, but it returned no record of which modalities it had actually
+  scored, so an NMR-only ranking was wire-indistinguishable from a fused one.
+  Worse, the planner hard-coded `sirius.predict_formula` (an MS/MS tool) into
+  both `single_compound` and `novelty_scan` and hard-coded an HSQC matching step
+  into `single_compound`, so an NMR-only user's run would fail partway through
+  or, for a workflow that merely tolerated the missing step, complete while
+  silently omitting the mass constraint its verdicts assumed. A reviewer reading
+  `verdict: tentative` had no way to see that no MS evidence existed.
+- **Decision:**
+  1. Observation modalities get a shared vocabulary in
+     `phyto_shared.constants`: `ObservationModality` (`h_1d`, `c_1d`, `hsqc`,
+     `ms1`, `ms2`), a family mapping (NMR/MS), and helpers `modality_families`,
+     `is_single_family`, `single_family_gap`, and
+     `parse_observation_modalities` (case-insensitive, and it REJECTS unknown
+     names rather than dropping them -- a typo must not silently shrink the
+     evidence set a run is planned against).
+  2. Every `CandidateRank` carries an optional `CandidateEvidenceProfile`
+     listing the modalities that actually produced a score (`evaluated`), those
+     supplied but unusable (`unavailable`), the families covered, and a
+     human-readable `gap`. Families are computed from CONTRIBUTING evidence, not
+     from what the user sent: an MS2 spectrum supplied without a reference
+     spectrum does not upgrade an NMR-only result to cross-modal.
+  3. The single-family caveat is appended to the rank's `EvidenceGraph.gaps` as
+     well as the profile. The graph is what a downstream reader (and the LLM
+     explainer) consumes; a caveat that lives only in a side field is a caveat
+     nobody reads.
+  4. MS-only ranking is supported explicitly: MS2 plus a reference spectrum
+     scores, and `precursor_mz` acts as the mass filter (ADR-0014). MS1 alone,
+     or MS2 without a reference, raises `InvalidInputError` with a message
+     naming the missing evidence. It never returns a rank with no support.
+  5. Tasks declare `requires_modalities`; `PlannerAgent.plan` accepts the
+     observed set and prunes steps that cannot run, recording each in
+     `TaskGraph.pruned` with a reason. Dependents are rewired onto the nearest
+     surviving ancestor. `depends_on` (ordering) is separated from `consumes`
+     (real dataflow) and `consumes_any` (a join, e.g. the knowledge-graph gate
+     needs whichever network was built), so pruning removes only steps that are
+     genuinely starved.
+  6. `AnalysisRequest.modalities` is optional and empty means "undeclared":
+     planning is then unconstrained and behaviour is exactly as before. This is
+     deliberate -- callers that have not declared their evidence must not be
+     silently narrowed.
+  7. A workflow with no runnable step for the supplied evidence is refused with
+     422, not executed as an empty success. Separately, each workflow declares
+     `WORKFLOW_MODALITY_REQUIREMENTS`: the modalities of which at least ONE must
+     be present. This catches what per-task pruning cannot. Pruning keeps a
+     connected path, but a path can reach no defensible conclusion -- a
+     `novelty_scan` on MS1-only data survives as a graph and would then propose
+     structures from an analogue's predicted shifts with nothing observed to
+     test them against. `ms1` appears in no requirement set, because a precursor
+     m/z filters candidates and never identifies one (ADR-0014).
+     `compare_extracts` declares the empty set: it is feature statistics and is
+     genuinely instrument-agnostic, so a precursor mass alone is enough.
+- **Alternatives considered:** Requiring both modalities (rejected: it excludes
+  exactly the users the principle names); inferring modalities from
+  `parameters` (rejected: implicit and impossible to validate, and a missing
+  parameter cannot be distinguished from an unparsed one); failing the run when
+  a required step is missing (rejected: a user with good NMR data and no MS
+  should still get an NMR analysis, with the gap stated); letting the ranking
+  average over only available modalities without reporting them (rejected:
+  that is the silent-weakening the platform forbids -- the score is honest, the
+  absence of a whole instrument is not); treating a missing modality as a
+  zero-scoring modality (rejected: it would penalise a candidate for evidence
+  the user never had, and would make the combined score depend on data
+  collection rather than structure).
+- **Consequences:** Verdicts are unchanged for unchanged evidence -- this ADR
+  reports coverage, it does not re-weight it. `MIN_COVERAGE_FOR_TENTATIVE` still
+  governs the label, so a well-covered NMR-only match remains TENTATIVE (MSI
+  Level 2), which is correct: NMR-only cannot reach Level 1 without a standard.
+  The `unavailable` list is populated only for score-capable modalities;
+  `ms1` is a filter, so it appears in the families covered but never in
+  `evaluated`. Tasks that consume a pruned task's output are pruned too, which
+  means a `novelty_scan` on HSQC-only data keeps the whole reachable chain
+  (the analogue's shifts are predicted from the library structure, not from a
+  SIRIUS formula) -- this is correct but worth knowing: the formula gate is
+  then absent, and `evidence_gap` says so. **TODO:** COCONUT/NPAtlas formula
+  enumeration from an NMR-derived formula is not implemented; an NMR-only user
+  supplies the formula themselves, and the ranker's `require_formula_match`
+  still fails candidates whose formula differs.
+
+---
+
+### ADR-0051: Commit discipline for multi-chat work
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** Two chat sessions edited this repository concurrently on
+  2026-10-21. Commits e9feb29 and 7148e54 were created from one session while
+  the other was adding growth-feature code to the same working tree, so their
+  token-system messages describe only part of what they contain. The code is
+  committed and pushes cleanly, but the history no longer tells a reader what
+  each commit did. The ID here is 0051, not the requested 0049: ADR-0049 was
+  already allocated to the share rate limiter, and this log allocates IDs by
+  checking the existing sequence rather than assuming the next number.
+- **Decision:**
+  1. Every chat session commits its completed work before ending.
+  2. Commit messages note the chat name, so concurrent work is attributable.
+  3. The ADR sequence is checked before allocating a new ID (`grep -oE
+     "ADR-[0-9]{4}" docs/DECISIONS.md | sort -u`), so a second session cannot
+     silently reuse a number.
+  4. No file-based lock is used for same-user multi-chat work; commit
+     discipline is the control. A lock would not span sessions that start
+     before it is taken, and it would add state to clean up.
+- **Alternatives considered:** Rewriting e9feb29/7148e54 to split the mixed
+  changes (rejected: it requires a force-push, breaks reproducibility of the
+  current tree, and every existing reference to those SHAs stops resolving);
+  a lockfile/lease (rejected: same-user sessions do not reliably observe one,
+  and a stale lock blocks all work); leaving the history unexplained
+  (rejected: the next reader would reasonably mistrust the messages).
+- **Consequences:** Mixed commits stay in history and are documented as such in
+  `docs/WORKING_PRACTICES.md`. Attribution now depends on authors remembering
+  to name the chat, which is exactly what the rule asks of them. This ADR does
+  not change any code or runtime behaviour.

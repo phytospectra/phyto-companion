@@ -18,11 +18,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from phyto_shared.constants import (
     ELEMENT_MASSES,
     MSIConfidenceLevel,
+    ObservationModality,
     ToolTier,
+    modality_families,
+    single_family_gap,
 )
 from phyto_shared.exceptions import InvalidInputError
 from phyto_shared.models import (
     Candidate,
+    CandidateEvidenceProfile,
     CandidateRank,
     EvidenceGraph,
     EvidenceItem,
@@ -51,9 +55,20 @@ __all__ = [
     "ms2_cosine",
     "rank_candidates",
     "score_molecule",
+    "supplied_modalities",
+    "evidence_profile",
 ]
 
 _ELEMENT_PATTERN = re.compile(r"([A-Z][a-z]?)(\d*)")
+
+# Matcher result keys -> the modality they represent.  MS1 is deliberately
+# absent: precursor m/z is a filter, never a score (ADR-0014).
+_SCORE_MODALITIES: dict[str, ObservationModality] = {
+    "h_1d": ObservationModality.H_1D,
+    "c_1d": ObservationModality.C_1D,
+    "hsqc": ObservationModality.HSQC,
+    "ms2": ObservationModality.MS2,
+}
 
 
 class ObservedEvidence(BaseModel):
@@ -191,6 +206,79 @@ def _predicted_views(prediction) -> tuple[list[float], list[float], list[tuple[f
     return h_1d, c_1d, hsqc
 
 
+def supplied_modalities(observed: ObservedEvidence) -> frozenset[ObservationModality]:
+    """Which modalities the user actually supplied.
+
+    ``precursor_mz`` alone counts as MS1: it is real evidence (a mass
+    filter), even though it never becomes a structural score.  MS2 counts
+    only when peaks are present -- an empty fragment list is not evidence.
+    """
+    modalities: set[ObservationModality] = set()
+    if observed.h_1d:
+        modalities.add(ObservationModality.H_1D)
+    if observed.c_1d:
+        modalities.add(ObservationModality.C_1D)
+    if observed.hsqc:
+        modalities.add(ObservationModality.HSQC)
+    if observed.precursor_mz is not None:
+        modalities.add(ObservationModality.MS1)
+    if observed.ms2:
+        modalities.add(ObservationModality.MS2)
+    return frozenset(modalities)
+
+
+def evidence_profile(
+    scored: set[str],
+    observed: ObservedEvidence,
+    gaps: list[EvidenceItem] | None = None,
+) -> CandidateEvidenceProfile:
+    """Describe which modalities were scored and what could not be checked.
+
+    ``scored`` holds the names the matcher actually produced (the keys of
+    a modality-results dict), so this reports behaviour, not intent.  MS1
+    is applied as a mass FILTER (ADR-0014) and never appears as a score, so
+    it is neither ``evaluated`` nor ``unavailable`` -- its presence still
+    counts toward the instrument families covered.
+    """
+    supplied = supplied_modalities(observed)
+    evaluated = {
+        ObservationModality(name) for name in scored if name in _SCORE_MODALITIES
+    }
+    # A supplied, score-capable modality with no score is a gap, not
+    # agreement: the canonical case is MS2 with no reference spectrum.
+    ms1_filter = {ObservationModality.MS1} if ObservationModality.MS1 in supplied else set()
+    supporting = evaluated | ms1_filter
+    unavailable = {
+        modality
+        for modality in supplied - supporting
+        if modality in _SCORE_MODALITIES
+    }
+    # Families are counted from what actually contributed, not from what
+    # the user sent: a supplied-but-unusable MS2 must not upgrade an
+    # NMR-only assignment to "cross-modal".
+    families = modality_families(supporting)
+    gap = single_family_gap(supporting)
+    if gap and unavailable:
+        # The base sentence says a family was never supplied; here the user
+        # did supply it but it could not be scored, so say that instead of
+        # claiming it is absent.
+        missing = "mass spectrometry" if families == {"NMR"} else "NMR"
+        gap = (
+            "single-family evidence: the supplied "
+            f"{', '.join(sorted(m.value for m in unavailable))} could not be "
+            f"scored (no reference spectrum to compare against), so it adds "
+            f"no support; this assignment rests on {next(iter(families))} "
+            f"alone, with no {missing} cross-check"
+        )
+    return CandidateEvidenceProfile(
+        evaluated=sorted(m.value for m in evaluated),
+        unavailable=sorted(m.value for m in unavailable),
+        families=sorted(families),
+        is_single_family=len(families) <= 1,
+        gap=gap,
+    )
+
+
 def _precursor_passes(
     observed: ObservedEvidence, candidate: Candidate, config: RankingConfig
 ) -> bool:
@@ -288,12 +376,26 @@ def _modality_scores(
     elif ms2_gap is not None:
         gap_notes.append(ms2_gap)
     if not results:
-        raise InvalidInputError(
-            "no modality available for ranking: provide h_1d, c_1d, or hsqc "
-            "in the observed evidence (precursor m/z is a filter, not a "
-            "score; MS2 needs a reference spectrum)",
-            context={},
-        )
+        supplied = supplied_modalities(observed)
+        if ObservationModality.MS2 in supplied:
+            detail = (
+                "MS2 peaks were supplied but no reference spectrum is "
+                "available for this candidate, so there is nothing to score "
+                "against (a precursor m/z alone is a filter, not a score)"
+            )
+        elif supplied & {ObservationModality.MS1}:
+            detail = (
+                "only MS1 evidence was supplied: a precursor m/z filters "
+                "candidates but cannot rank them, so an MS2 spectrum (with "
+                "a reference) or any NMR modality is required"
+            )
+        else:
+            detail = (
+                "no modality available for ranking: provide h_1d, c_1d, or "
+                "hsqc in the observed evidence (precursor m/z is a filter, "
+                "not a score; MS2 needs a reference spectrum)"
+            )
+        raise InvalidInputError(detail, context={"supplied": sorted(m.value for m in supplied)})
     return results, gap_notes
 
 
@@ -495,6 +597,14 @@ def rank_candidates(
                 ])) else "all observed peaks explained"
             ],
         )
+        profile = evidence_profile(
+            set(per_candidate_results[index]), observed, per_candidate_gaps[index]
+        )
+        if profile.gap:
+            # The single-family caveat belongs on the claim, not only in a
+            # side channel: a reader of ``gaps`` must not conclude that
+            # an NMR-only assignment was cross-modal supported (ADR-0050).
+            graph.gaps.append(profile.gap)
         ranks.append(
             CandidateRank(
                 candidate=candidate,
@@ -506,6 +616,7 @@ def rank_candidates(
                 tied_candidates=tied_ids,
                 verdict=assessment.verdict,
                 evidence_graph=graph,
+                evidence_profile=profile,
             )
         )
     return sorted(ranks, key=lambda r: r.score)

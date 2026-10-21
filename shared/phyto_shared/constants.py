@@ -22,7 +22,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from types import MappingProxyType
-from typing import Literal, Mapping
+from typing import Any, Literal, Mapping
+
+from .exceptions import InvalidInputError
 
 __all__ = [
     "SolventReference",
@@ -41,6 +43,15 @@ __all__ = [
     "NOVELTY_STATUS_DEFINITIONS",
     "NoveltyStatus",
     "solvent_lookup",
+    "ObservationModality",
+    "MODALITY_FAMILIES",
+    "MODALITY_REQUIREMENTS",
+    "NMR_MODALITIES",
+    "MS_MODALITIES",
+    "modality_families",
+    "is_single_family",
+    "single_family_gap",
+    "parse_observation_modalities",
 ]
 
 
@@ -429,3 +440,152 @@ ELECTRON_MASS_DA = 0.000548579909
 # frequency per tesla -- the basis of any future resonance-frequency math.
 PROTON_GYROMAGNETIC_RATIO_RAD_S_PER_T = 2.6752218744e8
 PROTON_LARMOR_FREQUENCY_MHZ_PER_T = 42.57747892
+
+
+# ---------------------------------------------------------------------------
+# 8. Observation modalities (NMR-only / MS-only / combined)
+# ---------------------------------------------------------------------------
+#
+# Every user is allowed to arrive with one modality.  The platform must then
+# say what it did and what it could NOT check, rather than quietly running a
+# fused workflow on half the evidence.  These names are the shared vocabulary
+# for that: the elucidation ranker reports which ones it evaluated, and the
+# orchestrator planner uses them to decide which tasks are even possible.
+
+
+class ObservationModality(StrEnum):
+    """One kind of observation a user can supply for a sample."""
+
+    H_1D = "h_1d"
+    C_1D = "c_1d"
+    HSQC = "hsqc"
+    MS1 = "ms1"
+    MS2 = "ms2"
+
+
+MODALITY_FAMILIES: Mapping[ObservationModality, Literal["NMR", "MS"]] = MappingProxyType(
+    {
+        ObservationModality.H_1D: "NMR",
+        ObservationModality.C_1D: "NMR",
+        ObservationModality.HSQC: "NMR",
+        ObservationModality.MS1: "MS",
+        ObservationModality.MS2: "MS",
+    }
+)
+"""Which instrument family each modality belongs to."""
+
+NMR_MODALITIES: frozenset[ObservationModality] = frozenset(
+    {ObservationModality.H_1D, ObservationModality.C_1D, ObservationModality.HSQC}
+)
+
+MS_MODALITIES: frozenset[ObservationModality] = frozenset(
+    {ObservationModality.MS1, ObservationModality.MS2}
+)
+
+MODALITY_REQUIREMENTS: Mapping[ObservationModality, str] = MappingProxyType(
+    {
+        ObservationModality.H_1D: (
+            "Observed 1H chemical shifts (ppm). Supports ranking against "
+            "predicted shifts; too few resolved signals to stand alone."
+        ),
+        ObservationModality.C_1D: (
+            "Observed 13C chemical shifts (ppm). Tight tolerance is used when "
+            "an HSQC or multiplicity-edited list establishes CH/CH2/CH3, "
+            "otherwise a loose full-range tolerance applies."
+        ),
+        ObservationModality.HSQC: (
+            "Observed 1H-13C correlation pairs. The strongest structural "
+            "evidence available without a standard; drives the matching "
+            "distance and the NMR network."
+        ),
+        ObservationModality.MS1: (
+            "Precursor m/z and adduct. Used as a FILTER on candidate mass "
+            "(ADR-0014), never as a structural score."
+        ),
+        ObservationModality.MS2: (
+            "Observed fragment peaks. Scores only against a REFERENCE "
+            "spectrum; with no reference it is recorded as a gap, not "
+            "silently treated as agreement."
+        ),
+    }
+)
+
+
+def modality_families(
+    modalities: frozenset[ObservationModality] | set[ObservationModality],
+) -> frozenset[str]:
+    """Instrument families ('NMR', 'MS') represented by these modalities."""
+    return frozenset(MODALITY_FAMILIES[m] for m in modalities)
+
+
+def is_single_family(
+    modalities: frozenset[ObservationModality] | set[ObservationModality],
+) -> bool:
+    """True when every supplied modality comes from ONE instrument family.
+
+    A single-family analysis is legitimate and supported; it is simply less
+    constrained than a cross-modal one, and callers must say so rather than
+    presenting the result as fused.
+    """
+    return len(modality_families(modalities)) <= 1
+
+
+def single_family_gap(
+    modalities: frozenset[ObservationModality] | set[ObservationModality],
+) -> str | None:
+    """The honest evidence gap for a single-family analysis, else None.
+
+    Returns ``None`` for an empty set (nothing was supplied, so there is no
+    "missing other family" to report) and for genuinely cross-modal input.
+    """
+    families = modality_families(modalities)
+    if len(families) != 1:
+        return None
+    family = next(iter(families))
+    if family == "NMR":
+        return (
+            "NMR-only evidence: no mass spectrometry supplied, so the "
+            "molecular formula and precursor mass were not independently "
+            "confirmed, and no MS2 library hit can support or contradict "
+            "this assignment"
+        )
+    return (
+        "MS-only evidence: no NMR supplied, so isomeric structures sharing "
+        "this mass and formula cannot be distinguished; connectivities "
+        "are unconstrained"
+    )
+
+
+def parse_observation_modalities(
+    names: Any,
+) -> frozenset[ObservationModality]:
+    """Normalize a caller-supplied modality list into a validated set.
+
+    Accepts ``None``/empty (meaning "unspecified"), a single string, or an
+    iterable of strings.  Names are matched case-insensitively against
+    ``ObservationModality``.  Unknown names raise ``InvalidInputError``:
+    a typo like ``"hmbc"`` must not silently drop a modality the user
+    believes was considered.
+    """
+    if names is None:
+        return frozenset()
+    if isinstance(names, str):
+        names = [names]
+    modalities: set[ObservationModality] = set()
+    for name in names:
+        if not isinstance(name, str):
+            raise InvalidInputError(
+                "modality names must be strings", context={"value": repr(name)}
+            )
+        try:
+            modalities.add(ObservationModality(name.strip().lower()))
+        except ValueError:
+            raise InvalidInputError(
+                f"unknown observation modality '{name}'; allowed: "
+                f"{', '.join(sorted(m.value for m in ObservationModality))}",
+                context={
+                    "modality": name,
+                    "allowed": sorted(m.value for m in ObservationModality),
+                },
+            ) from None
+    return frozenset(modalities)

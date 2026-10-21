@@ -5,8 +5,10 @@ Prices live in Stripe, never in code.  This module exposes:
 * ``GET /billing/plans`` -- public; plan FEATURES (not prices) so the
   frontend can render the pricing page; prices are fetched from Stripe.
 * ``POST /billing/subscribe`` -- auth; returns a Stripe Checkout URL.
-* ``POST /billing/webhook`` -- public (Stripe calls it, signature
-  verified in production); idempotent per ``session.id``.
+* ``POST /billing/webhook`` -- public (Stripe calls it); the request is
+  authenticated by the ``Stripe-Signature`` header, which is verified
+  against ``STRIPE_WEBHOOK_SECRET`` before the event is processed.
+  Idempotent per ``session.id``.
 * ``GET/POST /billing/api-keys`` -- auth; pro and above (api_access).
 
 The Stripe client is a protocol with a deterministic mock and a thin real
@@ -23,6 +25,7 @@ import os
 import secrets
 from typing import Any, Protocol
 
+import stripe
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -165,6 +168,43 @@ class WebhookEvent(BaseModel):
     data: dict = Field(default_factory=dict)
 
 
+class WebhookVerificationError(Exception):
+    """The request did not prove it came from Stripe."""
+
+
+def verify_webhook_signature(payload: bytes, sig_header: str | None) -> dict:
+    """Return the verified event payload, or raise WebhookVerificationError.
+
+    The signature is the ONLY credential on this endpoint: it is public by
+    necessity (Stripe cannot present a Firebase token), so an unverified
+    request must never reach the processor.  A missing secret is a
+    configuration error and fails closed -- with no secret we cannot tell a
+    real Stripe delivery from a forged one, so we process nothing.
+
+    Returns the plain dict Stripe sent, not the SDK's Event object: the
+    processor takes a dict-shaped payload and the SDK's attribute access
+    would hide key-name mistakes until production.
+    """
+    secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+    if not secret:
+        raise WebhookVerificationError(
+            "STRIPE_WEBHOOK_SECRET is not configured; refusing to process an "
+            "unverified webhook (see docs/STRIPE_SETUP.md)"
+        )
+    if not sig_header:
+        raise WebhookVerificationError("missing Stripe-Signature header")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, secret)
+    except ValueError as exc:
+        # Malformed payload, or a signature header we cannot parse.
+        raise WebhookVerificationError(f"malformed webhook payload: {exc}") from exc
+    except stripe.error.SignatureVerificationError as exc:
+        raise WebhookVerificationError(f"invalid webhook signature: {exc}") from exc
+    # The SDK returns an Event object; the processor and the pydantic model
+    # both take plain dicts, so unwrap it to nested Python types here.
+    return event.to_dict()
+
+
 class WebhookProcessor:
     """Idempotent checkout.session.completed processing.
 
@@ -185,7 +225,16 @@ class WebhookProcessor:
         if not session_id:
             return {"status": "malformed", "error": "missing session id"}
         if session_id in self._processed:
-            return {"status": "ok", "duplicate": True, **self._processed[session_id]}
+            # Report the stored outcome, but with this delivery's own
+            # duplicate flag: the stored copy says duplicate=False because
+            # it describes the first delivery.
+            outcome = self._processed[session_id]
+            return {
+                "status": "ok",
+                "duplicate": True,
+                "user_id": outcome["user_id"],
+                "plan": outcome["plan"],
+            }
 
         metadata = session.get("metadata") or {}
         user_id = str(
@@ -308,8 +357,25 @@ def install_billing_routes(
         )
 
     @app.post("/billing/webhook")
-    def stripe_webhook(event: WebhookEvent) -> dict:
-        result = webhook.handle(event)
+    async def stripe_webhook(request: Request) -> dict:
+        """Verify the Stripe signature, then process the event.
+
+        The raw body is read before any parsing: the signature covers the
+        exact bytes Stripe sent, so re-serializing a parsed model would
+        invalidate it.  Auth (the Firebase token) and this signature are
+        separate gates; this endpoint is in ``PUBLIC_PATHS`` because Stripe
+        cannot send the former, so this one must always pass.
+        """
+        payload = await request.body()
+        try:
+            event = verify_webhook_signature(
+                payload, request.headers.get("Stripe-Signature")
+            )
+        except WebhookVerificationError as exc:
+            logger.warning("rejected Stripe webhook: %s", exc)
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        result = webhook.handle(WebhookEvent.model_validate(event))
         if result.get("status") == "malformed":
             # Acknowledge with 200: Stripe retries 5xx forever, and a
             # malformed session will never become well-formed.

@@ -12,6 +12,7 @@ after completing one full analysis -- a confirmed metered
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 import threading
 import uuid
@@ -169,7 +170,7 @@ class InMemoryWorkspaceStore:
         # Email invites resolve to a placeholder uid until the invitee signs
         # in; a real deployment sends a Firebase invite email and swaps the
         # placeholder for the claimed uid (documented in ADR-0047).
-        uid = f"invite-{secrets.sha256(email.lower().encode()).hexdigest()[:12]}"
+        uid = f"invite-{hashlib.sha256(email.lower().encode()).hexdigest()[:12]}"
         with self._lock:
             workspace = self._require(workspace_id)
             if len(workspace.members) >= workspace.caps.seats:

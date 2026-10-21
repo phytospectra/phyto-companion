@@ -162,7 +162,14 @@ def cost_for_route(method: str, path: str) -> RoutePrice | None:
         return exact
 
     for (prefix_method, prefix), price in _PREFIX_PRICING.items():
-        if normalized_method == prefix_method and normalized_path.startswith(prefix):
+        if normalized_method != prefix_method:
+            continue
+        # Match the collection route itself (``/workspaces``) as well as
+        # its children (``/workspaces/ws-123``).  Comparing only against
+        # the trailing-slash prefix leaves POST /workspaces unpriced, and
+        # an unpriced route is refused with 503 by the middleware.
+        base = prefix.rstrip("/")
+        if normalized_path == base or normalized_path.startswith(prefix):
             return price
 
     return None

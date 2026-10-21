@@ -37,6 +37,7 @@ __all__ = [
     "EvidenceGraph",
     "Candidate",
     "CandidateRank",
+    "CandidateEvidenceProfile",
     "NetworkNode",
     "NetworkEdge",
     "FusedNetwork",
@@ -337,6 +338,40 @@ class Candidate(StrictModel):
     evidence_graph: EvidenceGraph | None = None
 
 
+class CandidateEvidenceProfile(StrictModel):
+    """Which modalities were actually scored for one candidate, and what
+    was NOT checkable.
+
+    Attached to every rank so a single-modality analysis cannot be mistaken
+    for a fused one: ``evaluated`` lists the modalities that produced a
+    score, ``unavailable`` those the user supplied but that could not be
+    used (e.g. MS2 without a reference spectrum), and ``families`` names
+    the instrument families covered.
+    """
+
+    evaluated: list[str] = Field(
+        default_factory=list,
+        description="Modalities that contributed a score, e.g. ['h_1d', 'hsqc']",
+    )
+    unavailable: list[str] = Field(
+        default_factory=list,
+        description="Modalities supplied but unusable, e.g. ['ms2'] with no "
+        "reference spectrum",
+    )
+    families: list[str] = Field(
+        default_factory=list, description="Instrument families covered: 'NMR', 'MS'"
+    )
+    is_single_family: bool = Field(
+        default=True,
+        description="True when only one instrument family contributed evidence",
+    )
+    gap: str | None = Field(
+        default=None,
+        description="Honest statement of what cross-modal support is missing, "
+        "or None when the evidence is genuinely multi-modal",
+    )
+
+
 class CandidateRank(StrictModel):
     """A candidate with its score and honest ranking statistics."""
 
@@ -362,6 +397,11 @@ class CandidateRank(StrictModel):
         default=None,
         description="Evidence supporting this rank (attached by the ranker; "
         "structured per-claim graphs are built by the elucidation service)",
+    )
+    evidence_profile: CandidateEvidenceProfile | None = Field(
+        default=None,
+        description="Modalities scored for this rank and the cross-modal gap; "
+        "required reading before treating a rank as fused evidence (ADR-0050)",
     )
 
     @model_validator(mode="after")

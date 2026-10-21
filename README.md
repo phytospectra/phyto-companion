@@ -96,6 +96,36 @@ inference, submits real GNPS jobs, trains models, or processes spectral files >1
 | `shared/phyto_shared` | Pydantic models, JSON schemas, provenance/SHA256 utilities, uncertainty quantification, constants (solvents, adducts, MSI levels), domain exceptions |
 | `infrastructure/` | Terraform for GCP (Cloud Run, Vertex AI, Cloud SQL, BigQuery, GCS, IAM) + Cloud Build CI/CD |
 
+### Single-modality contract
+
+A user with only NMR data, or only MS data, gets a complete analysis and an
+honest account of what it cannot establish (ADR-0050).
+
+- **Declaring evidence.** `AnalysisRequest.modalities` accepts any of `h_1d`,
+  `c_1d`, `hsqc`, `ms1`, `ms2` (case-insensitive; an unknown name such as
+  `hmbc` is rejected rather than silently dropped). Omitting it leaves planning
+  unconstrained, so existing callers are unaffected. The elucidation candidate
+  endpoint needs no such field: it derives the modalities from whichever
+  observations are present in its `observed` payload.
+- **Planning.** Tasks whose modality is absent are pruned with a reason, and
+  their dependents are pruned too. Each workflow also declares the modalities
+  of which **at least one** must be present; a request that can never reach a
+  defensible conclusion is refused with `422` rather than run as an empty
+  success. `compare_extracts` declares none — feature statistics are
+  instrument-agnostic.
+- **Ranking.** `CandidateRank.evidence_profile` names the families actually
+  scored, whether the evidence is single-family, and the `gap`. For NMR-only
+  input the gap reads: "no mass spectrometry supplied, so the molecular formula
+  and precursor mass were not independently confirmed, and no MS2 library hit
+  can support or contradict this assignment"; for MS-only input, "isomeric
+  structures sharing this mass and formula cannot be distinguished;
+  connectivities are unconstrained". Missing modalities are never scored as
+  zero; the score stays honest and the absence is reported separately.
+- **Why `ms1` never satisfies a structural workflow.** A precursor m/z filters
+  candidate formulas; it never identifies a structure (ADR-0014). It is
+  therefore counted as evidence coverage but never as an evaluated scoring
+  modality.
+
 ### Repository layout
 
 ```

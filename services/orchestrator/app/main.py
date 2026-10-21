@@ -40,11 +40,13 @@ from phyto_shared.citation import (
     doi_from_identifier,
     mint_analysis_doi,
 )
-from phyto_shared.constants import ToolTier
+from phyto_shared.constants import ToolTier, parse_observation_modalities
+from phyto_shared.exceptions import InvalidInputError
 from phyto_shared.plans import plan_features
 from phyto_shared.provenance import ProvenanceBuilder, sha256_dict
 from phyto_shared.schemas import AnalysisRequest, AnalysisResponse
 from phyto_shared.share import (
+    InMemoryShareRegistry,
     ShareTokenManager,
     share_url_for,
 )
@@ -96,8 +98,10 @@ class _Runtime:
         self.manifests: dict[str, str] = {}
         # Share tokens: HMAC-signed read-only links (ADR-0044).  The dev
         # HMAC key is fine only in dry-run; from_env refuses to mint with
-        # it in production.
-        self.share_manager = ShareTokenManager.from_env()
+        # it in production.  The registry is what makes revocation real:
+        # a manager without one can mint and verify but never revoke.
+        self.share_registry = InMemoryShareRegistry()
+        self.share_manager = ShareTokenManager.from_env(self.share_registry)
         self.rate_limiter = SlidingWindowRateLimiter(
             max_requests=int(
                 os.environ.get("SHARE_RATE_LIMIT_PER_MIN", str(DEFAULT_SHARE_RATE_LIMIT))
@@ -142,6 +146,20 @@ class RunStatusResponse(BaseModel):
     tasks: list[TaskSummary]
     provenance_manifest_id: str
     citation: CitationRecord | None = None
+    modalities: list[str] = Field(
+        default_factory=list,
+        description="Observation modalities this run was planned for; empty "
+        "when the request did not declare any",
+    )
+    pruned_tasks: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Planned steps dropped as impossible for the supplied "
+        "evidence, each with the reason (ADR-0050)",
+    )
+    evidence_gap: str | None = Field(
+        default=None,
+        description="What the supplied modality set cannot establish",
+    )
 
 
 class ApproveRequest(BaseModel):
@@ -209,6 +227,12 @@ def _run_status_payload(run_id: str, runtime: _Runtime) -> RunStatusResponse:
         ],
         provenance_manifest_id=runtime.manifests[run_id],
         citation=entry.get("citation"),
+        modalities=graph.modalities,
+        pruned_tasks=[
+            {"id": pruned.id, "description": pruned.description, "reason": pruned.reason}
+            for pruned in graph.pruned
+        ],
+        evidence_gap=graph.evidence_gap,
     )
 
 
@@ -509,13 +533,25 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
     runtime.manifests[run_id] = manifest_id
 
     try:
+        modalities = parse_observation_modalities(request.modalities)
+    except InvalidInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    try:
         graph = runtime.planner.plan(
-            run_id=run_id, workflow=request.workflow, dry_run=request.dry_run
+            run_id=run_id,
+            workflow=request.workflow,
+            dry_run=request.dry_run,
+            modalities=modalities,
         )
     except KeyError:
         raise HTTPException(
             status_code=422, detail=f"unknown workflow '{request.workflow}'"
         ) from None
+    except InvalidInputError as exc:
+        # Every step of this workflow needs a modality the user did not
+        # supply: refuse rather than return a run that did nothing (ADR-0050).
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     # QA/Critic is registered -> verification capacity is available.  Human
     # approval for Tier 3 starts withheld; checkpoint approvals grant it.
@@ -555,6 +591,9 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
             "awaiting_task_id": awaiting,
             "cost_estimate_usd": result.cost_estimate_usd,
             "wall_seconds": result.wall_seconds,
+            "modalities": graph.modalities,
+            "pruned_tasks": [p.id for p in graph.pruned],
+            "evidence_gap": graph.evidence_gap,
         },
     )
 
@@ -646,7 +685,10 @@ def get_citation(run_id: str, http_request: Request) -> dict[str, Any]:
         )
     record: CitationRecord = entry["citation"]
     # The share URL is an alternate access link: surface the current one.
-    record = record.model_copy(update={"share_url": entry.get("share_url")})
+    share_token = entry.get("share_token")
+    record = record.model_copy(
+        update={"share_url": share_url_for(share_token) if share_token else None}
+    )
     already_cited = any(
         r.get("event") == "run_cited" and r.get("run_id") == run_id
         for r in runtime.audit.records()

@@ -18,8 +18,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from phyto_shared.constants import ToolTier
-from phyto_shared.exceptions import ToolTierViolationError
+from phyto_shared.constants import ObservationModality, ToolTier, single_family_gap
+from phyto_shared.exceptions import InvalidInputError, ToolTierViolationError
 from phyto_shared.literature_models import PaperHit
 from phyto_shared.provenance import sha256_dict
 
@@ -37,9 +37,11 @@ __all__ = [
     "TaskStatus",
     "Task",
     "TaskGraph",
+    "PrunedTask",
     "PlannerAgent",
     "WorkflowEngine",
     "EngineResult",
+    "WORKFLOW_MODALITY_REQUIREMENTS",
 ]
 
 WorkflowName = Literal[
@@ -73,6 +75,22 @@ class Task(BaseModel):
     inputs: dict[str, Any] = Field(default_factory=dict)
     depends_on: list[str] = Field(default_factory=list)
     requires_checkpoint: HumanCheckpoint | None = None
+    # Modalities this task can consume: AT LEAST ONE must have been observed.
+    # Empty means the task has no modality requirement (a checkpoint, a
+    # statistics step, a literature lookup).  Planning prunes tasks whose
+    # requirements cannot be met and records why (ADR-0050) -- a step that
+    # needs MS2 must never run on NMR-only input and report success.
+    requires_modalities: frozenset[ObservationModality] = frozenset()
+    # Tasks whose OUTPUT this task genuinely needs.  This is distinct from
+    # ``depends_on``, which is often mere ordering (e.g. "predict shifts
+    # after formula prediction"); a pruned dependency that is not consumed
+    # can simply be rewired away.  A pruned CONSUMED task, by contrast,
+    # removes this task too: its input no longer exists (ADR-0050).
+    consumes: list[str] = Field(default_factory=list)
+    # A JOIN: the task needs at least ONE of these outputs (e.g. "write the
+    # network to the knowledge graph" works with whichever network was
+    # built).  It is pruned only when ALL of them were pruned.
+    consumes_any: list[str] = Field(default_factory=list)
     status: str = TaskStatus.PENDING
     result_summary: str | None = None
     error: str | None = None
@@ -80,6 +98,16 @@ class Task(BaseModel):
     # Output of the task, retained so dependent tasks can consume it.  Only
     # the engine writes this; planning leaves it unset.
     output: dict[str, Any] | None = None
+
+
+class PrunedTask(BaseModel):
+    """A planned step that the supplied evidence made impossible."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    description: str
+    reason: str
 
 
 class TaskGraph(BaseModel):
@@ -92,6 +120,21 @@ class TaskGraph(BaseModel):
     dry_run: bool
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     tasks: list[Task] = Field(..., min_length=1)
+    modalities: list[str] = Field(
+        default_factory=list,
+        description="Observation modalities supplied for this run; empty when "
+        "the caller did not specify any",
+    )
+    pruned: list[PrunedTask] = Field(
+        default_factory=list,
+        description="Planned steps dropped because the supplied modalities "
+        "cannot support them",
+    )
+    evidence_gap: str | None = Field(
+        default=None,
+        description="What the supplied modality set cannot establish, stated "
+        "once for the whole run",
+    )
 
     @model_validator(mode="after")
     def _validate_topology(self) -> "TaskGraph":
@@ -178,6 +221,7 @@ def _single_compound_tasks() -> list[Task]:
             tool="sirius.predict_formula",
             inputs={"peaks": [_MS2_PEAK]},
             depends_on=["parse-peaks"],
+            requires_modalities=frozenset({ObservationModality.MS2}),
         ),
         Task(
             id="predict-shifts",
@@ -196,6 +240,7 @@ def _single_compound_tasks() -> list[Task]:
                 "predicted_c": [102.3],
             },
             depends_on=["parse-peaks", "predict-shifts"],
+            requires_modalities=frozenset({ObservationModality.HSQC}),
         ),
         Task(
             id="approve-claim",
@@ -206,12 +251,14 @@ def _single_compound_tasks() -> list[Task]:
             tool=None,
             requires_checkpoint=HumanCheckpoint.BEFORE_CONFIRMED_CLAIM,
             depends_on=["match-peaks"],
+            consumes=["match-peaks"],
         ),
         Task(
             id="confirm-identity",
             description="Record the identification claim after approval",
             tool=None,
             depends_on=["approve-claim"],
+            consumes=["approve-claim"],
         ),
         Task(
             id="explain-result",
@@ -219,6 +266,7 @@ def _single_compound_tasks() -> list[Task]:
             tool="llm.explain",
             inputs={"evidence_graph": _EVIDENCE_GRAPH},
             depends_on=["confirm-identity"],
+            consumes=["confirm-identity"],
         ),
     ]
 
@@ -267,6 +315,7 @@ def _novelty_scan_tasks() -> list[Task]:
             tool="sirius.predict_formula",
             inputs={"peaks": [_MS2_PEAK]},
             depends_on=["parse-peaks"],
+            requires_modalities=frozenset({ObservationModality.MS2}),
         ),
         Task(
             id="predict-shifts",
@@ -284,12 +333,14 @@ def _novelty_scan_tasks() -> list[Task]:
             tool=None,
             requires_checkpoint=HumanCheckpoint.BEFORE_NOVEL_STRUCTURE_GENERATION,
             depends_on=["predict-shifts"],
+            consumes=["predict-shifts"],
         ),
         Task(
             id="generate-novel-candidates",
             description="Enumerate novel structure candidates (Step 5 service)",
             tool=None,
             depends_on=["approve-novel-generation"],
+            consumes=["approve-novel-generation"],
         ),
         Task(
             id="approve-experiments",
@@ -299,6 +350,7 @@ def _novelty_scan_tasks() -> list[Task]:
             tool=None,
             requires_checkpoint=HumanCheckpoint.BEFORE_EXPERIMENT_RECOMMENDATION,
             depends_on=["generate-novel-candidates"],
+            consumes=["generate-novel-candidates"],
         ),
         Task(
             id="propose-experiments",
@@ -327,6 +379,7 @@ def _build_network_tasks() -> list[Task]:
             description="Submit the FBMN job to GNPS2",
             tool="gnps.submit_job",
             inputs={"mgf_content": "BEGIN IONS\nEND IONS\n", "title": "sample A"},
+            requires_modalities=frozenset({ObservationModality.MS2}),
         ),
         Task(
             id="fetch-gnps",
@@ -334,6 +387,7 @@ def _build_network_tasks() -> list[Task]:
             tool="gnps.fetch_results",
             inputs={"job_id": "MOCK-GNPS-0000000000"},
             depends_on=["submit-gnps"],
+            requires_modalities=frozenset({ObservationModality.MS2}),
         ),
         Task(
             id="hsqc-network",
@@ -341,6 +395,7 @@ def _build_network_tasks() -> list[Task]:
             tool="nmr_networking.build",
             inputs={"spectra": {"sample_a": [_HSQC_PEAK]}},
             depends_on=["fetch-gnps"],
+            requires_modalities=frozenset({ObservationModality.HSQC}),
         ),
         Task(
             id="approve-kg-write",
@@ -348,12 +403,14 @@ def _build_network_tasks() -> list[Task]:
             tool=None,
             requires_checkpoint=HumanCheckpoint.BEFORE_KNOWLEDGE_GRAPH_WRITE,
             depends_on=["hsqc-network"],
+            consumes_any=["fetch-gnps", "hsqc-network"],
         ),
         Task(
             id="write-knowledge-graph",
             description="Persist network annotations to the knowledge graph",
             tool=None,
             depends_on=["approve-kg-write"],
+            consumes=["approve-kg-write"],
         ),
     ]
 
@@ -382,6 +439,7 @@ def _mechanism_hypothesis_tasks() -> list[Task]:
                 ],
                 "max_results": 5,
             },
+            requires_modalities=frozenset({ObservationModality.HSQC}),
         ),
         Task(
             id="literature-search",
@@ -392,6 +450,9 @@ def _mechanism_hypothesis_tasks() -> list[Task]:
                 "max_results": 5,
             },
             depends_on=["nmr-search"],
+            # The query names the top spectral hit, so the search result is
+            # genuinely needed -- not mere ordering.
+            consumes=["nmr-search"],
         ),
         Task(
             id="approve-mechanism",
@@ -402,6 +463,7 @@ def _mechanism_hypothesis_tasks() -> list[Task]:
             tool=None,
             requires_checkpoint=HumanCheckpoint.BEFORE_MECHANISM_HYPOTHESIS,
             depends_on=["literature-search"],
+            consumes=["literature-search"],
         ),
         Task(
             id="hypothesize-mechanism",
@@ -413,6 +475,7 @@ def _mechanism_hypothesis_tasks() -> list[Task]:
             },
             # context_papers is injected from literature-search at run time.
             depends_on=["approve-mechanism", "literature-search"],
+            consumes=["approve-mechanism", "literature-search"],
         ),
         Task(
             id="verify-grounding",
@@ -422,6 +485,7 @@ def _mechanism_hypothesis_tasks() -> list[Task]:
             # text and context_papers are injected from the hypothesis and
             # literature tasks at run time.
             depends_on=["hypothesize-mechanism", "literature-search"],
+            consumes=["hypothesize-mechanism", "literature-search"],
         ),
         Task(
             id="approve-kg-write",
@@ -429,12 +493,14 @@ def _mechanism_hypothesis_tasks() -> list[Task]:
             tool=None,
             requires_checkpoint=HumanCheckpoint.BEFORE_KNOWLEDGE_GRAPH_WRITE,
             depends_on=["verify-grounding"],
+            consumes=["verify-grounding"],
         ),
         Task(
             id="write-knowledge-graph",
             description="Persist the verified mechanism hypothesis to the knowledge graph",
             tool=None,
             depends_on=["approve-kg-write"],
+            consumes=["approve-kg-write"],
         ),
     ]
 
@@ -445,6 +511,29 @@ _TEMPLATES: dict[WorkflowName, Any] = {
     "novelty_scan": _novelty_scan_tasks,
     "build_network": _build_network_tasks,
     "mechanism_hypothesis": _mechanism_hypothesis_tasks,
+}
+
+# Minimum evidence a workflow needs to be worth running at all: AT LEAST ONE
+# of these modalities must have been observed.  Per-task pruning alone is not
+# enough, because a template can keep a path that reaches no defensible
+# conclusion -- a novelty scan on MS1-only data would still propose structures
+# from an analogue's predicted shifts, with nothing observed to test them
+# against.  A precursor m/z is deliberately absent everywhere: it filters
+# candidates, it never identifies one (ADR-0014).
+WORKFLOW_MODALITY_REQUIREMENTS: dict[WorkflowName, frozenset[ObservationModality]] = {
+    "single_compound": frozenset(
+        {ObservationModality.H_1D, ObservationModality.C_1D,
+         ObservationModality.HSQC, ObservationModality.MS2}
+    ),
+    "compare_extracts": frozenset(),  # feature statistics; instrument-agnostic
+    "novelty_scan": frozenset(
+        {ObservationModality.H_1D, ObservationModality.C_1D,
+         ObservationModality.HSQC, ObservationModality.MS2}
+    ),
+    "build_network": frozenset(
+        {ObservationModality.HSQC, ObservationModality.MS2}
+    ),
+    "mechanism_hypothesis": frozenset({ObservationModality.HSQC}),
 }
 
 
@@ -461,6 +550,132 @@ _INPUT_WIRING: dict[str, dict[str, tuple[str, str]]] = {
 }
 
 
+def _missing_modality_requirement(
+    task: Task, available: frozenset[ObservationModality]
+) -> bool:
+    """True when a task cannot run because none of its modalities was seen.
+
+    A task with NO requirement is always runnable: checkpoints, statistics,
+    and literature lookups do not depend on the instrument.
+    """
+    if not task.requires_modalities:
+        return False
+    return not (task.requires_modalities & available)
+
+
+def _prune_by_modality(
+    tasks: list[Task], available: frozenset[ObservationModality]
+) -> tuple[list[Task], list[PrunedTask]]:
+    """Drop tasks the supplied modalities cannot support, then rewire.
+
+    Dependents of a pruned task inherit its surviving ancestors, so the
+    graph stays connected and topologically valid.  A dependent that
+    depended on a pruned task ONLY is itself pruned, because its input no
+    longer exists.
+
+    This is a planning decision, not a runtime failure: the caller can show
+    the user exactly which steps were skipped and why, before anything runs.
+    """
+    original_graph = {task.id: list(task.depends_on) for task in tasks}
+    removed: dict[str, PrunedTask] = {}
+    kept: list[Task] = []
+    for task in tasks:
+        if _missing_modality_requirement(task, available):
+            provided = ", ".join(
+                sorted(m.value for m in task.requires_modalities)
+            )
+            seen = ", ".join(sorted(m.value for m in available)) or "none"
+            removed[task.id] = PrunedTask(
+                id=task.id,
+                description=task.description,
+                reason=(
+                    f"requires {provided}, which was not observed "
+                    f"(supplied: {seen}); this step cannot be run on the "
+                    f"available evidence"
+                ),
+            )
+        else:
+            kept.append(task)
+
+    if not removed:
+        return kept, []
+
+    # A task that CONSUMES a removed task's output cannot run: the input is
+    # gone.  This cascades, so iterate to a fixpoint before rewiring.
+    changed = True
+    while changed:
+        changed = False
+        for task in list(kept):
+            lost = [dep for dep in task.consumes if dep in removed]
+            if lost:
+                removed[task.id] = PrunedTask(
+                    id=task.id,
+                    description=task.description,
+                    reason=(
+                        f"its input comes from {', '.join(sorted(lost))}, "
+                        "which the supplied modalities made impossible"
+                    ),
+                )
+                kept.remove(task)
+                changed = True
+                continue
+            if task.consumes_any and all(
+                dep in removed for dep in task.consumes_any
+            ):
+                removed[task.id] = PrunedTask(
+                    id=task.id,
+                    description=task.description,
+                    reason=(
+                        "it needs at least one of "
+                        f"{', '.join(sorted(task.consumes_any))}, and the "
+                        "supplied modalities ruled out all of them"
+                    ),
+                )
+                kept.remove(task)
+                changed = True
+
+    if not kept:
+        raise InvalidInputError(
+            "the supplied modalities cannot support any step of this workflow",
+            context={
+                "modalities": sorted(m.value for m in available),
+                "pruned": sorted(removed),
+            },
+        )
+
+    # Rewire: a dependency that SURVIVES stays a dependency.  Only a removed
+    # dependency is replaced by its own surviving ancestors, transitively, so
+    # ordering is preserved through the gap.
+    ancestors_cache: dict[str, list[str]] = {}
+
+    def surviving_ancestors(task_id: str, seen: set[str] | None = None) -> list[str]:
+        """Surviving tasks that the removed ``task_id`` depended on."""
+        if task_id in ancestors_cache:
+            return ancestors_cache[task_id]
+        seen = seen or set()
+        if task_id in seen:  # pragma: no cover - templates are acyclic
+            return []
+        seen.add(task_id)
+        result: list[str] = []
+        for dep in original_graph[task_id]:
+            if dep in removed:
+                result.extend(surviving_ancestors(dep, seen))
+            elif dep not in result:
+                result.append(dep)
+        ancestors_cache[task_id] = result
+        return result
+
+    for task in kept:
+        rewired: list[str] = []
+        for dep in original_graph[task.id]:
+            if dep in removed:
+                rewired.extend(surviving_ancestors(dep))
+            else:
+                rewired.append(dep)
+        task.depends_on = list(dict.fromkeys(rewired))
+    return kept, list(removed.values())
+
+
 class PlannerAgent:
     """Decomposes goals into validated task graphs (deterministic; no LLM)."""
 
@@ -468,14 +683,58 @@ class PlannerAgent:
         self.registry = registry
 
     def plan(
-        self, *, run_id: str, workflow: WorkflowName, dry_run: bool
+        self,
+        *,
+        run_id: str,
+        workflow: WorkflowName,
+        dry_run: bool,
+        modalities: frozenset[ObservationModality] | None = None,
     ) -> TaskGraph:
+        """Build the task graph for one workflow.
+
+        ``modalities`` names what the user actually observed.  When it is
+        omitted or empty, planning is unconstrained: every template step is
+        kept, matching the historical behaviour for callers that have not
+        declared their inputs.  When it IS supplied, steps whose required
+        modality is absent are pruned, dependents are rewired onto the
+        nearest surviving ancestor, and each pruning is recorded on the
+        graph with its reason (ADR-0050) -- so a user with only NMR data
+        gets an NMR workflow that says what it could not do, instead of a
+        fused workflow that fails at the SIRIUS step or, worse, silently
+        reports success without the mass constraint.
+        """
         tasks = _TEMPLATES[workflow]()
         # Planning-time validation: every referenced tool must exist.
         for task in tasks:
             if task.tool is not None:
                 self.registry.get_tool(task.tool)
-        return TaskGraph(run_id=run_id, workflow=workflow, dry_run=dry_run, tasks=tasks)
+
+        pruned: list[PrunedTask] = []
+        if modalities:
+            required = WORKFLOW_MODALITY_REQUIREMENTS[workflow]
+            if required and not (required & modalities):
+                raise InvalidInputError(
+                    f"workflow '{workflow}' needs at least one of "
+                    f"{', '.join(sorted(m.value for m in required))}, none of "
+                    f"which was supplied (supplied: "
+                    f"{', '.join(sorted(m.value for m in modalities))})",
+                    context={
+                        "workflow": workflow,
+                        "required_any_of": sorted(m.value for m in required),
+                        "supplied": sorted(m.value for m in modalities),
+                    },
+                )
+            tasks, pruned = _prune_by_modality(tasks, modalities)
+
+        return TaskGraph(
+            run_id=run_id,
+            workflow=workflow,
+            dry_run=dry_run,
+            tasks=tasks,
+            modalities=sorted(m.value for m in (modalities or frozenset())),
+            pruned=pruned,
+            evidence_gap=single_family_gap(modalities) if modalities else None,
+        )
 
     def replan_after_failure(
         self, graph: TaskGraph, failed_task_id: str

@@ -13,6 +13,8 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "firebase-admin>=6.5",
+    # The webhook verifies Stripe's HMAC signature (see billing_routes).
+    "stripe>=9.0",
 ]
 
 [tool.hatch.build.targets.wheel]
