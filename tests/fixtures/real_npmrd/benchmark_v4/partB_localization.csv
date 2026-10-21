@@ -1,0 +1,4 @@
+subset,n,observed_pct,chance_pct,p_value
+all,36,88.9,44.3,<1e-5
+≥2 sites,28,85.7,28.4,<1e-5
+≥4 sites,13,69.2,13.8,1e-05

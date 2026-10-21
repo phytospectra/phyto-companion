@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC FIXTURE: GNPS2 feature-based molecular networking (FBMN)
+     GraphML schema.  Nodes are MZmine features (feature_id attribute
+     carries the row ID).  Generated locally 2026-10-21; no GNPS task. -->
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+  <key id="d0" for="node" attr.name="label" attr.type="string"/>
+  <key id="d1" for="node" attr.name="precursor mass" attr.type="double"/>
+  <key id="d2" for="node" attr.name="feature_id" attr.type="string"/>
+  <key id="d3" for="node" attr.name="RT" attr.type="double"/>
+  <key id="d4" for="edge" attr.name="cosine score" attr.type="double"/>
+  <key id="d5" for="edge" attr.name="matched peaks" attr.type="int"/>
+  <graph edgedefault="undirected">
+    <node id="scan=10"><data key="d0">scan=10</data><data key="d1">356.1210</data><data key="d2">FT1</data><data key="d3">110.5</data></node>
+    <node id="scan=11"><data key="d0">scan=11</data><data key="d1">427.1535</data><data key="d2">FT2</data><data key="d3">112.0</data></node>
+    <node id="scan=12"><data key="d0">scan=12</data><data key="d1">573.1876</data><data key="d2">FT3</data><data key="d3">113.2</data></node>
+    <node id="scan=13"><data key="d0">scan=13</data><data key="d1">205.0972</data><data key="d2">FT4</data><data key="d3">55.8</data></node>
+    <edge id="e0" source="scan=10" target="scan=11"><data key="d4">0.88</data><data key="d5">12</data></edge>
+    <edge id="e1" source="scan=11" target="scan=12"><data key="d4">0.79</data><data key="d5">10</data></edge>
+    <edge id="e2" source="scan=10" target="scan=12"><data key="d4">0.72</data><data key="d5">7</data></edge>
+  </graph>
+</graphml>

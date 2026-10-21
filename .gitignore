@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Environments
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# ---------------------------------------------------------------------------
+# Data: never commit raw or bulk data
+# ---------------------------------------------------------------------------
+# The public NP-MRD raw archive (experimental_spectra.zip, ~13.7 GB) lives in
+# the owner's Google Drive SUMMIT workspace and in GCS -- never in git.
+experimental_spectra.zip
+
+# The SUMMIT reference implementation's workspace: model checkpoints (.pt),
+# HOSE/shift tables, benchmark_v2/v3/v4 outputs, and database dumps.  These
+# are the reference implementation's artifacts, useful for cross-checking
+# the platform but NOT part of it (ADR-0025).  Only the small, public
+# benchmark CSVs copied into tests/fixtures/real_npmrd/ are committed.
+summit_poc/
+
+# Local-only source trees (outside the repo by design; listed here so an
+# accidental in-repo copy is obviously wrong):
+#   /Users/<user>/Library/CloudStorage/.../My Drive/NMR-Data   [local only, do not redistribute]
+
+# NOTE: data/inventory/*.json and data/validation_report.json ARE committed --
+# they are provenance/validation records (hashes, counts, timings) containing
+# no spectral data and no PII, and they are the evidence that the platform
+# was validated against public data.
+
+# ---------------------------------------------------------------------------
+# Firebase / Google service credentials (Step 6.5, ADR-0028).
+# NEVER commit service-account keys: they grant full project access.
+firebase-service-account.json
+*-credentials.json
+*-service-account.json
+serviceAccountKey.json
+.env.local
+.env.*.local
+
+# ---------------------------------------------------------------------------
+# Bulk data / archives / model weights (defence in depth)
+# ---------------------------------------------------------------------------
+*.zip
+*.tar.gz
+*.7z
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+data/raw/
+*.mzML
+*.mzXML
+*.wiff
+
+# ---------------------------------------------------------------------------
+# Credentials
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# Node
+# ---------------------------------------------------------------------------
+node_modules/
+.next/
+
+# ---------------------------------------------------------------------------
+# macOS resource forks
+# ---------------------------------------------------------------------------
+._*

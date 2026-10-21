@@ -1,0 +1,1114 @@
+{
+  "_redaction_note": "The source path has been redacted (personal email address). See ADR-0041's concurrency/hygiene context and docs/CONCURRENCY.md.",
+  "root": "/Users/subhadipbanerjee/Library/CloudStorage/GoogleDrive-[redacted]/My Drive/NMR-Data",
+  "generated_utc": "2026-10-21T11:42:59+00:00",
+  "totals": {
+    "file_count": 89,
+    "total_size_bytes": 15338919262,
+    "total_size_gb": 15.339,
+    "materialized_size_bytes": 426096462,
+    "cloud_placeholder_size_bytes": 14912822800,
+    "dataset_count": 4,
+    "empty_directory_count": 0
+  },
+  "format_breakdown": {
+    "csv_tsv": 35,
+    "archive": 31,
+    "other": 12,
+    "model": 9,
+    "structure": 1,
+    "columnar": 1
+  },
+  "experiment_type_breakdown": {
+    "other": 87,
+    "HSQC": 2
+  },
+  "datasets": [
+    {
+      "dataset": "_root",
+      "path": "",
+      "file_count": 2,
+      "size_bytes": 13721289982,
+      "local_size_bytes": 6148,
+      "cloud_placeholder_bytes": 13721283834,
+      "formats": {
+        "archive": 1,
+        "other": 1
+      },
+      "experiment_types": {
+        "other": 2
+      },
+      "has_bruker": false,
+      "has_processed": false,
+      "has_raw": false
+    },
+    {
+      "dataset": "summit_poc",
+      "path": "summit_poc/",
+      "file_count": 76,
+      "size_bytes": 1541676515,
+      "local_size_bytes": 422305695,
+      "cloud_placeholder_bytes": 1119370820,
+      "formats": {
+        "model": 9,
+        "archive": 20,
+        "csv_tsv": 34,
+        "other": 11,
+        "structure": 1,
+        "columnar": 1
+      },
+      "experiment_types": {
+        "other": 74,
+        "HSQC": 2
+      },
+      "has_bruker": false,
+      "has_processed": false,
+      "has_raw": false
+    },
+    {
+      "dataset": "NPAtlas",
+      "path": "NPAtlas/",
+      "file_count": 4,
+      "size_bytes": 62709809,
+      "local_size_bytes": 272973,
+      "cloud_placeholder_bytes": 62436836,
+      "formats": {
+        "archive": 3,
+        "csv_tsv": 1
+      },
+      "experiment_types": {
+        "other": 4
+      },
+      "has_bruker": false,
+      "has_processed": false,
+      "has_raw": false
+    },
+    {
+      "dataset": "NP-MRD",
+      "path": "NP-MRD/",
+      "file_count": 7,
+      "size_bytes": 13242956,
+      "local_size_bytes": 3511646,
+      "cloud_placeholder_bytes": 9731310,
+      "formats": {
+        "archive": 7
+      },
+      "experiment_types": {
+        "other": 7
+      },
+      "has_bruker": false,
+      "has_processed": false,
+      "has_raw": false
+    }
+  ],
+  "bruker_processed_count": 0,
+  "bruker_raw_only_count": 0,
+  "integrity_check": {
+    "before": {
+      "file_count": 89,
+      "total_bytes": 15338919262,
+      "mtime_set_sha256": "ce760004625d9d4feaa973d7c9700d318a071337bb30f9b08effe77687642f85",
+      "note": "allocated block counts are excluded: reading a cloud placeholder hydrates it, so blocks drift with no content change"
+    },
+    "after": {
+      "file_count": 89,
+      "total_bytes": 15338919262,
+      "mtime_set_sha256": "ce760004625d9d4feaa973d7c9700d318a071337bb30f9b08effe77687642f85",
+      "note": "allocated block counts are excluded: reading a cloud placeholder hydrates it, so blocks drift with no content change"
+    },
+    "unchanged": true
+  },
+  "flags": [
+    {
+      "level": "high",
+      "code": "no_bruker_experiments",
+      "message": "No Bruker acqus/fid/pdata markers anywhere in the tree: this folder contains no uncompressed Bruker NMR experiments."
+    },
+    {
+      "level": "high",
+      "code": "cloud_placeholders",
+      "message": "51 file(s) are cloud placeholders (14.91 GB logical). Their contents were NOT read; materialize them before any ingestion or validation.",
+      "files": [
+        "experimental_spectra.zip",
+        "NP-MRD/smiles_NP0000001_NP0050000.csv.gz",
+        "NP-MRD/smiles_NP0150001_NP0200000.csv.gz",
+        "NP-MRD/smiles_NP0250001_NP0300000.csv.gz",
+        "NP-MRD/smiles_NP0200001_NP0250000.csv.gz",
+        "summit_poc/nmrshiftdb2withsignals.sd",
+        "summit_poc/coconut_index_2d.parquet",
+        "summit_poc/run_summary.txt",
+        "summit_poc/nmrshiftdb2_records_v2.pt",
+        "summit_poc/summit_poc_andrographolide.png",
+        "summit_poc/hose_table_v4_ae70a056.pt",
+        "summit_poc/benchmark_v2/partA_benchmark_per_compound.csv",
+        "summit_poc/benchmark_v2/partA_overall.csv",
+        "summit_poc/benchmark_v2/partA_benchmark.png",
+        "summit_poc/benchmark_v2/summary.txt",
+        "summit_poc/benchmark_v2/partB_novelty.csv",
+        "summit_poc/benchmark_v2/partA_by_class.csv",
+        "summit_poc/external_test/manual_review.csv",
+        "summit_poc/external_test/cmnpd_not_in_coconut.csv",
+        "summit_poc/external_test/misassignment_candidates.csv",
+        "summit_poc/external_test/timesplit_candidates.csv",
+        "summit_poc/external_test/npmrd_unreadable_files.csv",
+        "summit_poc/external_test/npatlas_table.csv",
+        "summit_poc/benchmark_v4/summary_v4.txt",
+        "summit_poc/benchmark_v4/partB_v4.csv",
+        "summit_poc/benchmark_v4/partA_failures.csv",
+        "summit_poc/benchmark_v4/partA_by_class.csv",
+        "summit_poc/benchmark_v4/partC_v4.csv",
+        "summit_poc/benchmark_v3/summary_v3.txt",
+        "summit_poc/benchmark_v3/partB_v3.csv",
+        "summit_poc/benchmark_v3/partA_per_compound.csv",
+        "summit_poc/benchmark_v3/partA_failures.csv",
+        "summit_poc/benchmark_v3/partA_methods.csv",
+        "summit_poc/npmrd_downloads/smiles_NP0100001_NP0150000.csv.gz",
+        "summit_poc/npmrd_downloads/CMNPD_1.0_2d.sdf.gz",
+        "summit_poc/npmrd_downloads/archive_index.json.gz",
+        "summit_poc/npmrd_downloads/structures_NP0000001_NP0050000.zip",
+        "summit_poc/npmrd_downloads/NPAtlas_download.json",
+        "summit_poc/npmrd_downloads/smiles_NP0150001_NP0200000.csv.gz",
+        "summit_poc/npmrd_downloads/smiles_NP0250001_NP0300000.csv.gz",
+        "summit_poc/npmrd_downloads/npmrd_natural_products_NP0300001_NP0350000_json.zip",
+        "summit_poc/npmrd_downloads/npmrd_natural_products_NP0100001_NP0150000_json.zip",
+        "summit_poc/npmrd_downloads/structures_NP0300001_NP0350000.zip",
+        "summit_poc/npmrd_downloads/structures_NP0250001_NP0300000.zip",
+        "summit_poc/npmrd_downloads/CMNPD_1.0_act_br.tsv",
+        "summit_poc/npmrd_downloads/smiles_NP0050001_NP0100000.csv.gz",
+        "summit_poc/npmrd_downloads/npmrd_natural_products_NP0000001_NP0050000_json.zip",
+        "summit_poc/npmrd_downloads/smiles_NP0300001_NP0350000.csv.gz",
+        "NPAtlas/NPBS_Atlas_Data.zip",
+        "NPAtlas/NPAtlas_download_2024_09.tsv",
+        "NPAtlas/NPBS_Atlas_biological_source_annotations.zip"
+      ]
+    },
+    {
+      "level": "low",
+      "code": "suspiciously_small_files",
+      "message": "10 file(s) under 1 KB",
+      "files": [
+        "summit_poc/andrographolide_hsqc_literature.csv",
+        "summit_poc/run_summary.txt",
+        "summit_poc/benchmark_v2/partA_overall.csv",
+        "summit_poc/external_test/manual_review.csv",
+        "summit_poc/external_test/external_hsqc_long.csv",
+        "summit_poc/external_test/timesplit_candidates.csv",
+        "summit_poc/external_test/npmrd_extracted_experiments.csv",
+        "summit_poc/benchmark_v4/partB_localization.csv",
+        "summit_poc/benchmark_v4/partA_methods.csv",
+        "summit_poc/benchmark_v3/partA_methods.csv"
+      ]
+    },
+    {
+      "level": "medium",
+      "code": "unexpanded_archives",
+      "message": "31 archive(s) were recorded but NOT expanded: experimental_spectra.zip (13721.3 MB, cloud placeholder), summit_poc/coconut_csv_lite-09-2026.zip (199.1 MB), summit_poc/260413_frozen_metadata.csv.gz (90.3 MB), summit_poc/npmrd_downloads/structures_NP0000001_NP0050000.zip (64.2 MB, cloud placeholder), summit_poc/npmrd_downloads/structures_NP0250001_NP0300000.zip (35.9 MB, cloud placeholder), summit_poc/npmrd_downloads/npmrd_natural_products_NP0000001_NP0050000_json.zip (32.7 MB, cloud placeholder)"
+    },
+    {
+      "level": "medium",
+      "code": "multi_dataset_assumption",
+      "message": "The 'one dataset per top-level folder' assumption holds only at the top level: ['NP-MRD', 'NPAtlas', 'summit_poc'] are heterogeneous collections (database dumps, model files, benchmark outputs, not per-sample experiments)."
+    }
+  ],
+  "files": [
+    {
+      "path": ".DS_Store",
+      "size_bytes": 6148,
+      "extension": "(none)",
+      "format": "other",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-10-21T11:34:52+00:00",
+      "experiment_type": "other"
+    },
+    {
+      "path": "NP-MRD/smiles_NP0000001_NP0050000.csv.gz",
+      "size_bytes": 1539234,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-29T12:15:16+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "NP-MRD/smiles_NP0050001_NP0100000.csv.gz",
+      "size_bytes": 972512,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-29T12:15:18+00:00",
+      "experiment_type": "other",
+      "line_count": 37963,
+      "magic": "gzip"
+    },
+    {
+      "path": "NP-MRD/smiles_NP0100001_NP0150000.csv.gz",
+      "size_bytes": 609576,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-29T12:15:30+00:00",
+      "experiment_type": "other",
+      "line_count": 13881,
+      "magic": "gzip"
+    },
+    {
+      "path": "NP-MRD/smiles_NP0150001_NP0200000.csv.gz",
+      "size_bytes": 2724667,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-29T12:15:33+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "NP-MRD/smiles_NP0200001_NP0250000.csv.gz",
+      "size_bytes": 2734147,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-29T12:15:36+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "NP-MRD/smiles_NP0250001_NP0300000.csv.gz",
+      "size_bytes": 2733262,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-29T12:15:38+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "NP-MRD/smiles_NP0300001_NP0350000.csv.gz",
+      "size_bytes": 1929558,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-29T12:15:42+00:00",
+      "experiment_type": "other",
+      "line_count": 40888,
+      "magic": "gzip",
+      "sha256_head": "a48818b507354ec1b80e3943311f8b392930504ec1c138e6fc2f8ae08b91ba71"
+    },
+    {
+      "path": "NPAtlas/NPAtlas_download_2024_09.tsv",
+      "size_bytes": 33671731,
+      "extension": ".tsv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-28T11:25:00+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "NPAtlas/NPBS_Atlas_Data.zip",
+      "size_bytes": 18165460,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-28T11:33:26+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "NPAtlas/NPBS_Atlas_bioactivity_annotations.zip",
+      "size_bytes": 272973,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-28T11:34:23+00:00",
+      "experiment_type": "other",
+      "magic": "zip"
+    },
+    {
+      "path": "NPAtlas/NPBS_Atlas_biological_source_annotations.zip",
+      "size_bytes": 10599645,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-28T11:34:23+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "experimental_spectra.zip",
+      "size_bytes": 13721283834,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-28T15:13:58+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/.DS_Store",
+      "size_bytes": 6148,
+      "extension": "(none)",
+      "format": "other",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-10-21T11:34:27+00:00",
+      "experiment_type": "other"
+    },
+    {
+      "path": "summit_poc/260413_frozen_metadata.csv.gz",
+      "size_bytes": 90298678,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T18:21:32+00:00",
+      "experiment_type": "other",
+      "magic": "gzip",
+      "sha256_head": "502aebdbf061f5ac2c151b200b7d54816c93a018d0e8eeb0e2af3df6b09b115f"
+    },
+    {
+      "path": "summit_poc/andrographolide_hsqc_literature.csv",
+      "size_bytes": 302,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T13:01:52+00:00",
+      "experiment_type": "HSQC",
+      "line_count": 16
+    },
+    {
+      "path": "summit_poc/benchmark_v2/partA_benchmark.png",
+      "size_bytes": 292719,
+      "extension": ".png",
+      "format": "other",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T15:33:08+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v2/partA_benchmark_per_compound.csv",
+      "size_bytes": 10278,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T15:33:06+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v2/partA_by_class.csv",
+      "size_bytes": 1030,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T15:33:06+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v2/partA_overall.csv",
+      "size_bytes": 138,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T15:33:06+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v2/partB_novelty.csv",
+      "size_bytes": 2449,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T15:37:38+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v2/partC_mixtures.csv",
+      "size_bytes": 2592,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T15:37:38+00:00",
+      "experiment_type": "other",
+      "line_count": 41
+    },
+    {
+      "path": "summit_poc/benchmark_v2/summary.txt",
+      "size_bytes": 2646,
+      "extension": ".txt",
+      "format": "other",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T15:37:38+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v3/calibration_grid_gnn.csv",
+      "size_bytes": 3991,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T16:24:22+00:00",
+      "experiment_type": "other",
+      "line_count": 106
+    },
+    {
+      "path": "summit_poc/benchmark_v3/partA_by_class.csv",
+      "size_bytes": 1036,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T16:25:18+00:00",
+      "experiment_type": "other",
+      "line_count": 21
+    },
+    {
+      "path": "summit_poc/benchmark_v3/partA_failures.csv",
+      "size_bytes": 7736,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T16:25:18+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v3/partA_methods.csv",
+      "size_bytes": 430,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T16:25:18+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v3/partA_per_compound.csv",
+      "size_bytes": 23298,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T16:25:18+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v3/partA_v3.png",
+      "size_bytes": 204761,
+      "extension": ".png",
+      "format": "other",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T16:25:18+00:00",
+      "experiment_type": "other"
+    },
+    {
+      "path": "summit_poc/benchmark_v3/partB_v3.csv",
+      "size_bytes": 4218,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T16:29:12+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v3/partC_v3.csv",
+      "size_bytes": 3690,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T16:29:12+00:00",
+      "experiment_type": "other",
+      "line_count": 61
+    },
+    {
+      "path": "summit_poc/benchmark_v3/summary_v3.txt",
+      "size_bytes": 2982,
+      "extension": ".txt",
+      "format": "other",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T16:29:12+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v4/partA_by_class.csv",
+      "size_bytes": 1054,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T19:08:54+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v4/partA_failures.csv",
+      "size_bytes": 5173,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T19:08:54+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v4/partA_methods.csv",
+      "size_bytes": 649,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T19:08:54+00:00",
+      "experiment_type": "other",
+      "line_count": 8
+    },
+    {
+      "path": "summit_poc/benchmark_v4/partA_per_compound.csv",
+      "size_bytes": 23273,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T19:08:54+00:00",
+      "experiment_type": "other",
+      "line_count": 208
+    },
+    {
+      "path": "summit_poc/benchmark_v4/partA_v4.png",
+      "size_bytes": 202302,
+      "extension": ".png",
+      "format": "other",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T19:08:54+00:00",
+      "experiment_type": "other"
+    },
+    {
+      "path": "summit_poc/benchmark_v4/partB_localization.csv",
+      "size_bytes": 124,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T19:22:58+00:00",
+      "experiment_type": "other",
+      "line_count": 4
+    },
+    {
+      "path": "summit_poc/benchmark_v4/partB_v4.csv",
+      "size_bytes": 7477,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T19:22:58+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v4/partC_v4.csv",
+      "size_bytes": 5975,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T19:34:26+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/benchmark_v4/summary_v4.txt",
+      "size_bytes": 3586,
+      "extension": ".txt",
+      "format": "other",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T19:34:56+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/coconut_csv_lite-09-2026.zip",
+      "size_bytes": 199089109,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-08-31T10:18:02+00:00",
+      "experiment_type": "other",
+      "magic": "zip",
+      "sha256_head": "a3763553882e330efdaf7f1db05d9592e8b22c73ad77a842d566970b5581d8ae"
+    },
+    {
+      "path": "summit_poc/coconut_index_2d.parquet",
+      "size_bytes": 38643195,
+      "extension": ".parquet",
+      "format": "columnar",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T15:23:22+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/external_test/cmnpd_not_in_coconut.csv",
+      "size_bytes": 12058,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-28T00:49:44+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/external_test/cmnpd_table.csv",
+      "size_bytes": 2812594,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-28T00:49:44+00:00",
+      "experiment_type": "other",
+      "line_count": 31562,
+      "sha256_head": "bc48023ad15bc83e1a1983b6b1b20873704efaa249d225aabbd71777a10df948"
+    },
+    {
+      "path": "summit_poc/external_test/external_catalog.csv",
+      "size_bytes": 20382,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T19:35:46+00:00",
+      "experiment_type": "other",
+      "line_count": 57
+    },
+    {
+      "path": "summit_poc/external_test/external_hsqc_long.csv",
+      "size_bytes": 1,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T19:35:46+00:00",
+      "experiment_type": "HSQC",
+      "line_count": 1
+    },
+    {
+      "path": "summit_poc/external_test/manual_review.csv",
+      "size_bytes": 1,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T19:35:46+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/external_test/misassignment_candidates.csv",
+      "size_bytes": 2247,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-28T00:49:44+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/external_test/npatlas_table.csv",
+      "size_bytes": 6675652,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-28T00:48:38+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/external_test/npmrd_extracted_experiments.csv",
+      "size_bytes": 1,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-28T00:38:08+00:00",
+      "experiment_type": "other",
+      "line_count": 1
+    },
+    {
+      "path": "summit_poc/external_test/npmrd_raw_inventory.csv",
+      "size_bytes": 473115,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-28T00:49:44+00:00",
+      "experiment_type": "other",
+      "line_count": 2289
+    },
+    {
+      "path": "summit_poc/external_test/npmrd_unreadable_files.csv",
+      "size_bytes": 164734,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-28T00:38:10+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/external_test/timesplit_candidates.csv",
+      "size_bytes": 820,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-28T00:49:44+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/hose_table_cacb3656.pt",
+      "size_bytes": 7606645,
+      "extension": ".pt",
+      "format": "model",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T16:23:34+00:00",
+      "experiment_type": "other",
+      "magic": "zip"
+    },
+    {
+      "path": "summit_poc/hose_table_v4_9b90cc3a.pt",
+      "size_bytes": 7722311,
+      "extension": ".pt",
+      "format": "model",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T19:05:14+00:00",
+      "experiment_type": "other",
+      "magic": "zip"
+    },
+    {
+      "path": "summit_poc/hose_table_v4_ae70a056.pt",
+      "size_bytes": 8026311,
+      "extension": ".pt",
+      "format": "model",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T18:32:52+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/manifold_C20H30O5.csv",
+      "size_bytes": 35801,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T13:02:00+00:00",
+      "experiment_type": "other",
+      "line_count": 345
+    },
+    {
+      "path": "summit_poc/nmrshiftdb2_records_v2.pt",
+      "size_bytes": 209285681,
+      "extension": ".pt",
+      "format": "model",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T02:16:06+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/nmrshiftdb2withsignals.sd",
+      "size_bytes": 158569118,
+      "extension": ".sd",
+      "format": "structure",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-03-15T09:33:16+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/CMNPD_1.0_2d.sdf.gz",
+      "size_bytes": 11338030,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2020-08-04T21:10:04+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/CMNPD_1.0_act_br.tsv",
+      "size_bytes": 679743,
+      "extension": ".tsv",
+      "format": "csv_tsv",
+      "cloud_placeholder": true,
+      "modified_utc": "2020-08-04T21:10:04+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/NPAtlas_download.json",
+      "size_bytes": 475573120,
+      "extension": ".json",
+      "format": "other",
+      "cloud_placeholder": true,
+      "modified_utc": "2024-09-13T03:13:10+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/archive_index.json.gz",
+      "size_bytes": 149801,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T20:59:26+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/assignment_tables.zip",
+      "size_bytes": 464020,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2025-08-01T08:19:36+00:00",
+      "experiment_type": "other",
+      "magic": "zip"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/npmrd_natural_products_NP0000001_NP0050000_json.zip",
+      "size_bytes": 32739476,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:36+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/npmrd_natural_products_NP0100001_NP0150000_json.zip",
+      "size_bytes": 10712199,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:36+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/npmrd_natural_products_NP0300001_NP0350000_json.zip",
+      "size_bytes": 29080699,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:36+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/smiles_NP0000001_NP0050000.csv.gz",
+      "size_bytes": 1539234,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2025-08-01T08:19:40+00:00",
+      "experiment_type": "other",
+      "line_count": 46841,
+      "magic": "gzip",
+      "sha256_head": "ff73c0416f821fc8c29349cf2d1f1bdc1b5947df6dc208460992925aafdfacff"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/smiles_NP0050001_NP0100000.csv.gz",
+      "size_bytes": 972512,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:40+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/smiles_NP0100001_NP0150000.csv.gz",
+      "size_bytes": 609576,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:40+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/smiles_NP0150001_NP0200000.csv.gz",
+      "size_bytes": 2724667,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:40+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/smiles_NP0200001_NP0250000.csv.gz",
+      "size_bytes": 2734147,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2025-08-01T08:19:40+00:00",
+      "experiment_type": "other",
+      "line_count": 49971,
+      "magic": "gzip",
+      "sha256_head": "c3becbaaccc75109d93f700a714128e0806e18a1905f4915cf7507b4b35cf29c"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/smiles_NP0250001_NP0300000.csv.gz",
+      "size_bytes": 2733262,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:40+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/smiles_NP0300001_NP0350000.csv.gz",
+      "size_bytes": 1929558,
+      "extension": ".gz",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:40+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/structures_NP0000001_NP0050000.zip",
+      "size_bytes": 64175813,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:36+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/structures_NP0050001_NP0100000.zip",
+      "size_bytes": 22694428,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2025-08-01T08:19:36+00:00",
+      "experiment_type": "other",
+      "magic": "zip",
+      "sha256_head": "36370cf97a078cbf7186988f37c88211445e85fdac25f1510e2b17962dac7300"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/structures_NP0100001_NP0150000.zip",
+      "size_bytes": 9316440,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": false,
+      "modified_utc": "2025-08-01T08:19:36+00:00",
+      "experiment_type": "other",
+      "magic": "zip",
+      "sha256_head": "66918182ceae059354421214a05eb31fd3413349e17935d9e5c4f265fd63db3d"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/structures_NP0250001_NP0300000.zip",
+      "size_bytes": 35885752,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:36+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/npmrd_downloads/structures_NP0300001_NP0350000.zip",
+      "size_bytes": 28138962,
+      "extension": ".zip",
+      "format": "archive",
+      "cloud_placeholder": true,
+      "modified_utc": "2025-08-01T08:19:36+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/ranking_andrographolide_C20H30O5.csv",
+      "size_bytes": 45753,
+      "extension": ".csv",
+      "format": "csv_tsv",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T13:01:54+00:00",
+      "experiment_type": "other",
+      "line_count": 345
+    },
+    {
+      "path": "summit_poc/requirements_used.txt",
+      "size_bytes": 14095,
+      "extension": ".txt",
+      "format": "other",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T13:01:58+00:00",
+      "experiment_type": "other",
+      "line_count": 705
+    },
+    {
+      "path": "summit_poc/run_summary.txt",
+      "size_bytes": 206,
+      "extension": ".txt",
+      "format": "other",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T13:01:58+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    },
+    {
+      "path": "summit_poc/shift_mpnn_benchmark_d3631329.pt",
+      "size_bytes": 15398447,
+      "extension": ".pt",
+      "format": "model",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T15:32:38+00:00",
+      "experiment_type": "other",
+      "magic": "zip"
+    },
+    {
+      "path": "summit_poc/shift_mpnn_holdout_C20H30O5.pt",
+      "size_bytes": 15398259,
+      "extension": ".pt",
+      "format": "model",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T02:26:14+00:00",
+      "experiment_type": "other",
+      "magic": "zip"
+    },
+    {
+      "path": "summit_poc/shift_mpnn_v3_cacb3656.pt",
+      "size_bytes": 15397789,
+      "extension": ".pt",
+      "format": "model",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T16:23:32+00:00",
+      "experiment_type": "other",
+      "magic": "zip"
+    },
+    {
+      "path": "summit_poc/shift_mpnn_v4_9b90cc3a.pt",
+      "size_bytes": 15397789,
+      "extension": ".pt",
+      "format": "model",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T19:05:04+00:00",
+      "experiment_type": "other",
+      "magic": "zip"
+    },
+    {
+      "path": "summit_poc/shift_mpnn_v4_ae70a056.pt",
+      "size_bytes": 15397789,
+      "extension": ".pt",
+      "format": "model",
+      "cloud_placeholder": false,
+      "modified_utc": "2026-09-27T18:32:04+00:00",
+      "experiment_type": "other",
+      "magic": "zip"
+    },
+    {
+      "path": "summit_poc/summit_poc_andrographolide.png",
+      "size_bytes": 176438,
+      "extension": ".png",
+      "format": "other",
+      "cloud_placeholder": true,
+      "modified_utc": "2026-09-27T13:01:56+00:00",
+      "experiment_type": "other",
+      "content_not_read": "cloud placeholder (0 allocated blocks): contents not read to avoid triggering a network download"
+    }
+  ]
+}

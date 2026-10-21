@@ -1,0 +1,8 @@
+method,top1_%,top1_95CI,top5_%,top5_95CI,MRR,paired test vs main (top-1)
+GNN + edited HSQC,92.3,88-96,100.0,100-100,0.957,-
+GNN + HSQC (no multiplicity),92.3,88-96,100.0,100-100,0.955,"main wins 0, loses 0, p=1"
+GNN + 13C only,89.9,86-94,100.0,100-100,0.942,"main wins 7, loses 2, p=0.18"
+GNN + 13C + DEPT-type mult.,90.3,86-94,100.0,100-100,0.945,"main wins 6, loses 2, p=0.289"
+GNN + Priessner-2024 matching (re-impl.),74.9,69-81,96.1,93-99,0.835,"main wins 39, loses 3, p=5.63e-09"
+HOSE + edited HSQC,73.9,68-80,98.1,96-100,0.842,"main wins 43, loses 5, p=1.37e-08"
+HOSE + 13C only,72.0,66-78,94.2,91-97,0.814,"main wins 47, loses 5, p=1.28e-09"

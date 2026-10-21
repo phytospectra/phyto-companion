@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC FIXTURE: generated locally (2026-10-21) to match the GNPS2
+     classical molecular networking GraphML schema.  No GNPS task was
+     submitted: the local development plane may not contact external APIs.
+     Structure mirrors GNPS2 exports: node keys "label" and "precursor
+     mass", edge keys "cosine score" and "matched peaks". -->
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+  <key id="d0" for="node" attr.name="label" attr.type="string"/>
+  <key id="d1" for="node" attr.name="precursor mass" attr.type="double"/>
+  <key id="d2" for="node" attr.name="RT" attr.type="double"/>
+  <key id="d3" for="node" attr.name="ABUNDANCE_F1" attr.type="double"/>
+  <key id="d4" for="node" attr.name="ABUNDANCE_F2" attr.type="double"/>
+  <key id="d5" for="edge" attr.name="cosine score" attr.type="double"/>
+  <key id="d6" for="edge" attr.name="matched peaks" attr.type="int"/>
+  <graph edgedefault="undirected">
+    <node id="scan=1"><data key="d0">scan=1</data><data key="d1">571.3012</data><data key="d2">12.4</data><data key="d3">125000.0</data><data key="d4">98000.0</data></node>
+    <node id="scan=2"><data key="d0">scan=2</data><data key="d1">628.3323</data><data key="d2">13.1</data><data key="d3">84000.0</data><data key="d4">101000.0</data></node>
+    <node id="scan=3"><data key="d0">scan=3</data><data key="d1">699.3689</data><data key="d2">14.0</data><data key="d3">54000.0</data><data key="d4">51000.0</data></node>
+    <node id="scan=4"><data key="d0">scan=4</data><data key="d1">312.1441</data><data key="d2">8.2</data><data key="d3">310000.0</data><data key="d4">290000.0</data></node>
+    <node id="scan=5"><data key="d0">scan=5</data><data key="d1">856.4251</data><data key="d2">15.3</data><data key="d3">15000.0</data><data key="d4">21000.0</data></node>
+    <edge id="e0" source="scan=1" target="scan=2"><data key="d5">0.92</data><data key="d6">11</data></edge>
+    <edge id="e1" source="scan=2" target="scan=3"><data key="d5">0.87</data><data key="d6">9</data></edge>
+    <edge id="e2" source="scan=1" target="scan=3"><data key="d5">0.81</data><data key="d6">8</data></edge>
+    <edge id="e3" source="scan=4" target="scan=5"><data key="d5">0.64</data><data key="d6">5</data></edge>
+  </graph>
+</graphml>

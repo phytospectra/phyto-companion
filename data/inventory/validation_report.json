@@ -1,0 +1,74 @@
+{
+  "validation_timestamp_utc": "2026-10-21T12:14:29+00:00",
+  "status": "PASSED",
+  "summary": "The platform successfully ingested the real NP-MRD andrographolide HSQC peak list, verified Modified Hungarian matching on real assignments, and reproduced all published SUMMIT v4 benchmark metrics from the per-compound fixture data.",
+  "andrographolide_ingestion": {
+    "fixture": "tests/fixtures/real_npmrd/andrographolide_hsqc_literature.csv",
+    "sha256": "32eacebda81a2f43f03eabaa9664c1efc0a88bed7c6ece9a08b4c8d49a8cbe13",
+    "peak_count": 15,
+    "h_ppm_range": [
+      0.75,
+      6.85
+    ],
+    "c_ppm_range": [
+      15.53,
+      149.29
+    ],
+    "assigned_positions": [
+      "C1",
+      "C2",
+      "C3",
+      "C5",
+      "C6",
+      "C7",
+      "C9",
+      "C11",
+      "C12",
+      "C14",
+      "C15",
+      "C17",
+      "C18",
+      "C19",
+      "C20"
+    ],
+    "self_match_score": 0.0,
+    "self_match_coverage": 1.0,
+    "perturbed_match_score_range": [
+      0.0,
+      1.0
+    ],
+    "perturbed_match_coverage": 1.0
+  },
+  "benchmark_v4_reproduction": {
+    "fixture": "tests/fixtures/real_npmrd/benchmark_v4/partA_per_compound.csv",
+    "sha256": "428842ab6819c9f3813f416573c5a0171138d9a5db66d3dcb52b8d978b5c0c29",
+    "n_compounds": 207,
+    "recomputed_metrics": {
+      "GNN + edited HSQC": {
+        "top1_pct": 92.3,
+        "top5_pct": 100.0,
+        "mrr": 0.957
+      },
+      "HOSE + 13C only": {
+        "top1_pct": 72.0,
+        "top5_pct": 94.2,
+        "mrr": 0.814
+      }
+    },
+    "site_localization": {
+      "n_compounds": 36,
+      "observed_pct": 88.9,
+      "chance_baseline_pct": 44.3,
+      "p_value": "<1e-5"
+    },
+    "mixtures_benchmark": {
+      "evaluated": true,
+      "pure_accuracy": 95.0,
+      "mixture_calibrated_accuracy": 65.0
+    }
+  },
+  "provenance_mode": "Hybrid (Mode D public archive cloud sync + Mode C narrow local fixtures)",
+  "license": "CC-BY-NC (NP-MRD)",
+  "commercial_use_note": "Pro-tier commercial strategy pending resolution per ADR-0026.",
+  "benchmark_scope_note": "REPRODUCTION, NOT INDEPENDENT VALIDATION (ADR-0036). The 92.3% top-1 figure reproduces SUMMIT v4's own outputs and carries no out-of-sample information. It must be quoted with the candidate-pool context: median 48 candidates, and accuracy by pool size of 79.3% (<10), 93.4% (10-50), 95.2% (50-200), 94.4% (>200). The 88.9% vs 44.3% site-localisation pairing is inflated: 15 of 36 compounds have at most two possible sites (8 have exactly one), so chance is weak on that subset. On the 21 compounds with more than two sites, top-1 localisation is 81.0%. See data/inventory/benchmark_context_report.md."
+}

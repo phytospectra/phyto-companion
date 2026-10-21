@@ -1,0 +1,511 @@
+"""Candidate ranking by combined NMR + MS evidence.
+
+Every score is a distance (lower is better): MatchResults are distances,
+the combined weighted score is a distance, and the resulting
+CandidateRank objects carry ``ranking_convention="lower_is_better"``
+with ranking intervals computed by ``rank_lower_is_better`` (Step 2).
+Verdicts come from ``verdict_from_evidence`` -- tied candidates surface
+as AMBIGUOUS, never CONFIRMED.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from phyto_shared.constants import (
+    ELEMENT_MASSES,
+    MSIConfidenceLevel,
+    ToolTier,
+)
+from phyto_shared.exceptions import InvalidInputError
+from phyto_shared.models import (
+    Candidate,
+    CandidateRank,
+    EvidenceGraph,
+    EvidenceItem,
+    MolecularFormula,
+    Adduct,
+)
+from phyto_shared.uncertainty import (
+    margin_lower_is_better,
+    rank_lower_is_better,
+    verdict_from_evidence,
+)
+
+from .hungarian_matcher import (
+    MatchResult,
+    match_1d,
+    match_carbon_1d,
+    match_carbon_full,
+    match_hsqc,
+)
+from .shift_predictor import ShiftPredictor, get_shift_predictor
+
+__all__ = [
+    "ObservedEvidence",
+    "RankingConfig",
+    "parse_formula_string",
+    "ms2_cosine",
+    "rank_candidates",
+    "score_molecule",
+]
+
+_ELEMENT_PATTERN = re.compile(r"([A-Z][a-z]?)(\d*)")
+
+
+class ObservedEvidence(BaseModel):
+    """Everything observed about the unknown, per modality."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    h_1d: Optional[list[float]] = None
+    c_1d: Optional[list[float]] = None
+    hsqc: Optional[list[tuple[float, float, str]]] = None  # (h, c, multiplicity)
+    ms2: Optional[list[tuple[float, float]]] = None  # (mz, intensity)
+    formula: Optional[str] = None
+    precursor_mz: Optional[float] = None
+    precursor_adduct: Optional[str] = None
+
+
+class RankingConfig(BaseModel):
+    """Weights and matching thresholds for candidate ranking."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    weight_h: float = 0.2
+    weight_c: float = 0.3
+    weight_hsqc: float = 0.4
+    weight_ms2: float = 0.1
+    require_formula_match: bool = True
+    tol_h: float = 0.05
+    tol_c: float = 0.5
+    tol_c_full: float = 3.0
+    cap: float = 4.0
+    # Precursor m/z is a FILTER, not a score (ADR-0014): candidates whose
+    # adduct-adjusted ion mass is outside this window are excluded from
+    # ranking entirely.
+    precursor_tolerance_ppm: float = 5.0
+    # MS2 distance conversion (ADR-0014): reference-vs-observed spectral
+    # cosine (higher is better) converts to a distance via 1 - cosine.
+    ms2_distance: Literal["one_minus_cosine"] = "one_minus_cosine"
+    fragment_tolerance_da: float = 0.02
+
+
+def ms2_cosine(
+    reference: list[tuple[float, float]],
+    observed: list[tuple[float, float]],
+    fragment_tolerance_da: float = 0.02,
+) -> tuple[float, int]:
+    """Spectral cosine between reference and observed MS2 spectra.
+
+    Peaks are matched greedily by ascending m/z distance within the
+    fragment tolerance; the cosine uses sqrt-transformed intensities of
+    the matched pairs only (GNPS convention).  Returns
+    ``(cosine in [0, 1], n_matched_peaks)``.
+    """
+    import numpy as np
+
+    ref = sorted(reference)
+    obs = sorted(observed)
+    matched_ref: list[float] = []
+    matched_obs: list[float] = []
+    used_obs = [False] * len(obs)
+    for ref_mz, ref_intensity in ref:
+        best_index = -1
+        best_distance = fragment_tolerance_da + 1.0
+        for j, (obs_mz, _) in enumerate(obs):
+            if used_obs[j]:
+                continue
+            distance = abs(ref_mz - obs_mz)
+            if distance <= fragment_tolerance_da and distance < best_distance:
+                best_distance = distance
+                best_index = j
+        if best_index >= 0:
+            used_obs[best_index] = True
+            matched_ref.append(ref_intensity)
+            matched_obs.append(obs[best_index][1])
+    if not matched_ref:
+        return 0.0, 0
+    a = np.sqrt(np.asarray(matched_ref, dtype=float))
+    b = np.sqrt(np.asarray(matched_obs, dtype=float))
+    denominator = float(np.linalg.norm(a) * np.linalg.norm(b))
+    if denominator == 0.0:
+        return 0.0, 0
+    return float(float(np.dot(a, b)) / denominator), len(matched_ref)
+
+
+def parse_formula_string(text: str) -> dict[str, int]:
+    """Parse 'C6H12O6'-style formula strings into element counts.
+
+    Validated against the shared element table; raises InvalidInputError
+    on unknown elements or empty input.
+    """
+    text = text.strip()
+    if not text:
+        raise InvalidInputError("empty formula string", context={})
+    counts: dict[str, int] = {}
+    position = 0
+    for match in _ELEMENT_PATTERN.finditer(text):
+        if match.start() != position:
+            raise InvalidInputError(
+                "formula contains unparseable characters",
+                context={"formula": text, "position": position},
+            )
+        element = match.group(1)
+        if element not in ELEMENT_MASSES:
+            raise InvalidInputError(
+                "unknown element in formula",
+                context={"formula": text, "element": element},
+            )
+        count = int(match.group(2)) if match.group(2) else 1
+        counts[element] = counts.get(element, 0) + count
+        position = match.end()
+    if position != len(text) or not counts:
+        raise InvalidInputError("malformed formula", context={"formula": text})
+    return counts
+
+
+def _predicted_views(prediction) -> tuple[list[float], list[float], list[tuple[float, float]]]:
+    """Extract 1H, 13C, and (h, c) HSQC views from a ShiftPrediction,
+    dropping the -1.0 'not predicted' sentinels."""
+    h_1d = [
+        h for h in prediction.predicted_h_shifts if h >= 0.0
+    ]
+    c_1d = [
+        c
+        for symbol, c in zip(prediction.atom_symbols, prediction.predicted_c_shifts)
+        if symbol == "C" and c >= 0.0
+    ]
+    hsqc = [
+        (h, c)
+        for symbol, h, c in zip(
+            prediction.atom_symbols,
+            prediction.predicted_h_shifts,
+            prediction.predicted_c_shifts,
+        )
+        if symbol == "C" and h >= 0.0 and c >= 0.0
+    ]
+    return h_1d, c_1d, hsqc
+
+
+def _precursor_passes(
+    observed: ObservedEvidence, candidate: Candidate, config: RankingConfig
+) -> bool:
+    """Precursor m/z agreement as a FILTER (ADR-0014), not a score."""
+    if observed.precursor_mz is None:
+        return True
+    adduct_name = observed.precursor_adduct or "[M+H]+"
+    try:
+        adduct = Adduct.from_name(adduct_name)
+    except InvalidInputError:
+        adduct = Adduct.from_name("[M+H]+")
+    ion = adduct.ion_mz(candidate.exact_mass)
+    ppm = abs(ion - observed.precursor_mz) / observed.precursor_mz * 1e6
+    return ppm <= config.precursor_tolerance_ppm
+
+
+def _match_ms2(
+    observed: ObservedEvidence,
+    candidate: Candidate,
+    config: RankingConfig,
+    reference_ms2: list[tuple[float, float]] | None,
+) -> tuple[MatchResult | None, EvidenceItem | None]:
+    """Reference-spectrum MS2 matching (ADR-0014).
+
+    Returns (match, gap_note): the match is None when MS2 scoring is
+    disabled (no reference spectrum available for this candidate), in
+    which case gap_note explains why.
+    """
+    if observed.ms2 is None:
+        return None, None
+    if not reference_ms2:
+        return None, EvidenceItem(
+            source_spectrum="observed:ms2",
+            spectral_feature=f"{len(observed.ms2)} MS2 peaks observed",
+            relation="ms2_scoring_disabled",
+            strength=0.0,
+        )
+    cosine, n_matched = ms2_cosine(
+        reference_ms2, [tuple(p) for p in observed.ms2], config.fragment_tolerance_da
+    )
+    distance = 1.0 - cosine if config.ms2_distance == "one_minus_cosine" else 1.0 - cosine
+    result = MatchResult(
+        score=round(distance, 6),
+        coverage=(n_matched / len(observed.ms2)) if observed.ms2 else 0.0,
+        n_observed=len(observed.ms2),
+        n_predicted=len(reference_ms2),
+        assignments=[],
+        unmatched_observed_indices=list(range(n_matched, len(observed.ms2))),
+        unmatched_predicted_indices=[],
+        ranking_convention="lower_is_better",
+    )
+    return result, None
+
+
+def _modality_scores(
+    observed: ObservedEvidence,
+    prediction,
+    candidate: Candidate,
+    config: RankingConfig,
+    reference_ms2: list[tuple[float, float]] | None = None,
+) -> tuple[dict[str, MatchResult], list[EvidenceItem]]:
+    """Run every available modality match for one candidate.
+
+    Returns (results, gap_notes); gap_notes carry disabled-modality
+    explanations (e.g. MS2 without a reference spectrum).
+    """
+    results: dict[str, MatchResult] = {}
+    gap_notes: list[EvidenceItem] = []
+    pred_h, pred_c, pred_hsqc = _predicted_views(prediction)
+
+    if observed.h_1d and pred_h:
+        results["h_1d"] = match_1d(pred_h, observed.h_1d, config.tol_h, config.cap)
+    if observed.c_1d and pred_c:
+        if observed.hsqc is not None:
+            # DEPT/edited-style carbon list available -> tight tolerance
+            results["c_1d"] = match_carbon_1d(
+                pred_c, observed.c_1d, config.tol_c, config.cap
+            )
+        else:
+            results["c_1d"] = match_carbon_full(
+                pred_c, observed.c_1d, config.tol_c_full, config.cap
+            )
+    if observed.hsqc and pred_hsqc:
+        results["hsqc"] = match_hsqc(
+            pred_hsqc,
+            [tuple(p) for p in observed.hsqc],
+            config.tol_h,
+            config.tol_c,
+            config.cap,
+            multiplicity_mode="edited",
+        )
+    ms2, ms2_gap = _match_ms2(observed, candidate, config, reference_ms2)
+    if ms2 is not None:
+        results["ms2"] = ms2
+    elif ms2_gap is not None:
+        gap_notes.append(ms2_gap)
+    if not results:
+        raise InvalidInputError(
+            "no modality available for ranking: provide h_1d, c_1d, or hsqc "
+            "in the observed evidence (precursor m/z is a filter, not a "
+            "score; MS2 needs a reference spectrum)",
+            context={},
+        )
+    return results, gap_notes
+
+
+def _combined_score(
+    results: dict[str, MatchResult], config: RankingConfig
+) -> tuple[float, float]:
+    """Weighted distance over available modalities + overall coverage."""
+    weights = {
+        "h_1d": config.weight_h,
+        "c_1d": config.weight_c,
+        "hsqc": config.weight_hsqc,
+        "ms2": config.weight_ms2,
+    }
+    total_weight = sum(weights[name] for name in results)
+    combined = sum(weights[name] * result.score for name, result in results.items())
+    combined /= total_weight
+    coverage = sum(
+        weights[name] * result.coverage for name, result in results.items()
+    ) / total_weight
+    return combined, coverage
+
+
+def score_molecule(
+    observed: ObservedEvidence,
+    smiles: str,
+    config: RankingConfig | None = None,
+    predictor: ShiftPredictor | None = None,
+    exact_mass: float | None = None,
+) -> tuple[float, dict[str, MatchResult]]:
+    """Combined distance of one structure against the observed evidence.
+
+    Used directly by site localization (scoring simulated edits) and
+    internally by ``rank_candidates``.
+    """
+    predictor = predictor or get_shift_predictor()
+    config = config or RankingConfig()
+    prediction = predictor.predict(smiles)
+    if exact_mass is None:
+        from rdkit import Chem
+        from rdkit.Chem import rdMolDescriptors
+
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            raise InvalidInputError("cannot parse SMILES", context={"smiles": smiles})
+        exact_mass = rdMolDescriptors.CalcExactMolWt(mol)
+    stand_in = Candidate(
+        id="score-stand-in",
+        name="stand-in",
+        smiles=smiles,
+        formula=MolecularFormula(counts={"C": 1}),
+        exact_mass=exact_mass,
+        provenance="structure_only",
+        source="scoring",
+    )
+    results, _gaps = _modality_scores(observed, prediction, stand_in, config)
+    combined, _ = _combined_score(results, config)
+    return combined, results
+
+
+def _evidence_items_for(
+    candidate: Candidate, results: dict[str, MatchResult], cap: float
+) -> list[EvidenceItem]:
+    items: list[EvidenceItem] = []
+    for modality, result in sorted(results.items()):
+        n_matched = len(result.assignments) - len(
+            [a for a in result.assignments if a.cost >= cap]
+        )
+        items.append(
+            EvidenceItem(
+                source_spectrum=f"observed:{modality}",
+                spectral_feature=(
+                    f"{n_matched}/{result.n_observed} observed peaks matched "
+                    f"within tolerance"
+                ),
+                relation=f"matched:{modality}",
+                strength=round(max(0.0, 1.0 - result.score / cap), 4),
+            )
+        )
+        for idx in result.unmatched_observed_indices[:10]:
+            items.append(
+                EvidenceItem(
+                    source_spectrum=f"observed:{modality}",
+                    spectral_feature=f"{modality} peak #{idx}",
+                    relation="unexplained_observed_peak",
+                    strength=0.0,
+                )
+            )
+        for idx in result.unmatched_predicted_indices[:10]:
+            items.append(
+                EvidenceItem(
+                    source_spectrum=f"predicted:{modality}",
+                    spectral_feature=f"{modality} predicted peak #{idx}",
+                    relation="unexplained_predicted_peak",
+                    strength=0.0,
+                )
+            )
+    return items
+
+
+def rank_candidates(
+    observed: ObservedEvidence,
+    candidates: list[Candidate],
+    config: RankingConfig | None = None,
+    predictor: ShiftPredictor | None = None,
+    reference_ms2: dict[str, list[tuple[float, float]]] | None = None,
+) -> list[CandidateRank]:
+    """Rank candidates by combined evidence; lower distance ranks first.
+
+    Candidates failing the precursor-m/z FILTER (ADR-0014) are excluded
+    from the returned ranks entirely; candidates failing the formula
+    match are kept but pinned at the maximum distance.
+    """
+    if not candidates:
+        return []
+    config = config or RankingConfig()
+    predictor = predictor or get_shift_predictor()
+    reference_ms2 = reference_ms2 or {}
+
+    observed_counts = (
+        parse_formula_string(observed.formula) if observed.formula else None
+    )
+
+    admitted: list[Candidate] = []
+    for candidate in candidates:
+        if _precursor_passes(observed, candidate, config):
+            admitted.append(candidate)
+    candidates = admitted
+    if not candidates:
+        return []
+
+    scores: list[float] = []
+    coverages: list[float] = []
+    per_candidate_results: list[dict[str, MatchResult]] = []
+    per_candidate_gaps: list[list[EvidenceItem]] = []
+    formula_failed: list[bool] = []
+
+    for candidate in candidates:
+        prediction = predictor.predict(candidate.smiles)
+        results, gap_notes = _modality_scores(
+            observed, prediction, candidate, config, reference_ms2.get(candidate.id)
+        )
+        failed = False
+        if (
+            config.require_formula_match
+            and observed_counts is not None
+            and dict(candidate.formula.counts) != observed_counts
+        ):
+            failed = True
+        formula_failed.append(failed)
+        if failed:
+            combined, coverage = config.cap, 0.0
+        else:
+            combined, coverage = _combined_score(results, config)
+        scores.append(round(combined, 6))
+        coverages.append(coverage)
+        per_candidate_results.append(results)
+        per_candidate_gaps.append(gap_notes)
+
+    ranks: list[CandidateRank] = []
+    for index, candidate in enumerate(candidates):
+        best, worst = rank_lower_is_better(scores, index)
+        margin = margin_lower_is_better(scores, index)
+        tied_ids = [
+            other.id
+            for j, other in enumerate(candidates)
+            if abs(scores[j] - scores[index]) <= 1e-8
+        ]
+        n_tied = worst - best + 1
+        assessment = verdict_from_evidence(
+            coverage=coverages[index],
+            margin=margin,
+            n_tied=n_tied,
+            msi_level=MSIConfidenceLevel.LEVEL_2,
+            tool_tier=ToolTier.TIER_2_ML_VALIDATED,
+            novelty="known",  # database candidates are known compounds
+        )
+        evidence = _evidence_items_for(
+            candidate, per_candidate_results[index], config.cap
+        )
+        evidence.extend(per_candidate_gaps[index])
+        if formula_failed[index]:
+            evidence.append(
+                EvidenceItem(
+                    source_spectrum="observed:formula",
+                    spectral_feature=f"candidate formula {candidate.formula}",
+                    relation="formula_mismatch",
+                    strength=0.0,
+                )
+            )
+        graph = EvidenceGraph(
+            node_id=candidate.id,
+            claim=f"identity: {candidate.name}",
+            evidence=evidence,
+            confidence=coverages[index],
+            gaps=[
+                f"{n} unexplained peak(s)" if (n := len([
+                    e for e in evidence
+                    if e.relation.startswith("unexplained")
+                ])) else "all observed peaks explained"
+            ],
+        )
+        ranks.append(
+            CandidateRank(
+                candidate=candidate,
+                score=scores[index],
+                ranking_convention="lower_is_better",
+                coverage=round(coverages[index], 4),
+                margin=margin,
+                ranking_interval=(best, worst),
+                tied_candidates=tied_ids,
+                verdict=assessment.verdict,
+                evidence_graph=graph,
+            )
+        )
+    return sorted(ranks, key=lambda r: r.score)

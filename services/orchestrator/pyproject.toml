@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "phyto-companion-orchestrator"
+version = "0.1.0"
+description = "PhytoCompanion orchestrator: plans, delegates, verifies, and logs analysis workflows"
+requires-python = ">=3.11"
+license = { text = "TBD" }
+dependencies = [
+    "phyto-companion-shared>=0.1.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

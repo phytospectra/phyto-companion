@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "phyto-companion-metabolomics"
+version = "0.1.0"
+description = "PhytoCompanion metabolomics service: features, statistics, fusion, enrichment, QC"
+requires-python = ">=3.11"
+license = { text = "TBD" }
+dependencies = [
+    "phyto-companion-shared>=0.1.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "httpx>=0.27",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "scikit-learn>=1.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

@@ -1,0 +1,19 @@
+{
+  "dataset": "NP-MRD public raw NMR archive (experimental spectra)",
+  "source_url": "https://np-mrd.org/system/downloads/current/experimental_spectra.zip",
+  "license": "CC-BY-NC",
+  "attribution": "NP-MRD (Natural Products Magnetic Resonance Database), https://np-mrd.org",
+  "local_path_note": "Held in the public SUMMIT benchmark workspace on the owner's Google Drive (path redacted); not committed to git.",
+  "download_date": "unknown (public NP-MRD 'current' archive; date not recorded at download time)",
+  "size_bytes": 13721283834,
+  "sha256": null,
+  "gcs_uri": null,
+  "gcs_generation_md5": null,
+  "upload_date_utc": null,
+  "uploaded_by": "scripts/sync_public_archive_to_gcs.sh",
+  "status": "pending-upload",
+  "blocking_reason": "Local file is a Google Drive placeholder (0 allocated blocks). It must be materialized, and a GCS bucket name must be supplied, before scripts/sync_public_archive_to_gcs.sh can upload.",
+  "integrity_note": "SHA256 is computed from the local file immediately before upload and recorded here; compare against `gsutil cat` output or the vendor-published checksum before use.",
+  "not_committed_to_git": true,
+  "license_warning": "NP-MRD data is licensed CC-BY-NC, which prohibits commercial use. The platform's FREE academic tier may serve NP-MRD data (research use) with attribution. The PRO tier must NOT include NP-MRD data unless a separate commercial license is obtained from NP-MRD. The Pro-tier data strategy must be resolved before deployment (see ADR-0026, pending)."
+}

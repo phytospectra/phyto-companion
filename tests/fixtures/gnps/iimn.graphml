@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC FIXTURE: GNPS2 ion identity molecular networking (IIMN)
+     GraphML schema.  Same as FBMN plus the "ionidentity" node attribute
+     marking co-eluting ion-adduct groups (Schmid et al. 2021).
+     Generated locally 2026-10-21; no GNPS task. -->
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+  <key id="d0" for="node" attr.name="label" attr.type="string"/>
+  <key id="d1" for="node" attr.name="precursor mass" attr.type="double"/>
+  <key id="d2" for="node" attr.name="feature_id" attr.type="string"/>
+  <key id="d3" for="node" attr.name="ionidentity" attr.type="string"/>
+  <key id="d4" for="edge" attr.name="cosine score" attr.type="double"/>
+  <key id="d5" for="edge" attr.name="matched peaks" attr.type="int"/>
+  <graph edgedefault="undirected">
+    <node id="scan=20"><data key="d0">scan=20</data><data key="d1">609.1456</data><data key="d2">IT1</data><data key="d3">M+H/M+Na-group-1</data></node>
+    <node id="scan=21"><data key="d0">scan=21</data><data key="d1">631.1275</data><data key="d2">IT2</data><data key="d3">M+H/M+Na-group-1</data></node>
+    <node id="scan=22"><data key="d0">scan=22</data><data key="d1">463.0877</data><data key="d2">IT3</data><data key="d3"></data></node>
+    <edge id="e0" source="scan=20" target="scan=21"><data key="d4">0.95</data><data key="d5">14</data></edge>
+    <edge id="e1" source="scan=20" target="scan=22"><data key="d4">0.77</data><data key="d5">8</data></edge>
+  </graph>
+</graphml>

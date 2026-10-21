@@ -1,0 +1,208 @@
+name,cls,formula,source,n_candidates,n_peaks,GNN + edited HSQC,GNN + HSQC (no multiplicity),GNN + 13C only,GNN + 13C + DEPT-type mult.,GNN + Priessner-2024 matching (re-impl.),HOSE + edited HSQC,HOSE + 13C only
+Dictysine,alkaloid/N-containing,C21H33NO3,NMRShiftDB2,31,17,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+CHEMBL1472740,alkaloid/N-containing,C21H26N2O3,NMRShiftDB2,136,16,1.0,1.0,1.0,1.0,2.0,1.0,3.0
+adenosine,alkaloid/N-containing,C10H13N5O4,NMRShiftDB2,16,7,1.0,1.0,1.0,1.0,1.0,2.0,3.0
+daphnilongeranins B,alkaloid/N-containing,C21H27NO2,NMRShiftDB2,34,15,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Thalicpureine,alkaloid/N-containing,C22H27NO5,NMRShiftDB2,74,12,1.0,1.0,1.0,1.0,1.0,1.0,6.0
+29984-33-6,alkaloid/N-containing,C10H14N5O7P,NMRShiftDB2,9,7,1.0,1.0,1.0,1.0,1.0,2.0,2.0
+"methyl (1S,10S,12S,13E,18S)-13-ethylidene-18-formyl-8,15-diazapentacyclo[10.5.1.01,9.02,7.010,15]octadeca-2,4,6,8-tetraene-18-carboxylate",alkaloid/N-containing,C21H22N2O3,NMRShiftDB2,134,14,1.0,1.0,1.0,1.0,2.0,1.0,1.0
+BDBDIRCWZPEVGI-IGYGKHONSA-,alkaloid/N-containing,C32H30N2O3,NMRShiftDB2,7,17,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+RUTACRIDONE,alkaloid/N-containing,C19H17NO3,NMRShiftDB2,47,10,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Salviamine E,alkaloid/N-containing,C20H21NO3,NMRShiftDB2,72,8,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+levodopa,alkaloid/N-containing,C9H11NO4,NMRShiftDB2,28,5,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+(R)-indole-3-lactic acid,alkaloid/N-containing,C11H11NO3,NMRShiftDB2,47,7,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+toddaquinoline,alkaloid/N-containing,C14H9NO3,NMRShiftDB2,15,7,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Penochalasin E,alkaloid/N-containing,C32H38N2O5,NMRShiftDB2,22,23,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+colchicine,alkaloid/N-containing,C22H25NO6,NMRShiftDB2,88,12,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Daphniyunnine A,alkaloid/N-containing,C23H31NO3,NMRShiftDB2,38,17,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Daphmanidins F,alkaloid/N-containing,C25H31NO6,NMRShiftDB2,21,15,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Coclaurine,alkaloid/N-containing,C17H19NO3,NMRShiftDB2,79,9,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Quinine,alkaloid/N-containing,C20H24N2O2,NMRShiftDB2,90,16,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+d-Desthiobiotin,alkaloid/N-containing,C10H18N2O3,NMRShiftDB2,12,8,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+7-Hydroxydehydroglaucine,alkaloid/N-containing,C21H23NO5,NMRShiftDB2,103,10,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Vincamidin,alkaloid/N-containing,C20H22N2O2,NMRShiftDB2,91,14,1.0,1.0,1.0,1.0,4.0,1.0,1.0
+Daphmanidin E,alkaloid/N-containing,C25H31NO5,NMRShiftDB2,24,15,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Leucovernine,alkaloid/N-containing,C20H25NO5,NMRShiftDB2,54,14,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+MALFODICFSIXPO-KOUXDDQNSA-,alkaloid/N-containing,C27H39NO2,NMRShiftDB2,14,21,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 ACOKXVSLVQCZRD,alkaloid/N-containing glycoside,C26H33NO12,NMRShiftDB2,5,16,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 SXPOXYLEVCBOBE,alkaloid/N-containing glycoside,C25H31NO12,NMRShiftDB2,6,18,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 GDKZNHGIXKBQNU,alkaloid/N-containing glycoside,C25H31NO12,NMRShiftDB2,6,15,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"(1S,18S,19R,20S)-19-ethenyl-10-hydroxy-18-[(2S,3R,4S,5S,6R)-3,4,5-trihydroxy-6-(hydroxymethyl)oxan-2-yl]oxy-17-oxa-3,13-diazapentacyclo[11.8.0.02,11.04,9.015,20]henicosa-2(11),3,5,7,9,15-hexaen-14-one",alkaloid/N-containing glycoside,C26H28N2O9,NMRShiftDB2,9,19,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 ORXQGKIUCDPEAJ,chalcone/dihydrochalcone,C21H22O5,NMRShiftDB2,182,9,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+deoxydihydroxanthoangelol H,chalcone/dihydrochalcone,C21H24O4,NMRShiftDB2,77,10,1.0,1.0,1.0,1.0,1.0,2.0,2.0
+NMRShiftDB2 AJTWDECGQXIMQX,chalcone/dihydrochalcone,C25H28O4,NMRShiftDB2,97,13,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 BQRLJINJRBLFJV,chalcone/dihydrochalcone,C25H30O5,NMRShiftDB2,77,13,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"(3S,5R,15S,16R,17R)-15-hydroxy-4,4,16,17-tetramethyl-9-phenyl-6,12,18-trioxapentacyclo[12.4.0.02,7.03,5.08,13]octadeca-1(14),2(7),8(13),9-tetraen-11-one",coumarin,C25H24O5,NMRShiftDB2,55,12,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+citropten,coumarin,C11H10O4,NMRShiftDB2,103,6,1.0,1.0,1.0,1.0,1.0,1.0,2.0
+Grewin,coumarin,C19H16O8,NMRShiftDB2,52,10,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 ZXVVWQRCGVMJOW,coumarin,C24H28O7,NMRShiftDB2,48,11,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 DNNPMEKEFPXNQR,coumarin,C18H16O5S,NMRShiftDB2,7,9,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"7-hydroxy-6-methoxy-8-[(2R,3R,4S,5S,6S)-3,4,5-trihydroxy-6-(hydroxymethyl)oxan-2-yl]oxychromen-2-one",coumarin glycoside,C16H18O10,NMRShiftDB2,17,10,1.0,1.0,1.0,1.0,1.0,2.0,2.0
+"(R)-5-Hydroxy-1,7-diphenyl-3-heptanone",diarylheptanoid/curcuminoid,C19H22O2,NMRShiftDB2,28,12,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 GIXGHUAQPPUMRA,diarylheptanoid/curcuminoid,C19H18O2,NMRShiftDB2,22,11,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 NMRUIRRIQNAQEB,diarylheptanoid/curcuminoid,C20H18O5,NMRShiftDB2,272,11,2.0,2.0,2.0,2.0,2.0,1.0,1.0
+NMRShiftDB2 YXAKCQIIROBKOP,diarylheptanoid/curcuminoid,C19H16O4,NMRShiftDB2,69,9,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 ZIUSSTSXXLLKKK,diarylheptanoid/curcuminoid,C21H20O6,NMRShiftDB2,252,13,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"10-hydroxy-10,7'-(chrysophanol anthrone)-chrysophanol",diarylheptanoid/curcuminoid,C30H20O8,NMRShiftDB2,13,11,1.0,1.0,1.0,1.0,1.0,2.0,2.0
+mearnsetin,flavonoid,C16H12O8,NMRShiftDB2,43,4,1.0,1.0,1.0,1.0,1.0,4.0,4.0
+"7,19-dimethyl (1S,5R,17S)-8,20-dihydroxy-2,2-dimethyl-4-oxo-3,16,28-trioxaheptacyclo[15.11.0.0^{1,5}.0^{6,15}.0^{9,14}.0^{18,27}.0^{21,26}]octacosa-6(15),7,9,11,13,18(27),19,21(26),22,24-decaene-7,19-dicarboxylate",flavonoid,C31H24O10,NMRShiftDB2,35,13,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Sinensetin,flavonoid,C20H20O7,NMRShiftDB2,182,10,1.0,1.0,1.0,1.0,1.0,4.0,5.0
+"(2R,3R)-5,7-Dihydroxy-2-(3,4,6-trihydroxy-5-oxo-8-((2R,3R)-3,5,7-trihydroxychroman-2-yl)-5H-benzo[7]annulen-1-yl)chroman-3-yl 3,4,5-trihydroxybenzoate",flavonoid,C36H28O16,NMRShiftDB2,9,14,3.0,3.0,5.0,5.0,1.0,5.0,6.0
+4670-05-7,flavonoid,C29H24O12,NMRShiftDB2,9,13,3.0,3.0,3.0,3.0,1.0,3.0,3.0
+"[(2R,3S)-5,7-dihydroxy-2-[3,4,6-trihydroxy-5-oxo-1-[(2S,3R)-3,5,7-trihydroxy-3,4-dihydro-2H-chromen-2-yl]benzo[7]annulen-8-yl]-3,4-dihydro-2H-chromen-3-yl] 3,4,5-trihydroxybenzoate",flavonoid,C36H28O16,NMRShiftDB2,9,14,3.0,3.0,5.0,5.0,3.0,5.0,5.0
+(+)-Epicatechin,flavonoid,C15H14O6,NMRShiftDB2,116,8,1.0,1.0,1.0,1.0,2.0,1.0,1.0
+"2-(3,4-dihydroxyphenyl)-5,7-dihydroxy-3-[(2S,3R,4R,5R,6R)-3,4,5-trihydroxy-6-(hydroxymethyl)oxan-2-yl]oxychromen-4-one",flavonoid glycoside,C21H20O12,NMRShiftDB2,92,11,1.0,1.0,1.0,1.0,1.0,3.0,1.0
+asiaticalin,flavonoid glycoside,C21H20O11,NMRShiftDB2,140,10,1.0,1.0,1.0,1.0,1.0,2.0,1.0
+Nicotiflorin,flavonoid glycoside,C27H30O15,NMRShiftDB2,177,16,1.0,1.0,1.0,1.0,20.0,11.0,3.0
+"2-(3,4-dihydroxyphenyl)-5,7-dihydroxy-3-{[(2S,3R,4S,5S,6R)-3,4,5-trihydroxy-6-methyloxan-2-yl]oxy}-4H-chromen-4-one",flavonoid glycoside,C21H20O11,NMRShiftDB2,140,11,1.0,1.0,1.0,1.0,3.0,2.0,2.0
+MEGxp0_000045,flavonoid glycoside,C28H34O15,NMRShiftDB2,37,20,1.0,1.0,1.0,1.0,7.0,5.0,2.0
+Isorhamnetin 3-rhamnoside,flavonoid glycoside,C22H22O11,NMRShiftDB2,146,12,1.0,1.0,1.0,1.0,4.0,8.0,7.0
+"5,7-dihydroxy-3-(8-hydroxy-2,2-dimethyl-3,4-dihydrochromen-5-yl)chromen-4-one",isoflavonoid,C20H18O6,NMRShiftDB2,292,8,1.0,1.0,1.0,1.0,2.0,2.0,2.0
+A837177,isoflavonoid,C17H18O6,NMRShiftDB2,126,9,1.0,1.0,1.0,1.0,1.0,3.0,2.0
+trimethyl fremontin,isoflavonoid,C23H24O6,NMRShiftDB2,145,11,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 JCQXUPLVXUGUEL,isoflavonoid,C21H22O6,NMRShiftDB2,184,10,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Erypoegin A,isoflavonoid,C21H22O4,NMRShiftDB2,121,11,1.0,1.0,1.0,1.0,1.0,2.0,1.0
+"3-[(3R)-7-hydroxy-3,4-dihydro-2H-chromen-3-yl]-6-methoxybenzene-1,2-diol",isoflavonoid,C16H16O5,NMRShiftDB2,183,9,1.0,1.0,1.0,1.0,1.0,2.0,2.0
+NMRShiftDB2 GWXRDVXVNDTQKV,isoflavonoid,C30H36O5,NMRShiftDB2,29,16,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Vogelin D,isoflavonoid,C26H30O5,NMRShiftDB2,86,13,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"5,7,3',4'-tetrahydroxy-2'-(3,3-dimethylallyl)isoflavone",isoflavonoid,C20H18O6,NMRShiftDB2,292,8,1.0,1.0,1.0,1.0,2.0,2.0,2.0
+KKVIERCIKBQLQG-VGMNWLOBSA-,other,C9H16O4,NMRShiftDB2,41,7,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"D-Fructose 2,6-bisphosphate",other,C6H14O12P2,NMRShiftDB2,7,5,2.0,2.0,2.0,2.0,3.0,1.0,2.0
+"(3R,4S,5S)-3,4,5-trihydroxycyclohex-1-ene-1-carboxylic acid",other,C7H10O5,NMRShiftDB2,14,5,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Quinic acid,other,C7H12O6,NMRShiftDB2,9,3,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+KOQBLQSTXBJTLT-WMZLMIDFSA-,other glycoside,C53H84O22,NMRShiftDB2,22,41,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+D-GlcA,other glycoside,C6H10O7,NMRShiftDB2,7,5,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+RAFFINOSE,other glycoside,C18H32O16,NMRShiftDB2,59,17,3.0,3.0,3.0,3.0,23.0,3.0,1.0
+ZDAANEWOAITQAQ-PZKIOYHUSA-,other glycoside,C19H36O8,NMRShiftDB2,14,17,1.0,1.0,1.0,1.0,3.0,1.0,3.0
+Parasorboside,other glycoside,C12H20O8,NMRShiftDB2,13,11,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+CERNUOSIDE A,other glycoside,C71H116O35,NMRShiftDB2,7,61,3.0,3.0,2.0,2.0,4.0,3.0,3.0
+Sarcaglaboside A,other glycoside,C21H30O8,NMRShiftDB2,64,16,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 KOMHTYYQRGPWLA,other glycoside,C16H26O8,NMRShiftDB2,43,12,1.0,1.0,1.0,1.0,8.0,1.0,2.0
+"alpha-D-Glucose 1,6-bisphosphate",other glycoside,C6H14O12P2,NMRShiftDB2,7,6,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+UNOQFSBKDLBTCO-RDYSDASBSA-,other glycoside,C60H98O27,NMRShiftDB2,19,50,1.0,1.0,1.0,1.0,3.0,2.0,1.0
+Pulchinenoside E2,other glycoside,C53H86O21,NMRShiftDB2,40,43,1.0,1.0,1.0,1.0,12.0,2.0,1.0
+Sarcaglaboside B,other glycoside,C21H28O8,NMRShiftDB2,64,16,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+D-Mannose 1-phosphate,other glycoside,C6H13O9P,NMRShiftDB2,12,6,1.0,1.0,1.0,1.0,1.0,2.0,2.0
+NPFGZJDRJCOHKS-LGARRYCISA-,other glycoside,C15H26O9,NMRShiftDB2,6,13,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+GMTYIEUFCJJIAD-SBAQFPBZSA-,other glycoside,C41H66O14,NMRShiftDB2,45,32,2.0,2.0,2.0,2.0,2.0,3.0,2.0
+CERNUOSIDE B,other glycoside,C71H116O36,NMRShiftDB2,9,62,2.0,2.0,1.0,1.0,2.0,1.0,1.0
+AKOS032436336,other glycoside,C38H60O18,NMRShiftDB2,8,32,1.0,1.0,1.0,1.0,4.0,3.0,3.0
+Sarcaglaboside C,other glycoside,C21H30O8,NMRShiftDB2,64,16,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+C18H26O11,other glycoside,C18H26O11,NMRShiftDB2,33,15,1.0,1.0,1.0,1.0,4.0,2.0,1.0
+GJLCGMOATCIXBW-BLSIQZDNSA-,other glycoside,C42H68O15,NMRShiftDB2,52,33,1.0,1.0,1.0,1.0,3.0,3.0,1.0
+Kenganthranol C,other phenolic/aromatic,C26H30O6,NMRShiftDB2,103,11,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"(3S,4S)-3-(1,3-benzodioxol-5-ylmethyl)-4-[(7-methoxy-1,3-benzodioxol-5-yl)methyl]oxolan-2-one",other phenolic/aromatic,C21H20O7,NMRShiftDB2,194,13,2.0,2.0,2.0,2.0,2.0,2.0,2.0
+Sterequinone F,other phenolic/aromatic,C19H16O3,NMRShiftDB2,30,10,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Bauhiniastatin 3,other phenolic/aromatic,C17H16O5,NMRShiftDB2,224,8,1.0,1.0,1.0,1.0,1.0,1.0,14.0
+trans-fertaric acid,other phenolic/aromatic,C14H14O9,NMRShiftDB2,8,8,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 IEPWIPZLLIOZLU,other phenolic/aromatic,C13H16O3,NMRShiftDB2,92,10,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Homovanillyl alcohol,other phenolic/aromatic,C9H12O3,NMRShiftDB2,70,6,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Bromophycolide H,other phenolic/aromatic,C27H37Br3O4,NMRShiftDB2,5,18,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Phenalen-1-one,other phenolic/aromatic,C13H8O,NMRShiftDB2,11,8,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+PPOHVZSUYIVHKL-UHFFFAOYSA-,other phenolic/aromatic,C29H26O4,NMRShiftDB2,15,16,3.0,3.0,1.0,1.0,11.0,1.0,5.0
+"(3R,4S)-3-(4-hydroxy-3,5-dimethoxybenzoyl)-4-[(7-methoxy-1,3-benzodioxol-5-yl)methyl]oxolan-2-one",other phenolic/aromatic,C22H22O9,NMRShiftDB2,68,10,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Kengaquinone,other phenolic/aromatic,C25H26O5,NMRShiftDB2,108,9,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"1,3-Naphthalenediol",other phenolic/aromatic,C10H8O2,NMRShiftDB2,41,6,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"3-[(2R,3S)-5-hydroxy-2,3,8,8-tetramethyl-4-oxo-2,3-dihydropyrano[2,3-h]chromen-6-yl]-3-phenylprop-2-enoic acid",other phenolic/aromatic,C25H24O6,NMRShiftDB2,107,11,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+SYRINGALDEHYDE,other phenolic/aromatic,C9H10O4,NMRShiftDB2,129,3,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"(3~{R},4~{R})-4-[(~{Z})-2-carboxy-1-[[(1~{R},19~{R},21~{R},23~{R})-6,7,8,11,12,13,22-heptahydroxy-3,16-dioxo-21-(3,4,5-trihydroxybenzoyl)oxy-2,17,20-trioxatetracyclo[17.3.1.0^{4,9}.0^{10,15}]tricosa-4,6,8,10(15),11,13-hexaen-23-yl]oxycarbonyl]vinyl]-5,6,7-trihydroxy-1-oxo-isochromane-3-carboxylic acid",other phenolic/aromatic,C41H30O28,NMRShiftDB2,9,13,1.0,1.0,1.0,1.0,1.0,1.0,5.0
+"(1R,3S,4S,5S)-3-[(E)-3-(3,4-dihydroxyphenyl)prop-2-enoyl]oxy-1,4,5-trihydroxycyclohexane-1-carboxylic acid",other phenolic/aromatic,C16H18O9,NMRShiftDB2,35,10,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Grandiuvarin A,other phenolic/aromatic,C23H22O7,NMRShiftDB2,90,13,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Fukanefurochromone B,other phenolic/aromatic,C24H28O5,NMRShiftDB2,53,13,1.0,1.0,2.0,2.0,1.0,1.0,1.0
+"(3E,4S)-3-[(4-hydroxy-3,5-dimethoxyphenyl)methylidene]-4-[(7-methoxy-1,3-benzodioxol-5-yl)methyl]oxolan-2-one",other phenolic/aromatic,C22H22O8,NMRShiftDB2,98,10,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Bromophycolide E,other phenolic/aromatic,C27H36Br2O4,NMRShiftDB2,10,19,1.0,1.0,1.0,1.0,2.0,1.0,3.0
+Urinatetralin,other phenolic/aromatic,C22H24O6,NMRShiftDB2,83,15,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Alizarin,other phenolic/aromatic,C14H8O4,NMRShiftDB2,13,6,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Homovanillic acid,other phenolic/aromatic,C9H10O4,NMRShiftDB2,129,5,1.0,1.0,1.0,1.0,2.0,2.0,3.0
+FOKIENAGAROFURAN A,other phenolic/aromatic,C40H42O11,NMRShiftDB2,7,22,1.0,1.0,1.0,1.0,2.0,3.0,3.0
+"[(1S,2S,4S,5S,6R,10S)-5-{[(2S,3R,4R,5S,6S)-3,4-bis(acetyloxy)-5-hydroxy-6-methyloxan-2-yl]oxy}-10-{[(2S,3R,4S,5S,6R)-3,4,5-trihydroxy-6-(hydroxymethyl)oxan-2-yl]oxy}-3,9-dioxatricyclo[4.4.0.0^{2,4}]dec-7-en-2-yl]methyl (2E)-3-phenylprop-2-enoate",other phenolic/aromatic glycoside,C34H42O17,NMRShiftDB2,8,27,1.0,1.0,4.0,4.0,3.0,1.0,4.0
+Syringin,other phenolic/aromatic glycoside,C17H24O9,NMRShiftDB2,29,11,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 PSQDLUHLEIWGCS,other phenolic/aromatic glycoside,C25H38O13,NMRShiftDB2,7,20,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+1-O-(4-Coumaroyl)-beta-D-glucose,other phenolic/aromatic glycoside,C15H18O8,NMRShiftDB2,35,10,1.0,1.0,1.0,1.0,6.0,2.0,1.0
+NMRShiftDB2 PWDKTMDATTYHBL,other phenolic/aromatic glycoside,C23H34O12,NMRShiftDB2,9,17,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+QUJVLURIRPUWBR-IFWUAMLASA-,other phenolic/aromatic glycoside,C39H44O18,NMRShiftDB2,5,28,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+stilbostemin H 3'-beta-D-glucopyranoside,other phenolic/aromatic glycoside,C22H28O8,NMRShiftDB2,169,14,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+LITSEAEFOLOSIDE A,other phenolic/aromatic glycoside,C23H26O12,NMRShiftDB2,30,15,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 YXWUKVNWHJHQJJ,other phenolic/aromatic glycoside,C20H30O12,NMRShiftDB2,15,17,1.0,1.0,1.0,1.0,2.0,4.0,4.0
+"[(1S,2S,4S,5S,6R,10S)-10-{[(2S,3R,4S,5S,6R)-3,4,5-trihydroxy-6-(hydroxymethyl)oxan-2-yl]oxy}-5-{[(2S,3R,4R,5R,6S)-3,4,5-trihydroxy-6-methyloxan-2-yl]oxy}-3,9-dioxatricyclo[4.4.0.0^{2,4}]dec-7-en-2-yl]methyl (2E)-3-phenylprop-2-enoate",other phenolic/aromatic glycoside,C30H38O15,NMRShiftDB2,37,25,1.0,1.0,1.0,1.0,1.0,1.0,4.0
+arbutin,other phenolic/aromatic glycoside,C12H16O7,NMRShiftDB2,12,8,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+ajugaside A,other phenolic/aromatic glycoside,C32H50O14,NMRShiftDB2,11,25,1.0,1.0,1.0,1.0,4.0,1.0,1.0
+"(2R,3S,4R,5S,6S)-2-[(1S,2R)-3-hydroxy-1,2-bis(4-hydroxy-3-methoxyphenyl)propoxy]-6-(hydroxymethyl)oxane-3,4,5-triol",other phenolic/aromatic glycoside,C23H30O11,NMRShiftDB2,15,17,1.0,1.0,1.0,1.0,2.0,2.0,2.0
+1464-44-4,other phenolic/aromatic glycoside,C12H16O6,NMRShiftDB2,32,9,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Stilbostemin B 3'-beta-d-glucopyranoside,other phenolic/aromatic glycoside,C21H26O7,NMRShiftDB2,154,14,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 OZRYKRPEVXHYIF,other phenolic/aromatic glycoside,C23H30O14,NMRShiftDB2,6,18,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"1-[2,4-dihydroxy-6-[(2S,3R,4S,5S,6R)-3,4,5-trihydroxy-6-(hydroxymethyl)oxan-2-yl]oxyphenyl]-2-methylbutan-1-one",other phenolic/aromatic glycoside,C17H24O9,NMRShiftDB2,29,12,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"(2R,3S,4S,5R,6R)-2-(hydroxymethyl)-6-[2-(hydroxymethyl)phenoxy]oxane-3,4,5-triol",other phenolic/aromatic glycoside,C13H18O7,NMRShiftDB2,22,11,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Phlorisobutyrophenone,phenylpropanoid,C10H12O4,NMRShiftDB2,177,3,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+eugenol,phenylpropanoid,C10H12O2,NMRShiftDB2,138,7,1.0,1.0,1.0,1.0,1.0,2.0,2.0
+NMRShiftDB2 CDICDSOGTRCHMG,phenylpropanoid,C11H12O4,NMRShiftDB2,147,5,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 LZFOPEXOUVTGJS,phenylpropanoid,C11H14O4,NMRShiftDB2,153,5,1.0,1.0,1.0,1.0,2.0,1.0,1.0
+NMRShiftDB2 JHLPYWLKSLVYOI,phenylpropanoid,C12H14O5,NMRShiftDB2,96,5,1.0,1.0,1.0,1.0,5.0,1.0,1.0
+Dihydroconiferyl alcohol,phenylpropanoid,C10H14O3,NMRShiftDB2,122,7,1.0,1.0,1.0,1.0,2.0,2.0,2.0
+NMRShiftDB2 PCMORTLOPMLEFB,phenylpropanoid,C11H12O5,NMRShiftDB2,104,4,1.0,1.0,1.0,1.0,3.0,1.0,1.0
+NMRShiftDB2 JMFRWRFFLBVWSI,phenylpropanoid,C10H12O3,NMRShiftDB2,165,7,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 VHVOLFRBFDOUSH,phenylpropanoid,C10H10O2,NMRShiftDB2,73,7,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 KKSDGJDHHZEWEP,phenylpropanoid,C9H8O3,NMRShiftDB2,43,6,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 PMOWTIHVNWZYFI,phenylpropanoid,C9H8O3,NMRShiftDB2,43,6,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 AUJXJFHANFIVKH,phenylpropanoid,C11H12O4,NMRShiftDB2,147,7,1.0,1.0,1.0,1.0,5.0,1.0,1.0
+Dihydrocaffeic acid,phenylpropanoid,C9H10O4,NMRShiftDB2,129,5,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+rubiarbonol A,steroid,C30H50O4,NMRShiftDB2,191,22,2.0,3.0,3.0,2.0,3.0,2.0,2.0
+Hancolupenone,steroid,C30H48O,NMRShiftDB2,128,21,1.0,1.0,1.0,1.0,4.0,4.0,22.0
+IILSBUXFTVZCJS-DPROJNMLSA-,steroid,C27H42O7,NMRShiftDB2,37,18,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+84605-18-5,steroid,C30H50O5,NMRShiftDB2,122,21,1.0,1.0,2.0,1.0,2.0,6.0,13.0
+24-epiquadrangularic acid G,steroid,C31H48O7,NMRShiftDB2,31,23,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"Ecdysterone 2,3:20,22-diacetonide",steroid,C33H52O7,NMRShiftDB2,27,21,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+1225-03-2,steroid,C18H22O2,NMRShiftDB2,40,13,1.0,1.0,1.0,1.0,1.0,1.0,2.0
+JUKIHJJXBNPJNL-UWISGEPLSA-,steroid,C30H38O11,NMRShiftDB2,26,21,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+progesterone,steroid,C21H30O2,NMRShiftDB2,107,16,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"(3alpha,9xi,14xi,24S)-stigmast-5-en-3-ol",steroid,C29H50O,NMRShiftDB2,83,25,1.0,1.0,1.0,1.0,2.0,1.0,1.0
+quadrangularic acid K,steroid,C30H48O5,NMRShiftDB2,215,22,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+lancifodilactone H,steroid,C27H40O5,NMRShiftDB2,74,19,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+quadrangularic acid H,steroid,C30H44O7,NMRShiftDB2,76,21,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+rubiarbonol F,steroid,C30H50O5,NMRShiftDB2,122,22,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+MJKOCZIZHOHSNY-OWFCURGQSA-,steroid,C33H50O10,NMRShiftDB2,16,22,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+11beta-Methoxy Dienogest,steroid,C18H24O2,NMRShiftDB2,46,14,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"(3S,4S,5S,10S,13R,14R,17R)-3-hydroxy-4,10,13,14-tetramethyl-17-[(2R)-6-methyl-5-methylideneheptan-2-yl]-2,3,4,5,6,7,12,15,16,17-decahydro-1H-cyclopenta[a]phenanthren-11-one",steroid,C30H48O2,NMRShiftDB2,261,22,1.0,1.0,1.0,1.0,1.0,1.0,5.0
+DIOSGENIN,steroid,C27H42O3,NMRShiftDB2,92,23,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+60433-72-9,steroid,C30H48O2,NMRShiftDB2,261,21,1.0,1.0,1.0,1.0,1.0,1.0,8.0
+AKOS030499957,steroid,C21H32O2,NMRShiftDB2,134,17,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+RWFULWGNOJLXHV-YVHGADRTSA-,steroid glycoside,C46H78O18,NMRShiftDB2,11,38,1.0,1.0,1.0,1.0,4.0,2.0,1.0
+BRYONIOSIDE C,steroid glycoside,C44H72O14,NMRShiftDB2,7,34,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+27-Deoxyactein,steroid glycoside,C37H56O10,NMRShiftDB2,15,28,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Dioscoreside B,steroid glycoside,C51H82O24,NMRShiftDB2,16,46,1.0,1.0,1.0,1.0,2.0,1.0,1.0
+NMRShiftDB2 MHQQPTNPTWQCBN,steroid glycoside,C36H60O10,NMRShiftDB2,37,27,1.0,1.0,2.0,2.0,2.0,5.0,7.0
+Pseudoprotodioscin,steroid glycoside,C51H82O21,NMRShiftDB2,34,46,2.0,2.0,2.0,2.0,3.0,2.0,1.0
+Cyclocephaloside II,steroid glycoside,C43H70O15,NMRShiftDB2,17,33,1.0,1.0,1.0,2.0,1.0,1.0,1.0
+ATVPSTCOCAQBSX-QBXFCDRGSA-,steroid glycoside,C49H80O19,NMRShiftDB2,15,39,1.0,1.0,1.0,1.0,3.0,1.0,1.0
+AOEKSLVHJZEURZ-JYXUTFFHSA-,steroid glycoside,C39H62O12,NMRShiftDB2,13,28,2.0,3.0,3.0,3.0,1.0,2.0,2.0
+Dioscoreside A,steroid glycoside,C51H82O24,NMRShiftDB2,16,46,2.0,2.0,2.0,2.0,4.0,1.5,3.5
+2-Epi-alpha-cedrene,terpenoid-like,C15H24,NMRShiftDB2,381,11,1.0,1.0,1.0,1.0,1.0,1.0,6.0
+NMRShiftDB2 BACKKBRUFWBBSR,terpenoid-like,C14H14O3,NMRShiftDB2,88,8,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Cassipouryl acetate,terpenoid-like,C22H40O2,NMRShiftDB2,22,18,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 AXPAUZGVNGEWJD,terpenoid-like,C17H34O2,NMRShiftDB2,43,16,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"(4aS,6aS,6bR,8aR,10R,12aS,12bR,14bS)-10-hydroxy-2,2,6a,6b,9,9,12a-heptamethyl-13-oxo-1,2,3,4,4a,5,6,6a,6b,7,8,8a,9,10,11,12,12a,12b,13,14b-icosahydropicene-4a-carboxylic acid",terpenoid-like,C30H46O4,NMRShiftDB2,311,19,1.0,1.0,2.0,1.0,1.0,1.0,1.0
+VUWOTUVAJXTKIV-UDYJRIAMSA-,terpenoid-like,C15H24O4,NMRShiftDB2,247,12,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+STL565971,terpenoid-like,C25H30O7,NMRShiftDB2,65,15,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NMRShiftDB2 GIHNTRQPEMKFKO,terpenoid-like,C15H22O,NMRShiftDB2,329,10,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+tithofolinolide,terpenoid-like,C21H30O8,NMRShiftDB2,64,14,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+3-Stearoyl-sn-glycerol,terpenoid-like,C21H42O4,NMRShiftDB2,9,20,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"[(1S,3R,9R,10R,11S,13R)-3-hydroxy-6,9,10-trimethyl-5-oxo-4,14-dioxatetracyclo[7.5.0.01,13.03,7]tetradec-6-en-11-yl] 3-methylbut-2-enoate",terpenoid-like,C20H26O6,NMRShiftDB2,433,11,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+HLZJSQQUPSXGEN-YIDDXWOWSA-,terpenoid-like,C20H30O3,NMRShiftDB2,642,14,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Humulene,terpenoid-like,C15H24,NMRShiftDB2,381,11,1.0,1.0,2.0,2.0,1.0,1.0,2.0
+"(E)-5-[(1R,2R,4aR,5S,6S,8aS)-5,6-dihydroxy-1,2,4a,5-tetramethyl-3,4,6,7,8,8a-hexahydro-2H-naphthalen-1-yl]-3-methylpent-2-enoic acid",terpenoid-like,C20H34O4,NMRShiftDB2,196,15,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+CASEAMEMBRIN M,terpenoid-like,C33H48O9,NMRShiftDB2,21,25,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+NJZSMGYGWKGBPU-PVBNJQRXSA-,terpenoid-like,C30H42O12,NMRShiftDB2,27,18,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+VDTCUNMXRDOLHU-YSDPSAINSA-,terpenoid-like,C22H28O8,NMRShiftDB2,169,15,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+HKCLJBNDOMXPCY-CTJDIJSBSA-,terpenoid-like,C21H26O7,NMRShiftDB2,154,12,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+IZDJWRQGKKMEJW-MQUHNJTRSA-,terpenoid-like,C27H38O8,NMRShiftDB2,48,19,1.0,1.0,1.0,1.0,1.0,2.0,1.0
+Epiprocurcumenol,terpenoid-like,C15H22O2,NMRShiftDB2,540,9,1.0,1.0,1.0,1.0,8.0,4.0,80.0
+NMRShiftDB2 KITGYVIOYOCIIE,terpenoid-like,C10H16O2,NMRShiftDB2,193,9,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+"[(2Z,4E)-6-[(3S,4R,5S,6R,7Z,10S)-4,10-dihydroxy-6-(3-hydroxypropyl)-10-methyl-7-(1-oxopropan-2-ylidene)spiro[4.5]decan-3-yl]-2-(4-methylpent-3-enyl)hepta-2,4,6-trienyl] acetate",terpenoid-like,C32H48O6,NMRShiftDB2,75,23,2.0,2.0,2.0,2.0,2.0,1.0,1.0
+ent-exo-Verticillene,terpenoid-like,C20H32,NMRShiftDB2,129,15,1.0,1.0,1.0,1.0,1.0,2.0,25.0
+Cassipourol,terpenoid-like,C20H38O,NMRShiftDB2,10,17,1.0,1.0,1.0,1.0,1.0,2.0,2.0
+Poricoic acid G,terpenoid-like,C30H46O5,NMRShiftDB2,221,20,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+CRATOXYARBORENONE F,xanthone,C14H10O5,NMRShiftDB2,87,6,1.0,1.0,2.0,2.0,5.0,1.0,1.0
+IGTOCWFRBRUVNC-UHFFFAOYSA-,xanthone,C15H12O7,NMRShiftDB2,85,5,1.0,1.0,1.0,1.0,1.0,2.5,2.5
+"2,6-dihydroxy-1,7-dimethoxyxanthone",xanthone,C15H12O6,NMRShiftDB2,184,6,1.0,1.0,1.0,1.0,1.0,14.0,13.0
+AKOS030502025,xanthone glycoside,C19H18O11,NMRShiftDB2,22,9,1.0,1.0,1.0,1.0,1.0,2.0,1.0
+andrographolide (literature),terpenoid-like (lit.),C20H30O5,literature,344,15,1.0,1.0,1.0,1.0,1.0,4.0,4.0

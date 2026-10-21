@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "phyto-companion-pharmacology"
+version = "0.1.0"
+description = "PhytoCompanion pharmacology service: targets, pathways, network pharmacology, ADMET"
+requires-python = ">=3.11"
+license = { text = "TBD" }
+dependencies = [
+    "phyto-companion-shared>=0.1.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "httpx>=0.27",
+    "networkx>=3.0",
+    "rdkit>=2024.3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

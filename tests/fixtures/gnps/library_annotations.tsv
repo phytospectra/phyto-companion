@@ -1,0 +1,4 @@
+#Scan#	LibraryName	SMILES	InChIKey	MQScore	SharedPeaks	SpecOnFile	Adduct	Precursor_MZ	MSI_LEVEL
+1	Cyclo(Pro-Val)	CC(C)C(C(=O)N1CCCC1C(=O))NC(=O)C(N)Cc1ccccc1	QNCLZRRGFGFHFF-UHFFFAOYSA-N	0.95	14	sample_a.mzML	M+H	571.3012	2
+3	Leu-Leu-fragment	CC(C)CC(C(=O)O)NC(=O)CC(C)C	...	0.82	11	sample_a.mzML	M+H	699.3689	2
+4	Phe-Gly	NCC(=O)NC(Cc1ccccc1)C(=O)O	...	0.74	8	sample_a.mzML	M+H	312.1441	3
