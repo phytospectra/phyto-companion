@@ -119,7 +119,7 @@ def search_peaks(
             "h_tolerance_ppm": request.h_tolerance_ppm,
             "c_tolerance_ppm": request.c_tolerance_ppm,
             "max_results": request.max_results,
-            "databases": sorted(request.databases),
+            "databases": sorted(request.databases or []),
             "include_noncommercial": request.include_noncommercial,
         },
     )
