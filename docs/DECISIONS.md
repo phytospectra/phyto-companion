@@ -41,7 +41,7 @@ not silently filled.
 
 Checked programmatically against this file on 2026-10-21:
 
-- Entries present: **0001-0018** and **0024-0037** (32 entries).
+- Entries present: **0001-0018** and **0024-0040** (35 entries).
 - Missing within the range: **0019, 0020, 0021, 0022, 0023** -- these five only.
 - No duplicate IDs; entries are in ascending order.
 - No references to ADR-0019..0023 anywhere else in the repository, so the gap
