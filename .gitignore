@@ -86,3 +86,6 @@ node_modules/
 # macOS resource forks
 # ---------------------------------------------------------------------------
 ._*
+frontend/
+phytospectra-frontend-phase1.bundle
+phytospectra-frontend-phase1.tar.gz
