@@ -1975,3 +1975,4 @@ own enforcement surface.
   `docs/DATA_SOURCES.md`). Live LOTUS/NPASS response shapes were written
   from their documentation and are unverifiable until the hosts answer;
   they are defensively parsed and never crash the prior.
+  - **Production data addendum (sizes and sources).** The three pilot snapshot files carry 17 organism–compound entries total (`knapsack_snapshot.json` 42 lines, `lotus_snapshot.json` 74 lines, `npass_snapshot.json` 26 lines). Before the first pilot user, replace each with the full dump: LOTUS (~750,000 organism–compound pairs, Zenodo CC0), KNApSAcK (~50,000 species-metabolite pairs, downloadable core table), NPASS (~35,000 compounds with species source, static export). The live-API code paths remain in place and are used when the dumps are absent; the snapshots are the offline and CI fallback, not the primary source.
