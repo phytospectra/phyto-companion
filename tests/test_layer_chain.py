@@ -263,6 +263,97 @@ def test_marker_evidence_cites_its_reference() -> None:
         assert ":" in source  # pharmacopoeial_marker:<reference>
 
 
+def _marker_penalties(rank: CandidateRank) -> list[float]:
+    """Miss strengths from the evidence graph, which carries the
+    diagnostic relations (the evidence_chain uses the layer tag)."""
+    graph = rank.evidence_graph
+    assert graph is not None
+    return [
+        e.strength
+        for e in graph.evidence
+        if e.relation in
+        {"pharmacopoeial_marker_miss", "pharmacopoeial_marker_miss_penalty"}
+    ]
+
+
+def test_genuine_sample_missing_marker_stays_at_support_baseline() -> None:
+    """ADR-0066 chemotype caveat (test a): a genuine sample can lack a
+    monograph marker (seasonal/ontogenetic chemotype, extraction
+    selectivity, co-elution); an unflagged miss carries strength 0.0 and
+    no score penalty, so the score never drops below the support-only
+    baseline."""
+    from taxon_prior.markers import MARKER_SUPPORT_BONUS
+
+    base = _rank("q", "quercetin", QUERCETIN, 1.0)
+    no_markers = apply_chromatography_layers(
+        [base], species="Arabidopsis thaliana", observed_rt_min=15.0,
+        observed_uv_spectrum=None, peak_purity_score=None,
+        lc_method=None, reference_standards=None, anchor_series=None,
+    ).ranks[0]
+    baseline_score = no_markers.score  # marker layer skipped, untouched
+
+    # Curcuma longa IS curated, so the marker layer runs; an RT far from
+    # every marker window makes every marker a miss.
+    result = apply_chromatography_layers(
+        [_rank("q", "quercetin", QUERCETIN, 1.0)],
+        species="Curcuma longa", observed_rt_min=1.0,
+        observed_uv_spectrum=None, peak_purity_score=None,
+        lc_method=None, reference_standards=None, anchor_series=None,
+    )
+    rank = result.ranks[0]
+    penalties = _marker_penalties(rank)
+    assert penalties, "marker layer ran, so miss evidence exists"
+    assert all(p == 0.0 for p in penalties), (
+        "unflagged misses must carry strength 0.0 (never proof of absence)"
+    )
+    assert rank.score == pytest.approx(baseline_score), (
+        "an unflagged miss must not move the score below the "
+        "support-only baseline"
+    )
+    assert rank.score >= baseline_score - MARKER_SUPPORT_BONUS
+
+
+def test_flagged_expected_marker_miss_penalised_more_than_unflagged() -> None:
+    """ADR-0066 (test b): only a marker explicitly flagged
+    ``expected_in_matrix`` may take the larger miss penalty; the flagged
+    penalty must be strictly larger in magnitude than both the unflagged
+    miss (0.0) and the support bonus."""
+    from taxon_prior.markers import (
+        MARKER_MISS_PENALTY,
+        MARKER_SUPPORT_BONUS,
+    )
+    from taxon_prior.markers import MarkerHit
+
+    assert MARKER_MISS_PENALTY > MARKER_SUPPORT_BONUS
+
+    rank = _rank("q", "quercetin", QUERCETIN, 1.0)
+    hits_unflagged = [
+        MarkerHit(
+            marker="m", smiles=QUERCETIN, rt_in_range=False,
+            uv_in_range=False, rt_expected=(10.0, 12.0),
+            reference="Ph.Int.", expected_in_matrix=False,
+        )
+    ]
+    hits_flagged = [
+        MarkerHit(
+            marker="m", smiles=QUERCETIN, rt_in_range=False,
+            uv_in_range=False, rt_expected=(10.0, 12.0),
+            reference="Ph.Int.", expected_in_matrix=True,
+        )
+    ]
+    from orchestrator.layer_chain import _attach_marker_evidence
+
+    out_unflagged = _attach_marker_evidence(rank, hits_unflagged, [])
+    out_flagged = _attach_marker_evidence(rank, hits_flagged, [])
+    # lower_is_better convention: penalty RAISES the score (worse).
+    delta_unflagged = out_unflagged.score - rank.score
+    delta_flagged = out_flagged.score - rank.score
+    assert delta_unflagged == 0.0
+    assert abs(delta_flagged) == pytest.approx(MARKER_MISS_PENALTY)
+    assert abs(delta_flagged) > abs(delta_unflagged)
+    assert abs(delta_flagged) > MARKER_SUPPORT_BONUS
+
+
 # --- Pipeline order ---------------------------------------------------------------
 
 

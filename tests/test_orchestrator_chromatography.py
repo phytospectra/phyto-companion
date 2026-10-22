@@ -107,6 +107,10 @@ def test_identify_dry_run_reports_layers_with_metadata() -> None:
     # checkpoint, so a dry run executes it.
     skipped_layers = {s["layer"] for s in layers["skipped"]}
     assert "uv" in skipped_layers  # no UV spectrum supplied
+    # MSI fallback reporting (ADR-0061 threshold basis): the top candidate
+    # carries an explicit level, so "no Level-1" is never read as
+    # "no match".
+    assert layers["top_candidate_msi_level"] in (1, 2)
 
 
 def test_layers_never_break_a_metadata_free_run() -> None:

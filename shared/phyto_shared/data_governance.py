@@ -157,7 +157,7 @@ ID here is a licence decision and requires a DATA_SOURCES.md entry."""
 def is_source_allowed_in_tier(source: str, tier: DataTier) -> bool:
     """Whether ``source`` may contribute to an analysis destined for ``tier``.
 
-    Licence constraint (``docs/DATA_SOURCES.md`` sections 1 and 5): NP-MRD
+    Licence constraint (``docs/DATA_SOURCES.md`` sections 1 and 3): NP-MRD
     data is licensed CC-BY-NC by its original depositors, and the NP-MRD
     literature fixtures derive their terms from it.  Every source in
     :data:`NON_COMMERCIAL_SOURCES` is therefore allowed ONLY in the

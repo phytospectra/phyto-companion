@@ -49,6 +49,14 @@ router = APIRouter()
 #: to agree; a property the standard or the peak does not carry is
 #: skipped rather than failed (a UV-less standard can still match on
 #: RT + MS2), but at least ONE property must match.
+#:
+#: Threshold basis: asserted, provisional.  RT ±0.1 min is the reproducibility
+#: of an injected standard on a well-retained peak under one method (worth
+#: tightening only with replication data); UV cosine > 0.95 and MS2 cosine
+#: > 0.85 follow the GNPS-library-match convention the elucidation ranker
+#: already uses (ADR-0014) so a Level-1 stamp cannot disagree with a spectral
+#: match on the same pair.  Calibrate all three against matched
+#: standard-vs-peak pairs before treating them as validated.
 RT_TOLERANCE_MIN = 0.1
 UV_COSINE_THRESHOLD = 0.95
 MS2_COSINE_THRESHOLD = 0.85

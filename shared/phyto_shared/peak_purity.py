@@ -23,6 +23,15 @@ from .chromatography import uv_cosine
 
 __all__ = ["peak_purity", "PURITY_AMBIGUITY_THRESHOLD", "purity_caveat"]
 
+#: Score at or below which a peak is declared a co-elution and the verdict
+#: is forced to AMBIGUOUS (ADR-0065).
+#:
+#: Threshold basis: asserted, provisional.  0.5 sits deliberately at the
+#: midpoint of the 0-1 score: below it the UV-drift and m/z-alignment
+#: signals agree that the peak is heterogeneous, above it the evidence is
+#: mixed.  It is coarse by design (see ADR-0065 Consequences) -- the score
+#: is always stamped so users can judge near-threshold cases (0.55) for
+#: themselves.  Recalibrate only with labelled pure/mixture peak data.
 PURITY_AMBIGUITY_THRESHOLD = 0.5
 
 PURITY_CAVEAT = (

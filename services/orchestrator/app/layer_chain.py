@@ -290,9 +290,51 @@ def _attach_marker_evidence(
     The marker check is about the PEAK (species authenticity), so every
     candidate sees it; only supporting markers contribute positive
     strength, and each item carries its pharmacopoeial reference.
+
+    Miss semantics (ADR-0066, chemotype-variation caveat): an unflagged
+    marker miss carries strength 0.0 and NO score penalty -- seasonal,
+    ontogenetic and extraction-driven variation mean a genuine sample can
+    lack a monograph marker, so a miss is never treated as proof of
+    absence and must never outweigh the support bonus.  Only a marker
+    explicitly flagged ``expected_in_matrix`` (the monograph's passing
+    criterion for this matrix) takes the larger miss penalty when absent.
     """
+    from taxon_prior.markers import (
+        MARKER_MISS_PENALTY,
+        MARKER_MISS_PENALTY_UNFLAGGED,
+        MARKER_SUPPORT_BONUS,
+    )
+
     if not hits:
         return rank
+    _hit = lambda h: bool(h.rt_in_range or h.uv_in_range)  # noqa: E731
+
+    def _miss_item(h: Any) -> EvidenceItem:
+        # House convention (cf. rt_reranker): strength is |delta| and the
+        # direction lives in the relation name -- a flagged miss is a
+        # penalty relation, an unflagged miss is neutral evidence.
+        if h.expected_in_matrix:
+            return EvidenceItem(
+                source_spectrum=f"pharmacopoeial_marker:{h.reference}",
+                spectral_feature=(
+                    f"marker {h.marker} (expected in matrix): RT in "
+                    f"range={h.rt_in_range}, UV in range={h.uv_in_range} "
+                    f"(expected RT {h.rt_expected[0]}-{h.rt_expected[1]} min)"
+                ),
+                relation="pharmacopoeial_marker_miss_penalty",
+                strength=MARKER_MISS_PENALTY,
+            )
+        return EvidenceItem(
+            source_spectrum=f"pharmacopoeial_marker:{h.reference}",
+            spectral_feature=(
+                f"marker {h.marker}: RT in range={h.rt_in_range}, "
+                f"UV in range={h.uv_in_range} (expected RT "
+                f"{h.rt_expected[0]}-{h.rt_expected[1]} min)"
+            ),
+            relation="pharmacopoeial_marker_miss",
+            strength=0.0,
+        )
+
     items = [
         EvidenceItem(
             source_spectrum=f"pharmacopoeial_marker:{h.reference}",
@@ -301,18 +343,31 @@ def _attach_marker_evidence(
                 f"UV in range={h.uv_in_range} (expected RT "
                 f"{h.rt_expected[0]}-{h.rt_expected[1]} min)"
             ),
-            relation="pharmacopoeial_marker_match"
-            if (h.rt_in_range or h.uv_in_range)
-            else "pharmacopoeial_marker_miss",
-            strength=0.3 if (h.rt_in_range or h.uv_in_range) else 0.0,
+            relation="pharmacopoeial_marker_match",
+            strength=0.3,
         )
+        if _hit(h)
+        else _miss_item(h)
         for h in hits[:5]
     ]
-    marker_bonus = 0.05 if supporting else 0.0
+    # A miss on an unflagged marker contributes 0 (never negative), so the
+    # support-only baseline is the floor for genuine samples; a flagged
+    # miss is the only path to a real penalty, and its magnitude must stay
+    # strictly larger than the support bonus to be meaningful.
+    assert MARKER_MISS_PENALTY > MARKER_SUPPORT_BONUS
+    flagged_miss = any(
+        h.expected_in_matrix and not _hit(h) for h in hits
+    )
+    if flagged_miss:
+        marker_delta = -MARKER_MISS_PENALTY
+    elif supporting:
+        marker_delta = MARKER_SUPPORT_BONUS
+    else:
+        marker_delta = MARKER_MISS_PENALTY_UNFLAGGED
     score = (
-        rank.score - marker_bonus
+        rank.score - marker_delta
         if rank.ranking_convention == "lower_is_better"
-        else rank.score + marker_bonus
+        else rank.score + marker_delta
     )
     graph = rank.evidence_graph
     if graph is not None:
@@ -324,7 +379,8 @@ def _attach_marker_evidence(
             source_spectrum=f"pharmacopoeial_marker:{h.reference}",
             spectral_feature=f"marker {h.marker}",
             relation="pharmacopoeial_markers",
-            strength=0.3 if (h.rt_in_range or h.uv_in_range) else 0.0,
+            strength=0.3 if _hit(h)
+            else (MARKER_MISS_PENALTY if h.expected_in_matrix else 0.0),
         )
         for h in hits[:5]
     ]

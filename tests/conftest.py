@@ -8,10 +8,53 @@ Add one ``_alias_package`` line per service in Steps 4-6.
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
+import pytest
+
 _ROOT = Path(__file__).resolve().parents[1]
+
+# Collection-time safety: several service modules build their FastAPI app at
+# import time (``app = create_app()``), baking ``AuthConfig.from_env()``
+# into a module-level singleton no fixture can reach afterwards.  Importing
+# them under an ambient ``PHYTO_ENV=cloud`` would construct REAL
+# Firebase/Firestore clients, and an ambient ``PHYTO_AUTH_ENABLED=1`` would
+# enforce auth on the module-level apps the endpoint tests reuse (401s for
+# every unauthenticated call).  The env is therefore pinned here at conftest
+# import -- before the ``_alias_package`` calls below execute any service
+# module.  Tests that need another plane still opt in per-test via
+# ``monkeypatch.setenv`` (and build their own app, as ``service_runner``
+# does); the pin only removes the INVOKING SHELL's influence.
+os.environ["PHYTO_ENV"] = "local"
+for _var in (
+    "FIREBASE_CREDENTIALS_PATH",
+    "PHYTO_AUTH_ENABLED",
+    "PHYTO_DRY_RUN",
+    "PHYTO_FREE_TOKENS",
+):
+    os.environ.pop(_var, None)
+
+
+@pytest.fixture(autouse=True)
+def _local_plane_env(monkeypatch):
+    """Auth-test isolation (ADR-0028 contract): every test runs on the
+    local plane unless it explicitly opts into another plane via
+    ``monkeypatch.setenv``.
+
+    The auth layer's ``AuthConfig.from_env()`` keys off ``PHYTO_ENV``: on
+    the cloud plane ``install_auth`` would construct the REAL Firebase and
+    Firestore clients (importing ``firebase_admin`` and applying
+    ``FIREBASE_CREDENTIALS_PATH`` from the developer's shell).  Defaulting
+    the whole suite to ``local`` makes that construction unreachable from
+    environment leakage -- a stray ``PHYTO_ENV=cloud`` in the invoking
+    shell or CI matrix cannot turn any test into a live-GCP call.  The
+    module-level pin above extends the same guarantee to import time, which
+    the fixture cannot reach.
+    """
+    monkeypatch.setenv("PHYTO_ENV", "local")
+    monkeypatch.delenv("FIREBASE_CREDENTIALS_PATH", raising=False)
 
 
 def _alias_package(alias: str, service: str) -> None:

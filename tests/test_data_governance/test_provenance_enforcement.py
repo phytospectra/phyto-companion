@@ -2,7 +2,8 @@
 
 The proprietary-tier validator rejects analyses whose inputs include a
 non-commercial source (NP-MRD in particular); public and training_only
-tiers pass; the commercial-plane flag widens enforcement.
+tiers pass; the commercial-plane flag widens enforcement; the governance
+labels are hashed into ``manifest_hash`` so tampering is detectable.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import pytest
 
 from phyto_shared.data_governance import DEFAULT_ABS_STATUS, DEFAULT_DATA_TIER
 from phyto_shared.exceptions import ProvenanceError
-from phyto_shared.provenance import ProvenanceBuilder
+from phyto_shared.provenance import ProvenanceBuilder, sha256_dict, verify_manifest
 
 TS = datetime(2026, 10, 22, tzinfo=timezone.utc)
 
@@ -93,3 +94,42 @@ def test_cloud_commercial_plane_rejects_np_mrd(monkeypatch):
             source_datasets=["np_mrd_fixtures"]
         ).build()
     assert excinfo.value.context["offending_sources"] == ["np_mrd_fixtures"]
+
+
+def test_tier_label_tampering_breaks_manifest_hash(monkeypatch, tmp_path):
+    """ADR-0056 enforcement is tamper-evident: the governance fields are
+    hashed into manifest_hash, so promoting a stored manifest to a more
+    permissive tier after the fact invalidates it -- and verify_manifest
+    raises instead of returning a soft False."""
+    monkeypatch.delenv("PHYTO_ENV", raising=False)
+    monkeypatch.delenv("PHYTO_COMMERCIAL_TIER", raising=False)
+
+    input_path = tmp_path / "query.csv"
+    input_path.write_bytes(b"ppm,intensity\n7.0,100\n")
+    manifest = (
+        ProvenanceBuilder()
+        .with_input("query.csv", input_path)
+        .with_data_governance(
+            data_tier="training_only",
+            abs_status="unknown",
+            source_datasets=["user_upload"],
+        )
+        .build()
+    )
+    # Intact record verifies.
+    assert verify_manifest(manifest, {"query.csv": input_path}) is True
+
+    # Tamper 1: relabel the tier upward (training_only -> public).
+    forged = manifest.model_copy(update={"data_tier": "public"})
+    assert sha256_dict(forged.content_dict()) != manifest.manifest_hash
+    with pytest.raises(ProvenanceError) as excinfo:
+        verify_manifest(forged, {"query.csv": input_path})
+    assert excinfo.value.context["check"] == "manifest_hash"
+
+    # Tamper 2: scrub the source dataset (hide the input's provenance).
+    forged2 = manifest.model_copy(update={"source_datasets": []})
+    assert sha256_dict(forged2.content_dict()) != manifest.manifest_hash
+
+    # Tamper 3: upgrade the ABS status (unknown -> exempt).
+    forged3 = manifest.model_copy(update={"abs_status": "exempt"})
+    assert sha256_dict(forged3.content_dict()) != manifest.manifest_hash

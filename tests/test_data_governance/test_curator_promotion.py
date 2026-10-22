@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from auth.roles import InMemoryRoleStore, can_promote, role_for
+from phyto_shared.audit_chain import ChainedAuditLogger
 
 
 def _isolation_main():
@@ -77,6 +78,88 @@ class TestRoleStore:
         store = InMemoryRoleStore()
         with pytest.raises(ValueError):
             store.set_role("u1", "emperor")
+
+
+class TestRejectedPromotionAudit:
+    def test_rejected_promotion_is_audited_with_accepted_false(self, client, tmp_path, monkeypatch):
+        """ADR-0056: every attempted violation lands in the hash-chained
+        audit log with ``accepted: false`` -- not only accepted changes."""
+        tc, main, _roles = client
+        audit_path = tmp_path / "governance_audit.jsonl"
+        monkeypatch.setattr(
+            main, "get_audit_log", lambda: ChainedAuditLogger(audit_path)
+        )
+        resp = tc.post(
+            "/isolation/records",
+            json=_record_payload(
+                abs_status="unknown",
+                compounds=[
+                    {
+                        "compound_id": "C1",
+                        "present_in_fractions": ["F1"],
+                        "data_tier": "proprietary",
+                    }
+                ],
+            ),
+            headers={"Authorization": "Bearer mock:alice"},
+        )
+        assert resp.status_code == 422, resp.text
+        records = ChainedAuditLogger(audit_path).records()
+        assert records, "rejected promotion must produce an audit record"
+        rejected = [r for r in records if r["detail"]["accepted"] is False]
+        assert rejected, "the audit record must carry accepted=false"
+        record = rejected[-1]
+        assert record["event"] == "isolation_tier_change"
+        assert record["detail"]["tier"] == "proprietary"
+        assert record["detail"]["compound_id"] == "C1"
+        assert "ABS-clear" in record["detail"]["reason"]
+        # The audit record itself is tamper-evident (hash-chained).
+        assert ChainedAuditLogger(audit_path).verify_chain() is True
+
+    def test_accepted_and_rejected_attempts_chain_together(self, client, tmp_path, monkeypatch):
+        """The audit trail is one append-only chain covering BOTH accepted
+        tier changes and rejected attempts, in order."""
+        tc, main, _roles = client
+        audit_path = tmp_path / "governance_audit.jsonl"
+        monkeypatch.setattr(
+            main, "get_audit_log", lambda: ChainedAuditLogger(audit_path)
+        )
+        # Rejected attempt (user, unknown ABS, proprietary).
+        tc.post(
+            "/isolation/records",
+            json=_record_payload(
+                compounds=[
+                    {
+                        "compound_id": "C1",
+                        "present_in_fractions": ["F1"],
+                        "data_tier": "proprietary",
+                    }
+                ],
+            ),
+            headers={"Authorization": "Bearer mock:alice"},
+        )
+        # Accepted change (curator, clear ABS, proprietary).
+        ok = tc.post(
+            "/isolation/records",
+            json=_record_payload(
+                collection_country="TH",
+                collection_permit="PIC/MAT-2026-001",
+                abs_status="clear",
+                compounds=[
+                    {
+                        "compound_id": "C1",
+                        "present_in_fractions": ["F1"],
+                        "data_tier": "proprietary",
+                    }
+                ],
+            ),
+            headers={"Authorization": "Bearer mock:cur"},
+        )
+        assert ok.status_code == 201, ok.text
+        records = ChainedAuditLogger(audit_path).records()
+        accepted_flags = [r["detail"]["accepted"] for r in records]
+        assert accepted_flags == [False, True]
+        assert ChainedAuditLogger(audit_path).verify_chain() is True
 
 
 class TestCuratorPromotionEndpoint:

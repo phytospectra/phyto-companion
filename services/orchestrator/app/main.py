@@ -572,6 +572,15 @@ def _chromatography_layers_status(graph: TaskGraph) -> dict[str, Any]:
                 or "no layer metadata supplied"
             )
         }
+    # MSI fallback level (ADR-0061 threshold basis): "no Level-1" must
+    # never read as "no match".  The ranker's baseline attribution is
+    # Level 2 (candidate_ranker); Level 1 appears only when a home-library
+    # standard matched on orthogonal properties.  The summary states which
+    # level the top candidate carries so the narrow Level-1 box is
+    # explicit in every report.
+    ranks = output.get("ranks") or []
+    top = ranks[0] if ranks else None
+    msi_level = 1 if (top or {}).get("level_1_match") else 2
     return {
         "chromatography_layers": {
             "applied": applied,
@@ -579,6 +588,7 @@ def _chromatography_layers_status(graph: TaskGraph) -> dict[str, Any]:
                 {"layer": s.get("layer"), "reason": s.get("reason")}
                 for s in skipped
             ],
+            "top_candidate_msi_level": msi_level,
         }
     }
 

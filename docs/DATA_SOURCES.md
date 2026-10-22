@@ -213,7 +213,7 @@ pilot ships curated snapshots under `services/taxon_prior/app/data/`.
 - **Curated public demo dataset:** Frontend demo mode remains synthetic until a curated
   public dataset is integrated in Step 8 / deployment validation.
 
-## 8. Pharmacopoeial Marker Data (committed curated file)
+## 9. Pharmacopoeial Marker Data (committed curated file)
 
 Added 2026-10-22 for the pharmacopoeial marker prior (ADR-0066).
 
@@ -233,7 +233,7 @@ Added 2026-10-22 for the pharmacopoeial marker prior (ADR-0066).
 > the monographs whenever the reference gradient definition changes, because
 > every RT window is quoted against it.
 
-## 9. Retention-Time Model Training Data (documented lineage, not committed)
+## 10. Retention-Time Model Training Data (documented lineage, not committed)
 
 Added 2026-10-22 for the retention service (ADR-0063).
 

@@ -33,6 +33,8 @@ __all__ = [
     "check_uv_range",
     "evaluate_markers",
     "MARKER_FILE",
+    "MARKER_SUPPORT_BONUS",
+    "MARKER_MISS_PENALTY",
 ]
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,18 @@ RT_GRACE_MIN = 0.5
 #: UV lambda_max tolerance (nm): solvent shifts are 5-15 nm (ADR-0062).
 UV_TOLERANCE_NM = 15.0
 
+#: Score support for at least one marker hit (ADR-0066, threshold basis:
+#: asserted, provisional).  A miss penalty must stay STRICTLY SMALLER in
+#: magnitude than this bonus for unflagged markers: seasonal/ontogenetic
+#: variation, extraction selectivity and co-elution mean a genuine sample
+#: can lack a monograph marker, so a miss is never treated as proof of
+#: absence.  Only markers explicitly flagged ``expected_in_matrix`` (the
+#: species monograph makes the marker a passing criterion for THIS matrix)
+#: take the larger penalty.
+MARKER_SUPPORT_BONUS = 0.05
+MARKER_MISS_PENALTY = 0.10  # flagged markers only; magnitude > bonus
+MARKER_MISS_PENALTY_UNFLAGGED = 0.0  # chemotype-variation caveat
+
 
 class PharmacopoeialMarker(BaseModel):
     """One curated marker entry (validated at load; bad entries are
@@ -60,6 +74,13 @@ class PharmacopoeialMarker(BaseModel):
     uv_lambda_max_nm: list[float] = Field(default_factory=list)
     uv_secondary_max_nm: list[float] = Field(default_factory=list)
     reference: str = Field(..., min_length=1)
+    expected_in_matrix: bool = Field(
+        default=False,
+        description="True when the species monograph makes this marker a "
+        "passing criterion for the analysed matrix (e.g. the USP assay "
+        "compound).  Only such markers may take the larger miss penalty; "
+        "unflagged misses carry 0.0 (ADR-0066 chemotype caveat).",
+    )
 
 
 class MarkerHit(BaseModel):
@@ -73,6 +94,7 @@ class MarkerHit(BaseModel):
     uv_in_range: bool | None = None
     rt_expected: tuple[float, float] | None = None
     reference: str = ""
+    expected_in_matrix: bool = False
 
 
 @dataclass
@@ -208,6 +230,7 @@ def evaluate_markers(
                 ),
                 rt_expected=marker.expected_rt_range_min,
                 reference=marker.reference,
+                expected_in_matrix=marker.expected_in_matrix,
             )
         )
     return hits

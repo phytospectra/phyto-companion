@@ -89,9 +89,14 @@ def rerank_with_uv(
     and still get the observed classification recorded, so a reader can
     see the layer RAN and did not move them.
 
-    ``observed_uv`` below the confidence threshold (or None) is a no-op
-    that returns the input list unchanged: an unconfident class is not
-    evidence.  ``predict_classes`` is injectable for tests.
+    ``observed_uv`` below the confidence threshold (default 0.6; basis:
+    asserted, provisional -- ADR-0062) is a no-op that returns the input
+    list unchanged: an unconfident class is not evidence.  The 0.6 gate
+    separates unambiguous band assignments (one band pair lands squarely
+    in one class window) from overlapped/edge cases (the flavone/flavonol
+    and coumarin/phenolic-acid windows adjoin); recalibrate against
+    labelled PDA spectra before treating it as validated.
+    ``predict_classes`` is injectable for tests.
     """
     if observed_uv is None or observed_uv.confidence < uv_confidence_threshold:
         logger.info(
