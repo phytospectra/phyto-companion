@@ -116,6 +116,14 @@ ROUTE_PRICING: Mapping[tuple[str, str], RoutePrice] = MappingProxyType(
             LLM_OPERATION_PRICING["summarize_literature"],
             "Summarise retrieved literature",
         ),
+        # Isolation records (ADR-0055): cheap structured writes, priced
+        # like ingestion; reads are free.
+        ("POST", "/isolation/records"): RoutePrice(
+            1, "Create an isolation record"
+        ),
+        ("PUT", "/isolation/records"): RoutePrice(
+            1, "Update an isolation record"
+        ),
     }
 )
 
@@ -142,6 +150,13 @@ _PREFIX_PRICING: Mapping[tuple[str, str], RoutePrice] = MappingProxyType(
         ("GET", "/admin/"): RoutePrice(0, "Admin analytics (role-gated)"),
         ("POST", "/admin/"): RoutePrice(0, "Admin actions (role-gated)"),
         ("GET", "/audit/"): RoutePrice(0, "Audit chain verification and export"),
+        ("GET", "/isolation/"): RoutePrice(0, "Read isolation records (ADR-0055)"),
+        ("POST", "/isolation/"): RoutePrice(
+            1, "Add a compound to an isolation record (ADR-0055/0056)"
+        ),
+        ("PUT", "/isolation/"): RoutePrice(
+            1, "Update an isolation record by id (ADR-0055/0056)"
+        ),
         ("POST", "/auth/"): RoutePrice(0, "Record signup for cohort analytics"),
         ("GET", "/sso/"): RoutePrice(0, "SSO configuration (plan-gated)"),
     }

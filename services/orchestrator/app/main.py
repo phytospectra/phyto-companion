@@ -60,7 +60,7 @@ from . import __version__
 from .audit_logger import ChainedAuditLogger
 from .cohort_analytics import InMemoryCohortStore, run_cohort_job
 from .onboarding import first_story_summary
-from .planner_agent import EngineResult, PlannerAgent, TaskGraph, WorkflowEngine
+from .planner_agent import EngineResult, PlannerAgent, TaskGraph, TaskStatus, WorkflowEngine
 from .qa_critic_agent import QACriticAgent
 from .rate_limit import DEFAULT_SHARE_RATE_LIMIT, SlidingWindowRateLimiter
 from .tool_registry import DEFAULT_REGISTRY, MockToolExecutor
@@ -528,6 +528,61 @@ def list_tools(
     ]
 
 
+def _isolation_layer_status(graph: TaskGraph) -> dict[str, str]:
+    """Visible report line for the isolation layer (ADR-0055).
+
+    Applied / skipped / not-planned, derived from the graph's own task
+    outputs so the report cannot disagree with what actually ran.
+    """
+    task = next((t for t in graph.tasks if t.id == "load-isolation-record"), None)
+    if task is None:
+        return {"isolation_layer": "skipped: no record"}
+    if task.status != TaskStatus.COMPLETE:
+        return {"isolation_layer": f"skipped: task {task.status}"}
+    if (task.output or {}).get("record") is None:
+        return {"isolation_layer": "skipped: no record"}
+    elucidate = graph.task_by_id("elucidate")
+    applied = bool((elucidate.output or {}).get("isolation_applied")) if elucidate else False
+    return {"isolation_layer": "applied" if applied else "skipped: no compounds"}
+
+
+def _chromatography_layers_status(graph: TaskGraph) -> dict[str, Any]:
+    """Visible report line for the chromatography evidence layers
+    (ADR-0061..0066): which ran and which were skipped with why, derived
+    from the apply-chromatography-layers task's own output so the report
+    cannot disagree with what actually executed.
+    """
+    task = next(
+        (t for t in graph.tasks if t.id == "apply-chromatography-layers"), None
+    )
+    if task is None:
+        return {"chromatography_layers": "skipped: no metadata"}
+    if task.status != TaskStatus.COMPLETE:
+        return {"chromatography_layers": f"skipped: task {task.status}"}
+    output = task.output or {}
+    applied = output.get("layers_applied") or []
+    skipped = output.get("skipped_layers") or []
+    if not applied:
+        return {
+            "chromatography_layers": "skipped: " + (
+                "; ".join(
+                    f"{s.get('layer')}: {s.get('reason', '')}"
+                    for s in skipped
+                )
+                or "no layer metadata supplied"
+            )
+        }
+    return {
+        "chromatography_layers": {
+            "applied": applied,
+            "skipped": [
+                {"layer": s.get("layer"), "reason": s.get("reason")}
+                for s in skipped
+            ],
+        }
+    }
+
+
 @router.post("/analysis", response_model=AnalysisResponse, status_code=200)
 def submit_analysis(request: AnalysisRequest, http_request: Request) -> AnalysisResponse:
     runtime = get_runtime()
@@ -602,6 +657,8 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
             "modalities": graph.modalities,
             "pruned_tasks": [p.id for p in graph.pruned],
             "evidence_gap": graph.evidence_gap,
+            **_isolation_layer_status(graph),
+            **_chromatography_layers_status(graph),
         },
     )
 

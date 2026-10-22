@@ -18,6 +18,17 @@ from .constants import (
     NoveltyStatus,
     ToolTier,
 )
+from .data_governance import (
+    ABS_STATUSES,
+    NON_COMMERCIAL_SOURCES,
+    SOURCE_DATASET_IDS,
+    TIERS,
+    USER_ROLES,
+    ABSStatus,
+    DataTier,
+    is_source_allowed_in_tier,
+    is_tier_compatible_with_abs,
+)
 from .exceptions import (
     AmbiguousResultError,
     CloudServiceError,
@@ -85,6 +96,16 @@ __all__ = [
     "MSIConfidenceLevel",
     "NoveltyStatus",
     "ToolTier",
+    # data governance (ADR-0056)
+    "ABS_STATUSES",
+    "NON_COMMERCIAL_SOURCES",
+    "SOURCE_DATASET_IDS",
+    "TIERS",
+    "USER_ROLES",
+    "ABSStatus",
+    "DataTier",
+    "is_source_allowed_in_tier",
+    "is_tier_compatible_with_abs",
     # exceptions
     "AmbiguousResultError",
     "CloudServiceError",

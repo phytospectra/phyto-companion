@@ -34,6 +34,21 @@ I redistribute it?"
 > product is now named Phytospectra (ADR-0035). The bucket is public-read data only;
 > nothing is written under the other subprefixes by this sync.
 
+> **Governance record (ADR-0056).** Every external source below carries its
+> licence, the data tiers it may feed, whether commercial use is allowed, and
+> the `source_dataset` ID used in provenance manifests
+> (`phyto_shared.data_governance.SOURCE_DATASET_IDS`). The CI completeness
+> test (`tests/test_data_governance/test_data_sources_completeness.py`) fails
+> if a source string used in `services/` has no governance record here.
+
+| Field | Value |
+|---|---|
+| Licence | **CC-BY-NC** (NP-MRD depositors) |
+| Allowed tiers | `public` (free academic use), `training_only` |
+| Commercial use | **no** — never in commercial analytics, the proprietary tier, or a sold model |
+| Source dataset ID used in provenance | `np_mrd` |
+| Derived fixtures (`tests/fixtures/real_npmrd/`, SUMMIT CSVs) | same terms; ID `np_mrd_fixtures` |
+
 ### Commercial Use Prohibition Warning (ADR-0026)
 
 > **WARNING:** NP-MRD data is licensed CC-BY-NC, which prohibits commercial use.
@@ -66,10 +81,78 @@ and contains no raw time-domain FID data.
 - **Source:** SUMMIT v4 benchmark proof-of-concept outputs and NP-MRD literature assignments.
 - **License:** CC-BY-NC (NP-MRD).
 - **Validation:** Tested via `tests/test_real_npmrd_fixtures.py` and documented in `data/inventory/validation_report.json`.
+- **Governance (ADR-0056):** Licence CC-BY-NC; allowed tiers `public` (free
+  academic use) and `training_only`; commercial use **no**; source dataset ID
+  `np_mrd_fixtures`.
 
 ---
 
-## 3. What Was Deliberately NOT Integrated
+## 3. External database sources — governance records
+
+### GNPS (GNPS2 molecular networking)
+
+| Field | Value |
+|---|---|
+| Dataset | GNPS2 public spectral libraries and molecular networking jobs (`https://gnps2.org`) |
+| Licence | **mixed** — GNPS public data is CC0-dedicated or CC-BY by individual contributors; verify per dataset at refresh |
+| Allowed tiers | `public`, `proprietary`, `training_only` |
+| Commercial use | **yes** (for CC0/CC-BY portions; verify per dataset) |
+| Source dataset ID used in provenance | `gnps_public` |
+
+### COCONUT
+
+| Field | Value |
+|---|---|
+| Dataset | COCONUT natural products (structure database; dereferenced in `services/elucidation` structure-DB layer) |
+| Licence | **CC-BY** (COCONUT releases are CC-BY 4.0; verify at refresh) |
+| Allowed tiers | `public`, `proprietary`, `training_only` |
+| Commercial use | **yes** (with attribution) |
+| Source dataset ID used in provenance | `coconut` |
+
+### LOTUS
+
+| Field | Value |
+|---|---|
+| Dataset | LOTUS natural products, organism–compound links (pilot snapshot `services/taxon_prior/app/data/lotus_snapshot.json`; full export on Zenodo) |
+| Licence | **CC0** (full LOTUS database releases are CC0; verify at refresh) |
+| Allowed tiers | `public`, `proprietary`, `training_only` |
+| Commercial use | **yes** |
+| Source dataset ID used in provenance | `lotus` |
+
+### KNApSAcK
+
+| Field | Value |
+|---|---|
+| Dataset | KNApSAcK species–metabolite core (pilot snapshot `knapsack_snapshot.json`) |
+| Licence | **academic use** (per KNApSAcK core terms; verify at refresh) |
+| Allowed tiers | `public` (free academic use), `training_only` |
+| Commercial use | **conditional** — requires permission from KNApSAcK; treat as non-commercial until cleared |
+| Source dataset ID used in provenance | `knapsack` |
+
+### NPASS
+
+| Field | Value |
+|---|---|
+| Dataset | NPASS natural product activity–species database (pilot snapshot `npass_snapshot.json`) |
+| Licence | **academic use** (per NPASS terms; verify at refresh) |
+| Allowed tiers | `public` (free academic use), `training_only` |
+| Commercial use | **conditional** — requires permission; treat as non-commercial until cleared |
+| Source dataset ID used in provenance | `npass` |
+
+### Platform-internal sources (governance records for completeness)
+
+| Source | Licence | Allowed tiers | Commercial use | Source dataset ID |
+|---|---|---|---|---|
+| User-contributed spectra and isolation records | user's own data; platform rights per ToS (docs/DATA_GOVERNANCE.md §5) | all three (tier is the contribution's label) | per tier label | `user_upload` |
+| In-house authenticated reference standards (owner lab) | owner proprietary | `proprietary`, `training_only`, `public` after curator review | **yes** (owner's own data) | `in_house_standard` |
+| BMRB | CC-BY-4.0 | all three | **yes** (attribution) | `bmrb` |
+| nmrshiftdb2 | CC-BY-SA | `public` (free academic use), `training_only` | **conditional** — share-alike bars inclusion in a licensed corpus; confined to the free academic tier (`phyto_shared.data_governance.NON_COMMERCIAL_SOURCES`) | `nmrshiftdb2` |
+| GBIF species taxonomy | CC-BY 4.0 (GBIF-mediated data) | all three | **yes** (attribution) | `gbif` |
+| ITIS taxonomy | public domain (US government) | all three | **yes** | `itis` |
+
+---
+
+## 4. What Was Deliberately NOT Integrated
 
 | Item | Reason |
 |---|---|
@@ -81,7 +164,7 @@ and contains no raw time-domain FID data.
 
 ---
 
-## 4. PII Handling and Redaction
+## 5. PII Handling and Redaction
 
 The local data folder path contains personal account details (`[redacted]@...`).
 Every committed document, manifest, and fixture metadata uses a redacted description
@@ -90,7 +173,7 @@ paths.
 
 ---
 
-## 5. Taxon Prior Databases (LOTUS, KNApSAcK, NPASS) — pilot snapshots
+## 6. Taxon Prior Databases (LOTUS, KNApSAcK, NPASS) — pilot snapshots
 
 Added 2026-10-22 for the taxonomy-aware reranking layer (ADR-0052, ADR-0054).
 All three live interfaces were probed on 2026-10-22; none was usable, so the
@@ -113,7 +196,7 @@ pilot ships curated snapshots under `services/taxon_prior/app/data/`.
 > database export is a data refresh, not a code change; re-verify the licence
 > column at each refresh.
 
-## 6. Taxonomy Resolution (GBIF, ITIS)
+## 7. Taxonomy Resolution (GBIF, ITIS)
 
 | Field | GBIF (primary) | ITIS (fallback) |
 |---|---|---|
@@ -123,9 +206,42 @@ pilot ships curated snapshots under `services/taxon_prior/app/data/`.
 | Integration mode | live (cloud plane); `MockTaxonomyClient` locally | live fallback (cloud plane) |
 | Decision | ADR-0053 | ADR-0053 |
 
-## 7. Pending Datasets
+## 8. Pending Datasets
 
 - **Owner-specific experimental Bruker acquisitions:** Not present in the analyzed workspace.
   When provided, Bruker raw parsing will be integrated and validated separately (ADR-0024).
 - **Curated public demo dataset:** Frontend demo mode remains synthetic until a curated
   public dataset is integrated in Step 8 / deployment validation.
+
+## 8. Pharmacopoeial Marker Data (committed curated file)
+
+Added 2026-10-22 for the pharmacopoeial marker prior (ADR-0066).
+
+| Field | Value |
+|---|---|
+| Dataset | `data/pharmacopoeial_markers.json` — per-species QC marker compounds with expected RT ranges and UV maxima |
+| Species covered | 26 medicinal plants with pharmacopoeial monographs (IP / USP / Ph. Eur. / ChP) |
+| Entries | Per marker: name, SMILES, expected RT range (min, relative to `REFERENCE_GRADIENT` — 30-min 5→95% C18, ADR-0063), expected λmax (nm), per-entry `reference` citing the source monograph |
+| Provenance | Each entry names the pharmacopoeial source in its `reference` field; every marker evidence item in a report carries that reference to the user |
+| Licence | **Verify per monograph at each refresh.** Pharmacopoeial monographs are copyrighted works; the committed file stores factual marker data (compound identity, RT window, λmax) with attribution, not monograph text. Re-check the licence column before redistributing a refreshed file. |
+| Committed to git? | **Yes** — small curated factual table |
+| Integration mode | **Local + cloud** (loaded by `services/taxon_prior/app/markers.py`; validated at load, invalid entries dropped with a logged reason) |
+
+> **Honesty note (ADR-0066).** These are EXPECTATIONS, not observations: a
+> marker match is weak supporting evidence (+0.05) and a miss is evidence
+> against the species-level identity claim. The file must be refreshed from
+> the monographs whenever the reference gradient definition changes, because
+> every RT window is quoted against it.
+
+## 9. Retention-Time Model Training Data (documented lineage, not committed)
+
+Added 2026-10-22 for the retention service (ADR-0063).
+
+| Field | Value |
+|---|---|
+| Dataset | METLIN SMRT small-molecule retention time dataset (Domingo-Almenara et al. 2019, Nature Biotechnology, https://doi.org/10.1038/s41587-019-0267-4) |
+| Size | ~80,000 compounds with experimental RT on standardized LC-MS gradients |
+| Licence | open (CC-BY-style per METLIN SMRT release; verify at refresh) |
+| Committed to git? | **No** — the pilot does not ship the dataset; the production model trains on it in the cloud plane |
+| Pilot stand-in | Hand-curated 20-compound lookup table (literature-typical RTs on the reference gradient) + logP descriptor baseline, both inside `services/retention/app/main.py` |
+| NP fine-tuning data | Surveyed 2026-10-22: public natural-product RT sets too sparse to fine-tune without overfitting; deferred (ADR-0063). When a fine-tuned model lands, its version string changes and the lookup becomes the fallback. |

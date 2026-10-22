@@ -18,6 +18,15 @@ These observations are PRIORS on candidate ranking, never verdicts:
 isolation reranker attaches one ``EvidenceItem`` per contributing
 signal so a reader can always see -- and undo -- their effect.
 
+Governance (ADR-0056): a compound is a chemical observation, and its
+``data_tier`` is the intended disposition of the data derived from it
+(public CC0 / proprietary licensed / training_only internal).  Every
+record also carries the collection's ABS provenance (country, permit,
+``abs_status``).  Both default to the most restrictive setting
+(``training_only`` / ``unknown``); promotion to a promotable tier is an
+explicit, curator-gated act validated by the isolation service -- never
+a silent default.
+
 The full isolation graph (sub-fractionation chains as first-class
 edges, TLC image upload, cross-lab comparison) is deliberately
 deferred until this MVP is validated by real users (ADR-0055).
@@ -33,6 +42,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from .data_governance import ABSStatus, DataTier, DEFAULT_ABS_STATUS, DEFAULT_DATA_TIER
 from .models import StrictModel
 
 __all__ = [
@@ -156,6 +166,13 @@ class IsolationCompound(StrictModel):
         description="Parent fraction chain, e.g. ['F3', 'F3.7', 'F3.7.2']; "
         "provenance for humans, not (yet) a graph (ADR-0055)",
     )
+    data_tier: DataTier = Field(
+        default=DEFAULT_DATA_TIER,
+        description="Intended disposition of the data derived from this "
+        "compound (ADR-0056).  Defaults to the most restrictive tier; "
+        "promotion to 'public' or 'proprietary' requires an explicit "
+        "curator action and ABS-clear provenance.",
+    )
     notes: str | None = None
 
 
@@ -184,6 +201,24 @@ class IsolationRecord(StrictModel):
         description="Owner; set by the isolation service from the "
         "authenticated request, never trusted from a payload",
     )
+    collection_country: str | None = Field(
+        default=None,
+        description="ISO 3166 alpha-2 code of the collection country; the "
+        "key that determines which jurisdiction's ABS law applies (the "
+        "source country's law, not the platform's -- ADR-0056)",
+    )
+    collection_permit: str | None = Field(
+        default=None,
+        description="Permit or ABS reference (PIC/MAT agreement id) for "
+        "the collection, when one exists",
+    )
+    abs_status: ABSStatus = Field(
+        default=DEFAULT_ABS_STATUS,
+        description="Access-and-benefit-sharing status of the collection "
+        "(ADR-0056).  'unknown' is treated as 'pending' for every "
+        "downstream decision, so promotion to a promotable tier is "
+        "refused until provenance is established.",
+    )
 
     @model_validator(mode="after")
     def _references_consistent(self) -> "IsolationRecord":
@@ -201,6 +236,13 @@ class IsolationRecord(StrictModel):
         cids = [c.compound_id for c in self.compounds]
         if len(cids) != len(set(cids)):
             raise ValueError(f"duplicate compound_id(s) in {cids}")
+        if self.collection_country is not None:
+            cc = self.collection_country.strip().upper()
+            if len(cc) != 2 or not cc.isalpha() or not cc.isascii():
+                raise ValueError(
+                    f"collection_country must be an ISO 3166 alpha-2 code, "
+                    f"got {self.collection_country!r}"
+                )
         return self
 
     def fraction_registry(self) -> dict[str, Fraction]:

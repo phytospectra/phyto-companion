@@ -13,7 +13,15 @@ from typing import Any, Literal  # noqa: F401  (Literal used below)
 
 from pydantic import Field, model_validator
 
+from .chromatography import AnchorStandard, LCMethod, ReferenceStandard
 from .constants import ConfidenceVerdict
+from .data_governance import (
+    ABSStatus,
+    DataTier,
+    DEFAULT_ABS_STATUS,
+    DEFAULT_DATA_TIER,
+    SOURCE_DATASET_IDS,
+)
 from .models import StrictModel
 
 __all__ = [
@@ -46,7 +54,14 @@ PHARMACOLOGY_DISCLAIMER = (
 
 
 class SpectrumUploadRequest(StrictModel):
-    """One raw file plus its acquisition metadata, base64-encoded."""
+    """One raw file plus its acquisition metadata, base64-encoded.
+
+    Governance (ADR-0056): every contribution declares its data tier, ABS
+    status and source dataset.  All three default to the most restrictive
+    setting -- a contribution is ``training_only`` with ``unknown`` ABS
+    status until a curator with established provenance promotes it, so
+    nothing becomes public or licensable by accident.
+    """
 
     filename: str = Field(..., min_length=1)
     format: Literal[
@@ -54,6 +69,27 @@ class SpectrumUploadRequest(StrictModel):
     ]
     content_b64: str = Field(..., min_length=1)
     metadata: dict[str, str] = Field(default_factory=dict)
+    data_tier: DataTier = Field(
+        default=DEFAULT_DATA_TIER,
+        description="Intended disposition; 'training_only' until promoted",
+    )
+    abs_status: ABSStatus = Field(
+        default=DEFAULT_ABS_STATUS,
+        description="ABS status of the underlying collection",
+    )
+    source_dataset: str = Field(
+        default="user_upload",
+        description="One of phyto_shared.data_governance.SOURCE_DATASET_IDS",
+    )
+
+    @model_validator(mode="after")
+    def _source_dataset_known(self) -> "SpectrumUploadRequest":
+        if self.source_dataset not in SOURCE_DATASET_IDS:
+            raise ValueError(
+                f"unknown source_dataset {self.source_dataset!r}; must be one "
+                f"of {SOURCE_DATASET_IDS}"
+            )
+        return self
 
 
 class SpectrumUploadResponse(StrictModel):
@@ -88,6 +124,52 @@ class SampleMetadata(StrictModel):
         default=None,
         description="Primary extraction solvent; see "
         "phyto_shared.solvent_prior.KNOWN_SOLVENTS",
+    )
+    extract_id: str | None = Field(
+        default=None,
+        description="The lab's identifier for THIS extract. When an "
+        "isolation record exists for it (isolation service, ADR-0055) "
+        "the identify workflow loads it and reranks candidates against "
+        "the bench evidence; otherwise that layer is skipped with a "
+        "visible note.",
+    )
+    # --- chromatographic metadata (ADR-0061..ADR-0064) --------------------
+    # All optional: a layer runs only when its metadata was supplied.  When
+    # none of lc_method / reference_standards / anchor_series is present the
+    # corresponding layers are SKIPPED and the report notes "layer skipped:
+    # no metadata" -- a skipped layer is never silently folded into the
+    # ranking.
+    lc_method: LCMethod | None = Field(
+        default=None,
+        description="The LC method the sample was run under.  Required for "
+        "RT prediction and RI conversion; RT prediction is only valid for "
+        "the method used in training (ADR-0063).",
+    )
+    reference_standards: list[ReferenceStandard] | None = Field(
+        default=None,
+        description="Authentic standards run under the same method; enables "
+        "Level-1 matching and the RT offset calibration (ADR-0061).",
+    )
+    anchor_series: list[AnchorStandard] | None = Field(
+        default=None,
+        description="Co-injected homologous anchor series (e.g. cocamide DEA); "
+        "enables retention-index normalization (ADR-0064).  Off by default: "
+        "requires the user to have co-injected anchors.",
+    )
+    observed_rt_min: float | None = Field(
+        default=None,
+        gt=0.0,
+        le=240.0,
+        description="Retention time of the unknown peak on the supplied LC "
+        "method (PDA/MS detection).  Drives the RT/RI reranking and the "
+        "pharmacopoeial marker check (ADR-0063, ADR-0066); absent when the "
+        "run is NMR-only.",
+    )
+    observed_uv_spectrum: list[tuple[float, float]] | None = Field(
+        default=None,
+        description="PDA spectrum of the unknown peak, [(wavelength_nm, "
+        "absorbance), ...]; drives the UV chromophore layer (ADR-0062) and "
+        "the marker UV check (ADR-0066).",
     )
 
     def has_taxon_hint(self) -> bool:

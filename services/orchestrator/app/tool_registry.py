@@ -18,7 +18,13 @@ from typing import Any, Callable
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from phyto_shared.constants import ConfidenceVerdict, ToolTier
+from phyto_shared.chromatography import (
+    AnchorStandard,
+    LCMethod,
+    ReferenceStandard,
+)
 from phyto_shared.exceptions import CloudServiceError, InvalidInputError
+from phyto_shared.isolation import Fraction, IsolationCompound, IsolationRecord
 from phyto_shared.literature_models import PaperHit
 from phyto_shared.models import (
     Candidate,
@@ -194,6 +200,38 @@ class SpeciesPaperSearchOutput(_Contract):
     source_counts: dict[str, int] = Field(default_factory=dict)
 
 
+class IsolationLoadInput(_Contract):
+    """Load the bench isolation record for one extract (ADR-0055)."""
+
+    extract_id: str = Field(..., min_length=1)
+
+
+class IsolationLoadOutput(_Contract):
+    record: IsolationRecord | None = Field(
+        default=None,
+        description="The user's isolation record for this extract, or None "
+        "when none exists -- the identify workflow then notes 'isolation "
+        "layer skipped: no record'",
+    )
+
+    def serialisable(self) -> dict:
+        """JSON-clean output for the engine's task-output store (the
+        record carries a datetime the raw dict dump cannot hash)."""
+        return {"record": self.record.model_dump(mode="json") if self.record else None}
+
+
+class IsolationRerankInput(_Contract):
+    """One compound's bench evidence for the isolation reranker."""
+
+    record: IsolationRecord | None = None
+    compound_id: str | None = None
+
+
+class IsolationRerankOutput(_Contract):
+    ranks: list[CandidateRank] = Field(default_factory=list)
+    applied: bool = False
+
+
 # --- Tier 2 ---------------------------------------------------------------
 
 
@@ -273,6 +311,8 @@ class RankCandidatesInput(_Contract):
     solvent: str | None = None
     taxon_prior: TaxonPrior | None = None
     apply_taxon_prior: bool = False
+    isolation_record: IsolationRecord | None = None
+    isolation_compound_id: str | None = None
 
 
 class RankCandidatesOutput(_Contract):
@@ -284,6 +324,34 @@ class RankCandidatesOutput(_Contract):
         description="False when the reranker did not run (no metadata, empty "
         "prior) -- the ranks are then the unmodified spectral ranking",
     )
+    isolation_applied: bool = Field(
+        default=False,
+        description="False when the isolation reranker did not run (no "
+        "record supplied) -- the report then notes 'isolation layer "
+        "skipped: no record' (ADR-0055)",
+    )
+
+
+class ApplyChromatographyLayersInput(_Contract):
+    """Chromatographic evidence layers over ranked candidates
+    (ADR-0061..ADR-0066).  Each optional field is one layer's metadata;
+    when it is absent that layer is reported as skipped, never silent."""
+
+    ranks: list[CandidateRank] = Field(default_factory=list)
+    species: str | None = None
+    observed_rt_min: float | None = Field(default=None, gt=0)
+    observed_uv_spectrum: list[tuple[float, float]] | None = None
+    peak_purity_score: float | None = Field(default=None, ge=0, le=1)
+    lc_method: LCMethod | None = None
+    reference_standards: list[ReferenceStandard] | None = None
+    anchor_series: list[AnchorStandard] | None = None
+
+
+class ApplyChromatographyLayersOutput(_Contract):
+    ranks: list[CandidateRank] = Field(default_factory=list)
+    layers_applied: list[str] = Field(default_factory=list)
+    skipped_layers: list[dict[str, str]] = Field(default_factory=list)
+    top_candidate_name: str | None = None
 
 
 # --- Tier 3 ---------------------------------------------------------------
@@ -422,6 +490,8 @@ TIER1_TOOL_NAMES = (
     "taxonomy.resolve_species",
     "taxon_prior.build",
     "literature.search_compound_in_species",
+    "isolation.load_record",
+    "chromatography.apply_layers",
 )
 TIER2_TOOL_NAMES = (
     "gnps.submit_job",
@@ -508,6 +578,20 @@ def build_default_registry() -> ToolRegistry:
             "PubMed search constrained to (compound AND species): papers "
             "reporting this compound from this organism (ADR-0052)",
             2.0, True, SpeciesPaperSearchInput, SpeciesPaperSearchOutput,
+        ),
+        (
+            "isolation.load_record",
+            "Load the bench isolation record (fractions, TLC, yield) for "
+            "one extract_id (ADR-0055)",
+            0.5, True, IsolationLoadInput, IsolationLoadOutput,
+        ),
+        (
+            "chromatography.apply_layers",
+            "Run the chromatographic evidence layers (Level-1 home library, "
+            "RT/RI reranking, UV chromophore, peak purity, pharmacopoeial "
+            "markers) over ranked candidates (ADR-0061..ADR-0066)",
+            0.5, True,
+            ApplyChromatographyLayersInput, ApplyChromatographyLayersOutput,
         ),
     ]
     tier2: list[tuple[str, str, float, bool, type, type]] = [
@@ -966,6 +1050,13 @@ _MOCK_RANK_LIBRARY: tuple[tuple[str, str, dict[str, int], float, float], ...] = 
      {"C": 8, "H": 10, "N": 4, "O": 2}, 194.080376, 1.00),
     ("quercetin", "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12",
      {"C": 15, "H": 10, "O": 7}, 302.042653, 1.10),
+    # quercetin-3-O-glucoside: a flavonol GLYCOSIDE one log unit more
+    # polar than its aglycone; its fixture distance sits just behind
+    # the aglycone's so only the isolation layer can promote it
+    # (ADR-0055 integration).
+    ("isoquercitrin",
+     "C1=CC(=C(C=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)OC4C(C(C(C(O4)CO)O)O)O)O",
+     {"C": 21, "H": 20, "O": 12}, 464.095477, 1.08),
     ("panduratin A", "CC(C)=CCC[C@@H](C)C(=O)c1c(O)cc(O)c(C)c1",
      {"C": 16, "H": 22, "O": 3}, 262.156895, 1.15),
 )
@@ -1017,6 +1108,40 @@ def _mock_rank_candidates(inp: RankCandidatesInput) -> RankCandidatesOutput:
         )
     ranks.sort(key=lambda r: r.score)
 
+    # --- isolation layer (ADR-0055) ---------------------------------
+    # Runs after the UV/RT signals carried in the spectral ranking and
+    # BEFORE the taxon reranker: bench isolation of THIS sample is more
+    # specific than what the species is generally reported to contain.
+    isolation_applied = False
+    if inp.isolation_record is not None:
+        try:
+            from elucidation.isolation_reranker import rerank_with_isolation
+        except ImportError:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "elucidation service not staged in this plane; isolation "
+                "reranking skipped"
+            )
+        else:
+            record = inp.isolation_record
+            if inp.isolation_compound_id is not None:
+                compound = record.compound(inp.isolation_compound_id)
+            else:
+                # MVP: apply the record's FIRST compound -- the primary
+                # isolate.  Selecting among several isolates is deferred
+                # with the full isolation graph (ADR-0055).
+                compound = record.compounds[0] if record.compounds else None
+            if compound is None:
+                logging.getLogger(__name__).info(
+                    "isolation layer skipped: record has no compounds"
+                )
+            else:
+                ranks = rerank_with_isolation(
+                    ranks, compound, record.fraction_registry()
+                )
+                isolation_applied = True
+
     if not inp.apply_taxon_prior or inp.taxon_prior is None:
         import logging
 
@@ -1029,6 +1154,7 @@ def _mock_rank_candidates(inp: RankCandidatesInput) -> RankCandidatesOutput:
             top_candidate_name=top.candidate.name if top else None,
             top_evidence_graph=top.evidence_graph if top else None,
             taxon_prior_applied=False,
+            isolation_applied=isolation_applied,
         )
 
     try:
@@ -1046,6 +1172,7 @@ def _mock_rank_candidates(inp: RankCandidatesInput) -> RankCandidatesOutput:
             top_candidate_name=top.candidate.name if top else None,
             top_evidence_graph=top.evidence_graph if top else None,
             taxon_prior_applied=False,
+            isolation_applied=isolation_applied,
         )
 
     reranked = rerank_with_taxon_prior(ranks, inp.taxon_prior, inp.solvent)
@@ -1055,6 +1182,79 @@ def _mock_rank_candidates(inp: RankCandidatesInput) -> RankCandidatesOutput:
         top_candidate_name=top.candidate.name if top else None,
         top_evidence_graph=top.evidence_graph if top else None,
         taxon_prior_applied=True,
+        isolation_applied=isolation_applied,
+    )
+
+
+_MOCK_ISOLATION_RECORDS: dict[str, IsolationRecord] = {}
+"""Extract_id -> record, seeded by tests; the local-plane stand-in for
+the isolation service's Firestore.  Deterministic and empty by default:
+an unknown extract_id is a genuine miss, and the workflow then notes
+'isolation layer skipped: no record' (ADR-0055)."""
+
+
+def _mock_isolation_load(inp: IsolationLoadInput) -> IsolationLoadOutput:
+    return IsolationLoadOutput(record=_MOCK_ISOLATION_RECORDS.get(inp.extract_id))
+
+
+def _isolation_load_output(output: Any) -> dict:
+    """Engine-facing output for ``isolation.load_record``: the mock
+    executor emits whatever ``serialisable()`` provides, keeping the
+    datetime out of the raw-JSON path."""
+    return output.serialisable()
+
+
+def _mock_apply_chromatography_layers(
+    inp: ApplyChromatographyLayersInput,
+) -> ApplyChromatographyLayersOutput:
+    """Run the REAL layer chain (layer_chain.apply_chromatography_layers)
+    over the ranks -- the layers are the deliverable, so the local plane
+    executes them for real, exactly like the taxon reranker."""
+    try:
+        from layer_chain import apply_chromatography_layers
+    except ImportError:
+        try:
+            from services.orchestrator.app.layer_chain import (
+                apply_chromatography_layers,
+            )
+        except ImportError:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "layer chain not staged in this plane; ranks returned "
+                "untouched with every layer reported skipped"
+            )
+            skipped = [
+                {"layer": tag, "reason": "layer skipped: chain not staged"}
+                for tag in (
+                    "level1", "rt", "uv", "purity", "pharmacopoeial_markers"
+                )
+            ]
+            return ApplyChromatographyLayersOutput(
+                ranks=inp.ranks, layers_applied=[], skipped_layers=skipped
+            )
+    result = apply_chromatography_layers(
+        inp.ranks,
+        species=inp.species,
+        observed_rt_min=inp.observed_rt_min,
+        observed_uv_spectrum=inp.observed_uv_spectrum,
+        peak_purity_score=inp.peak_purity_score,
+        lc_method=inp.lc_method,
+        reference_standards=inp.reference_standards,
+        anchor_series=inp.anchor_series,
+        predict_rt_fn=None,
+    )
+    applied = [
+        tag
+        for tag in ("level1", "rt", "uv", "purity", "pharmacopoeial_markers")
+        if tag not in {s["layer"] for s in result.skipped_layers}
+    ]
+    top = result.ranks[0] if result.ranks else None
+    return ApplyChromatographyLayersOutput(
+        ranks=result.ranks,
+        layers_applied=applied,
+        skipped_layers=result.skipped_layers,
+        top_candidate_name=top.candidate.name if top else None,
     )
 
 
@@ -1099,7 +1299,9 @@ _MOCK_IMPLEMENTATIONS: dict[str, Callable[[Any], Any]] = {
     "nmr_search.peaks": _mock_nmr_search,
     "taxonomy.resolve_species": _mock_resolve_species,
     "taxon_prior.build": _mock_taxon_prior_build,
+    "isolation.load_record": _mock_isolation_load,
     "elucidation.rank_candidates": _mock_rank_candidates,
+    "chromatography.apply_layers": _mock_apply_chromatography_layers,
     "gnps.submit_job": _mock_gnps_submit,
     "gnps.fetch_results": _mock_gnps_fetch,
     "sirius.predict_formula": _mock_sirius,

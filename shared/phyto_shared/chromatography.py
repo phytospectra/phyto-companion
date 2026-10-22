@@ -1,4 +1,4 @@
-"""Chromatography domain models and math (ADR-0055..ADR-0058).
+"""Chromatography domain models and math (ADR-0061..ADR-0064).
 
 Design notes
 ------------
@@ -10,7 +10,7 @@ Design notes
   The base config below is identical to ``StrictModel``.
 * ``LCMethod`` is user-supplied and per-method: retention prediction is
   ONLY valid for the method used in training (see the retention service
-  docstring, ADR-0057).  No default method exists on purpose -- a caller
+  docstring, ADR-0063).  No default method exists on purpose -- a caller
   that did not describe its method gets no RT layer, not a guessed one.
 * Retention-index math follows Aalizadeh et al. 2022
   (https://doi.org/10.1016/j.aca.2022.341688): an injected homologous
@@ -53,7 +53,7 @@ class ChromatographyModel(BaseModel):
 ColumnPhase = Literal["C18", "C8", "HILIC", "phenyl"]
 
 #: The gradient the hand-curated lookup RTs and pharmacopoeial RT ranges
-#: are representative of (ADR-0057, ADR-0060): a 30-minute 5 -> 95% B
+#: are representative of (ADR-0063, ADR-0066): a 30-minute 5 -> 95% B
 #: reversed-phase analytical gradient.  Documented so a reader knows what
 #: "expected_rt_range_min" in the curated data means.
 REFERENCE_GRADIENT: tuple[tuple[float, float], ...] = (
@@ -66,7 +66,7 @@ class LCMethod(ChromatographyModel):
     """A user-supplied liquid-chromatography method description.
 
     RT prediction is highly method-dependent: a prediction is only
-    valid for the method used in training the model (ADR-0057).  The
+    valid for the method used in training the model (ADR-0063).  The
     method is stored per user per method_id by the calibration and
     retention services; two methods with different gradients, columns or
     temperatures produce different RTs for the same compound and must
@@ -105,7 +105,7 @@ class LCMethod(ChromatographyModel):
 
 
 class RetentionPrediction(ChromatographyModel):
-    """One RT prediction with an honest interval (ADR-0057).
+    """One RT prediction with an honest interval (ADR-0063).
 
     ``prediction_interval`` carries the model's uncertainty: the curated
     lookup uses +/-0.6 min, the descriptor baseline +/-2.5 min.  The
@@ -133,7 +133,7 @@ class RetentionPrediction(ChromatographyModel):
 class ReferenceStandard(ChromatographyModel):
     """One authentic reference standard the user ran under a method.
 
-    This is the calibration unit of the home library (ADR-0055): the
+    This is the calibration unit of the home library (ADR-0061): the
     observed ``rt_min`` anchors Level-1 matching, ``uv_spectrum`` and
     ``ms2`` anchor orthogonal-property agreement.
     """
@@ -154,7 +154,7 @@ class ReferenceStandard(ChromatographyModel):
 
 
 class AnchorStandard(ChromatographyModel):
-    """One member of a co-injected homologous anchor series (ADR-0058)."""
+    """One member of a co-injected homologous anchor series (ADR-0064)."""
 
     name: str = Field(..., min_length=1)
     chain_length: int = Field(..., ge=1, le=60)
@@ -261,7 +261,7 @@ def ms2_cosine(
     Same convention as the elucidation ranker's ``ms2_cosine``
     (GNPS-style); duplicated here because services must not import each
     other's app packages -- the elucidation ranker keeps its own copy
-    and the two must stay in sync (ADR-0055).
+    and the two must stay in sync (ADR-0061).
     """
     ref = sorted(reference)
     obs = sorted(observed)
@@ -342,9 +342,16 @@ def rt_to_ri(rt_min: float, anchors: Sequence[AnchorStandard]) -> float:
 
 
 def _ri_on_segment(rt_min: float, low: AnchorStandard, high: AnchorStandard) -> float:
+    # Scale by the anchors' actual RI gap, not a fixed 100: with
+    # consecutive homologues (n2 = n1 + 1) this is the Aalizadeh formula
+    # exactly, and for a wider gap the map stays piecewise-linear and
+    # invertible against _rt_on_segment instead of folding every RT span
+    # onto 100 RI units (which made ri_to_rt disagree with rt_to_ri).
+    ri_low = 100.0 * low.chain_length
+    ri_high = 100.0 * high.chain_length
     span = high.observed_rt_min - low.observed_rt_min
     fraction = (rt_min - low.observed_rt_min) / span if span else 0.0
-    return 100.0 * (low.chain_length + fraction)
+    return ri_low + fraction * (ri_high - ri_low)
 
 
 def ri_to_rt(ri: float, anchors: Sequence[AnchorStandard]) -> float:

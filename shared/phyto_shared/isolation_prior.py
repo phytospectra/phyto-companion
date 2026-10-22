@@ -32,6 +32,8 @@ Known heuristic limitations (read before trusting a number):
 
 from __future__ import annotations
 
+from pydantic import Field
+
 from .exceptions import InvalidInputError
 from .isolation import (
     POLARITY_TIERS,

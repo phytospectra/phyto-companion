@@ -47,3 +47,10 @@ _alias_package("nmr_search", "nmr_search")
 # the container once staged.
 _alias_package("taxonomy", "taxonomy")
 _alias_package("taxon_prior", "taxon_prior")
+# Isolation service (ADR-0055): same aliasing contract; imports
+# ``auth.config`` / ``auth.install`` exactly as it will in the container.
+_alias_package("isolation", "isolation")
+# Chromatography services (ADR-0061..0066): calibration (reference
+# standards) and retention (RT/RI prediction) -- same contract.
+_alias_package("calibration", "calibration")
+_alias_package("retention", "retention")

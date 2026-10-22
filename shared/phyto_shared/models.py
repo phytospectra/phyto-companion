@@ -19,8 +19,16 @@ from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .constants import ADDUCT_MASSES, ConfidenceVerdict, ELEMENT_MASSES, ELEMENT_VALENCES
+from .data_governance import (
+    ABSStatus,
+    DataTier,
+    DEFAULT_ABS_STATUS,
+    DEFAULT_DATA_TIER,
+    SOURCE_DATASET_IDS,
+)
 from .exceptions import InvalidInputError
 from .taxonomy_models import ReportedCompound
+from .uv_chromophore import UVClass
 
 __all__ = [
     "StrictModel",
@@ -158,7 +166,13 @@ _KIND_TO_PEAK: dict[str, type[BaseModel]] = {
 
 
 class Spectrum(StrictModel):
-    """A validated spectrum of any supported kind with its provenance hash."""
+    """A validated spectrum of any supported kind with its provenance hash.
+
+    Governance (ADR-0056): every contribution carries its data tier, ABS
+    status and source dataset.  All three default to the most restrictive
+    setting so nothing becomes public or licensable by accident; promotion
+    is an explicit curator action.
+    """
 
     kind: SpectrumKind
     data: list[Peak] = Field(default_factory=list)
@@ -166,6 +180,30 @@ class Spectrum(StrictModel):
     provenance_hash: str | None = Field(
         default=None, pattern=_SHA256_PATTERN, description="SHA256 of the raw source file"
     )
+    data_tier: DataTier = Field(
+        default=DEFAULT_DATA_TIER,
+        description="Intended disposition of this contribution (ADR-0056); "
+        "'training_only' until a curator promotes it",
+    )
+    abs_status: ABSStatus = Field(
+        default=DEFAULT_ABS_STATUS,
+        description="ABS status of the underlying collection; 'unknown' is "
+        "treated as 'pending' downstream",
+    )
+    source_dataset: str = Field(
+        default="user_upload",
+        description="Which corpus this spectrum came from; one of "
+        "phyto_shared.data_governance.SOURCE_DATASET_IDS",
+    )
+
+    @field_validator("source_dataset")
+    @classmethod
+    def _known_source(cls, v: str) -> str:
+        if v not in SOURCE_DATASET_IDS:
+            raise ValueError(
+                f"unknown source_dataset {v!r}; must be one of {SOURCE_DATASET_IDS}"
+            )
+        return v
 
     @model_validator(mode="after")
     def _kind_matches_data(self) -> "Spectrum":
@@ -417,6 +455,78 @@ class CandidateRank(StrictModel):
         "database reported the compound, from which organism, at which "
         "taxonomic depth, and under which reference (ADR-0054)",
     )
+    isolation_evidence: list[EvidenceItem] = Field(
+        default_factory=list,
+        description="Bench-isolation signals (polarity vs fractions, TLC "
+        "class hints, flash-UV lambda-max) that adjusted this rank, one "
+        "item per contributing signal; empty when the isolation reranker "
+        "did not run (ADR-0055)",
+    )
+    isolation_bonus: float = Field(
+        default=0.0,
+        description="Net score adjustment from the isolation prior "
+        "(positive = bench evidence supports the candidate); 0.0 when "
+        "the isolation reranker did not run -- check isolation_evidence "
+        "to distinguish (ADR-0055)",
+    )
+    # --- chromatographic evidence layers (ADR-0061..ADR-0066) -------------
+    # Additive: the candidate_ranker never sets these.  Each layer runs
+    # AFTER ranking and records what it did, so the spectral ranking stays
+    # reconstructable and every adjustment is explainable.
+    level_1_match: str | None = Field(
+        default=None,
+        description="Reference-standard name when the home library matched "
+        "this peak at Level 1 (ADR-0061).  MSI Level 1 requires an authentic "
+        "standard; this field is that claim's provenance.",
+    )
+    rt_offset_applied: float | None = Field(
+        default=None,
+        description="RT offset (min) applied to predicted RTs after "
+        "calibrating a standard's observed vs predicted RT (ADR-0061)",
+    )
+    uv_evidence: UVClass | None = Field(
+        default=None,
+        description="Observed UV chromophore classification, attached only "
+        "when the UV reranker ran (ADR-0062)",
+    )
+    uv_bonus: float = Field(
+        default=0.0,
+        description="Score delta applied by the UV reranker, signed in the "
+        "rank's ranking_convention direction (ADR-0062)",
+    )
+    rt_prediction: float | None = Field(
+        default=None,
+        description="Method-specific predicted RT used by the RT reranker "
+        "(ADR-0063); None when that layer was skipped",
+    )
+    rt_bonus: float = Field(
+        default=0.0,
+        description="Score delta applied by the RT reranker (ADR-0063)",
+    )
+    ri_used: float | None = Field(
+        default=None,
+        description="Observed retention index when anchor calibration was "
+        "available; the RT reranker then compares RIs instead of RTs "
+        "(ADR-0064)",
+    )
+    purity_score: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Peak-purity score; below 0.5 the verdict is forced to "
+        "AMBIGUOUS (ADR-0065)",
+    )
+    classification_chain: list[str] = Field(
+        default_factory=list,
+        description="Which evidence layers contributed to this rank, in "
+        "pipeline order, e.g. ['formula', 'ms2', 'rt', 'uv', 'nrl']",
+    )
+    evidence_chain: list[EvidenceItem] = Field(
+        default_factory=list,
+        description="One item per contributing layer, each naming its source "
+        "and strength, so the report can show the chain of contributions "
+        "without re-deriving it from the evidence graph (ADR-0061)",
+    )
 
     @model_validator(mode="after")
     def _interval_ordered(self) -> "CandidateRank":
@@ -555,6 +665,22 @@ class ProvenanceManifest(StrictModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
     environment: dict[str, str] = Field(default_factory=dict)
     timestamp: datetime
+    data_tier: DataTier = Field(
+        default=DEFAULT_DATA_TIER,
+        description="Intended disposition of this analysis's outputs "
+        "(ADR-0056); defaults to the most restrictive tier",
+    )
+    abs_status: ABSStatus = Field(
+        default=DEFAULT_ABS_STATUS,
+        description="ABS status of the underlying collections; 'unknown' "
+        "is treated as 'pending' downstream",
+    )
+    source_datasets: list[str] = Field(
+        default_factory=list,
+        description="Every source corpus used in this analysis ("
+        "phyto_shared.data_governance.SOURCE_DATASET_IDS); the list the "
+        "proprietary-tier licence validator checks",
+    )
     manifest_hash: str = Field(
         default="",
         pattern=r"^([0-9a-f]{64})?$",
@@ -574,4 +700,7 @@ class ProvenanceManifest(StrictModel):
             "parameters": self.parameters,
             "environment": self.environment,
             "timestamp": self.timestamp.isoformat(),
+            "data_tier": self.data_tier,
+            "abs_status": self.abs_status,
+            "source_datasets": list(self.source_datasets),
         }

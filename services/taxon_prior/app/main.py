@@ -21,6 +21,7 @@ from auth.install import install_auth
 
 from . import __version__
 from .clients import KNApSAcKClient, LOTUSClient, NPASSClient
+from .markers import evaluate_markers, load_markers
 from .prior import build_taxon_prior
 
 router = APIRouter()
@@ -80,6 +81,54 @@ def taxon_prior_build(request: TaxonPriorRequest) -> TaxonPriorResponse:
     return TaxonPriorResponse(prior=prior, provenance_manifest_id=_manifest(request))
 
 
+class MarkerCheckRequest(BaseModel):
+    """One observed peak checked against the species' pharmacopoeial
+    markers (ADR-0066).  Inputs are optional; unchecked expectations
+    stay None."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    species: str = Field(..., min_length=1)
+    observed_rt_min: float | None = Field(default=None, ge=0.0)
+    observed_uv_maxima_nm: list[float] | None = None
+
+
+class MarkerCheckResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    species: str
+    n_markers: int
+    hits: list[dict[str, Any]]
+    provenance_manifest_id: str
+
+
+@router.post("/pharmacopoeial_markers/check", response_model=MarkerCheckResponse)
+def pharmacopoeial_markers_check(request: MarkerCheckRequest) -> MarkerCheckResponse:
+    """Evaluate the species' curated pharmacopoeial markers (ADR-0066)."""
+    hits = evaluate_markers(
+        request.species, request.observed_rt_min, request.observed_uv_maxima_nm
+    )
+    return MarkerCheckResponse(
+        species=request.species,
+        n_markers=len(hits),
+        hits=[h.model_dump() for h in hits],
+        provenance_manifest_id=_manifest(request),
+    )
+
+
+@router.get("/pharmacopoeial_markers/{species}")
+def pharmacopoeial_markers_for_species(species: str) -> dict[str, Any]:
+    """The curated marker list for a species (empty when none -- graceful)."""
+    from .markers import markers_for_species
+
+    markers = markers_for_species(species)
+    return {
+        "species": species,
+        "n_markers": len(markers),
+        "markers": [m.model_dump() for m in markers],
+    }
+
+
 def create_app(config: AuthConfig | None = None) -> FastAPI:
     application = FastAPI(
         title="PhytoCompanion Taxon Prior Service",
@@ -98,6 +147,7 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
             "version": __version__,
             "clients": ["LOTUS", "KNApSAcK", "NPASS"],
             "mode": "snapshot",
+            "pharmacopoeial_marker_species": len(load_markers()),
             "dry_run": cfg.dry_run,
         }
 

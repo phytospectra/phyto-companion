@@ -4,6 +4,11 @@ Provenance is mandatory, not a feature.  Every input file is hashed, every
 manifest self-hashes, and verification raises rather than returning a soft
 ``False`` -- a silent verification failure is worse than no verification.
 
+Every manifest also carries the analysis's governance disposition (data
+tier, ABS status, source datasets, ADR-0056) and :meth:`ProvenanceBuilder.build`
+enforces the tier/source licence rules -- a proprietary-tier analysis that
+used a non-commercial source cannot be built at all.
+
 Standard library + pydantic only (no external hashing libraries; pandas is
 deliberately absent so the local plane stays lightweight, ADR-0004).
 """
@@ -12,6 +17,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import os
 import platform
 import sys
 from datetime import datetime, timezone
@@ -19,6 +26,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from .data_governance import (
+    ABSStatus,
+    DataTier,
+    DEFAULT_ABS_STATUS,
+    DEFAULT_DATA_TIER,
+    is_source_allowed_in_tier,
+)
 from .exceptions import ProvenanceError
 from .models import ProvenanceManifest
 
@@ -30,6 +44,8 @@ __all__ = [
     "verify_manifest",
     "AuditLog",
 ]
+
+logger = logging.getLogger("phyto.provenance")
 
 _HASH_CHUNK_BYTES = 1 << 20  # 1 MiB streaming chunks
 
@@ -105,6 +121,9 @@ class ProvenanceBuilder:
             .with_database_version("mini_coconut", "v1", downloaded="2026-10-01")
             .with_parameters({"ppm_tolerance": 5.0})
             .with_environment()
+            .with_data_governance(
+                data_tier="training_only", source_datasets=["user_upload"]
+            )
             .build()
         )
     """
@@ -115,6 +134,9 @@ class ProvenanceBuilder:
         self._database_versions: dict[str, str] = {}
         self._parameters: dict[str, Any] = {}
         self._environment: dict[str, str] = {}
+        self._data_tier: DataTier = DEFAULT_DATA_TIER
+        self._abs_status: ABSStatus = DEFAULT_ABS_STATUS
+        self._source_datasets: list[str] = []
 
     def with_input(self, label: str, path: str | Path) -> "ProvenanceBuilder":
         """Hash the file at ``path`` and record it under ``label``."""
@@ -166,8 +188,36 @@ class ProvenanceBuilder:
         self._environment = env
         return self
 
+    def with_data_governance(
+        self,
+        *,
+        data_tier: DataTier = DEFAULT_DATA_TIER,
+        abs_status: ABSStatus = DEFAULT_ABS_STATUS,
+        source_datasets: list[str] | tuple[str, ...] | None = None,
+    ) -> "ProvenanceBuilder":
+        """Record the governance disposition of this analysis (ADR-0056).
+
+        ``data_tier`` defaults to the most restrictive tier and
+        ``abs_status`` to ``unknown``; a manifest is never more permissive
+        than what the caller declares.
+        """
+        self._data_tier = data_tier
+        self._abs_status = abs_status
+        self._source_datasets = list(source_datasets or [])
+        return self
+
     def build(self) -> ProvenanceManifest:
-        """Produce the frozen manifest with its top-level ``manifest_hash``."""
+        """Produce the frozen manifest with its top-level ``manifest_hash``.
+
+        Enforcement point (ADR-0056): a proprietary-tier manifest -- or any
+        manifest built on the cloud plane with the commercial tier enabled
+        (``PHYTO_ENV=cloud`` + ``PHYTO_COMMERCIAL_TIER=1``) -- is REJECTED
+        when any source in ``source_datasets`` is not allowed in that tier
+        (NP-MRD's CC-BY-NC terms, in particular).  The rejection is logged
+        with the offending source and tier before raising, so the audit
+        trail records the attempted promotion.
+        """
+        self._enforce_tier_licences()
         timestamp = datetime.now(timezone.utc)
         content = {
             "input_hashes": dict(self._input_hashes),
@@ -176,12 +226,56 @@ class ProvenanceBuilder:
             "parameters": _jsonify(self._parameters),
             "environment": dict(self._environment),
             "timestamp": timestamp.isoformat(),
+            "data_tier": self._data_tier,
+            "abs_status": self._abs_status,
+            "source_datasets": list(self._source_datasets),
         }
         return ProvenanceManifest(
             manifest_hash=sha256_dict(content),
             timestamp=timestamp,
             **{k: v for k, v in content.items() if k != "timestamp"},
         )
+
+    def _enforce_tier_licences(self) -> None:
+        """Reject analyses whose source mix is incompatible with the tier."""
+        commercial_plane = (
+            os.environ.get("PHYTO_ENV") == "cloud"
+            and os.environ.get("PHYTO_COMMERCIAL_TIER") == "1"
+        )
+        if self._data_tier == "proprietary":
+            benchmark = "proprietary"
+        elif commercial_plane and self._data_tier != "public":
+            # On the commercial plane the default tier feeds the commercial
+            # corpus or a sold model, so the proprietary rules apply unless
+            # the analysis is explicitly in the free academic tier.
+            benchmark = "proprietary"
+        else:
+            return
+        offending = [
+            source
+            for source in self._source_datasets
+            if not is_source_allowed_in_tier(source, benchmark)
+        ]
+        if offending:
+            logger.warning(
+                "provenance governance rejection: tier=%s benchmark=%s "
+                "sources=%s offending=%s",
+                self._data_tier,
+                benchmark,
+                list(self._source_datasets),
+                offending,
+            )
+            raise ProvenanceError(
+                f"Analysis cannot be built at tier {self._data_tier!r}: "
+                f"source(s) {offending} are not allowed in that tier "
+                "(non-commercial licence; see docs/DATA_SOURCES.md and "
+                "ADR-0056)",
+                context={
+                    "tier": self._data_tier,
+                    "offending_sources": offending,
+                    "source_datasets": list(self._source_datasets),
+                },
+            )
 
 
 def verify_manifest(

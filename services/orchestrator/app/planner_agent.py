@@ -538,6 +538,18 @@ def _identify_tasks(sample_metadata: SampleMetadata | None) -> list[Task]:
     metadata = sample_metadata
     has_taxon = bool(metadata and metadata.has_taxon_hint())
     solvent = metadata.extraction_solvent if metadata else None
+    extract_id = metadata.extract_id if metadata else None
+    # The isolation layer runs only when the user names an extract; a
+    # guessed extract_id would attach somebody else's bench evidence to
+    # this sample (ADR-0055).
+    has_extract_hint = bool(extract_id)
+    # Chromatography layers (ADR-0061..0066): each runs only when its
+    # metadata was supplied; the missing ones are reported as skipped
+    # ("layer skipped: no metadata") rather than silently absent.
+    has_lc = bool(metadata and metadata.lc_method is not None)
+    has_standards = bool(metadata and metadata.reference_standards)
+    has_anchors = bool(metadata and metadata.anchor_series)
+    has_chrom_layers = has_lc or has_standards or has_anchors
 
     tasks: list[Task] = [
         Task(
@@ -547,6 +559,22 @@ def _identify_tasks(sample_metadata: SampleMetadata | None) -> list[Task]:
             inputs={"path": "fixtures/sample_peaks.csv"},
         ),
     ]
+    if has_extract_hint:
+        tasks.append(
+            Task(
+                id="load-isolation-record",
+                description=(
+                    "Load the bench isolation record (fractions, TLC, "
+                    "yield) for the supplied extract_id (ADR-0055)"
+                ),
+                tool="isolation.load_record",
+                inputs={"extract_id": extract_id},
+                depends_on=["ingest-peaks"],
+                consumes=["ingest-peaks"],
+            )
+        )
+    else:
+        logger.info("isolation layer skipped: no record")
     if has_taxon:
         tasks.extend(
             [
@@ -573,14 +601,70 @@ def _identify_tasks(sample_metadata: SampleMetadata | None) -> list[Task]:
         )
     else:
         logger.info("taxon prior skipped: no metadata")
+    isolation_deps = ["load-isolation-record"] if has_extract_hint else []
+    if has_chrom_layers:
+        tasks.append(
+            Task(
+                id="apply-chromatography-layers",
+                description=(
+                    "Run the chromatographic evidence layers (Level-1 home "
+                    "library match, RT/RI reranking, UV chromophore, peak "
+                    "purity, pharmacopoeial markers) over the ranked "
+                    "candidates (ADR-0061..ADR-0066)"
+                ),
+                tool="chromatography.apply_layers",
+                inputs={
+                    "species": metadata.species if metadata else None,
+                    "observed_rt_min": metadata.observed_rt_min
+                    if metadata
+                    else None,
+                    "observed_uv_spectrum": metadata.observed_uv_spectrum
+                    if metadata
+                    else None,
+                    "lc_method": metadata.lc_method.model_dump()
+                    if has_lc
+                    else None,
+                    "reference_standards": [
+                        s.model_dump()
+                        for s in (metadata.reference_standards or [])
+                    ],
+                    "anchor_series": [
+                        a.model_dump() for a in (metadata.anchor_series or [])
+                    ],
+                },
+                depends_on=["elucidate"],
+                consumes=["elucidate"],
+            )
+        )
+    else:
+        logger.info("chromatography layers skipped: no metadata")
     tasks.append(
         Task(
             id="elucidate",
             description=(
                 "Rank structural candidates against the spectra, then rerank "
-                "with the taxon prior and solvent compatibility (ADR-0052)"
-                if has_taxon
-                else "Rank structural candidates against the spectra"
+                "with the chromatography layers (ADR-0061..0066), the "
+                "isolation evidence (ADR-0055), the taxon prior and "
+                "solvent compatibility (ADR-0052)"
+                if has_taxon and (has_extract_hint or has_chrom_layers)
+                else (
+                    "Rank structural candidates against the spectra, then "
+                    "rerank with the isolation evidence (ADR-0055)"
+                    if has_extract_hint
+                    else (
+                        "Rank structural candidates against the spectra, then "
+                        "rerank with the chromatography layers "
+                        "(ADR-0061..0066)"
+                        if has_chrom_layers
+                        else (
+                            "Rank structural candidates against the spectra, "
+                            "then rerank with the taxon prior and solvent "
+                            "compatibility (ADR-0052)"
+                            if has_taxon
+                            else "Rank structural candidates against the spectra"
+                        )
+                    )
+                )
             ),
             tool="elucidation.rank_candidates",
             inputs={
@@ -592,9 +676,13 @@ def _identify_tasks(sample_metadata: SampleMetadata | None) -> list[Task]:
                 "apply_taxon_prior": has_taxon,
             },
             depends_on=(
-                ["ingest-peaks", "build-taxon-prior"] if has_taxon else ["ingest-peaks"]
+                ["ingest-peaks", "build-taxon-prior", *isolation_deps]
+                if has_taxon
+                else ["ingest-peaks", *isolation_deps]
             ),
-            consumes=["ingest-peaks"] + (["build-taxon-prior"] if has_taxon else []),
+            consumes=["ingest-peaks"]
+            + (["build-taxon-prior"] if has_taxon else [])
+            + isolation_deps,
         )
     )
     if metadata and metadata.species:
@@ -622,9 +710,13 @@ def _identify_tasks(sample_metadata: SampleMetadata | None) -> list[Task]:
                 tool=None,
                 requires_checkpoint=HumanCheckpoint.BEFORE_CONFIRMED_CLAIM,
                 depends_on=(
-                    ["elucidate", "literature-ground"]
+                    [
+                        "elucidate",
+                        "literature-ground",
+                        *(["apply-chromatography-layers"] if has_chrom_layers else []),
+                    ]
                     if metadata and metadata.species
-                    else ["elucidate"]
+                    else ["elucidate", *(["apply-chromatography-layers"] if has_chrom_layers else [])]
                 ),
                 consumes=["elucidate"],
             ),
@@ -687,7 +779,13 @@ _INPUT_WIRING: dict[str, dict[str, tuple[str, str]]] = {
         "text": ("hypothesize-mechanism", "hypothesis"),
         "context_papers": ("literature-search", "papers"),
     },
-    "elucidate": {"taxon_prior": ("build-taxon-prior", "prior")},
+    "elucidate": {
+        "taxon_prior": ("build-taxon-prior", "prior"),
+        # ADR-0055: the isolation record arrives from load-isolation-record.
+        # A source task the graph does not contain (no extract_id supplied)
+        # leaves the input key absent on purpose -- the skip is visible.
+        "isolation_record": ("load-isolation-record", "record"),
+    },
     "literature-ground": {"compound_name": ("elucidate", "top_candidate_name")},
     "explain-result": {"evidence_graph": ("elucidate", "top_evidence_graph")},
 }
@@ -1143,7 +1241,9 @@ class WorkflowEngine:
                 break
 
             input_hash = sha256_dict(resolved_inputs)
-            output_hash = sha256_dict(output.model_dump())
+            # mode="json": outputs may carry datetimes (isolation records,
+            # ADR-0055) that the raw dump cannot canonicalise.
+            output_hash = sha256_dict(output.model_dump(mode="json"))
             verified: bool | None = None
             if spec.tier is ToolTier.TIER_3_LLM_GENERATED:
                 if self.qa_critic is None:

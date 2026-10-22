@@ -6,8 +6,15 @@ import base64
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from phyto_shared.data_governance import (
+    ABSStatus,
+    DataTier,
+    DEFAULT_ABS_STATUS,
+    DEFAULT_DATA_TIER,
+    SOURCE_DATASET_IDS,
+)
 from phyto_shared.exceptions import InvalidInputError
 from phyto_shared.models import Spectrum
 from phyto_shared.provenance import ProvenanceBuilder, sha256_bytes
@@ -27,6 +34,20 @@ class PeakCSVRequest(BaseModel):
     content_b64: str = Field(..., min_length=1)
     spectrum_id: str = "spectrum_1"
     kind: str | None = None  # None for auto-detect, or '1H', '13C', 'HSQC'
+    # Governance (ADR-0056): defaulted to the most restrictive settings so
+    # nothing becomes public or licensable by accident.
+    data_tier: DataTier = DEFAULT_DATA_TIER
+    abs_status: ABSStatus = DEFAULT_ABS_STATUS
+    source_dataset: str = "user_upload"
+
+    @model_validator(mode="after")
+    def _source_dataset_known(self) -> "PeakCSVRequest":
+        if self.source_dataset not in SOURCE_DATASET_IDS:
+            raise ValueError(
+                f"unknown source_dataset {self.source_dataset!r}; must be one "
+                f"of {SOURCE_DATASET_IDS}"
+            )
+        return self
 
 
 class SpectrumResponse(BaseModel):
@@ -53,10 +74,19 @@ def ingest_peak_csv(request: PeakCSVRequest) -> SpectrumResponse:
     except InvalidInputError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
+    spectrum.data_tier = request.data_tier
+    spectrum.abs_status = request.abs_status
+    spectrum.source_dataset = request.source_dataset
+
     manifest_hash = (
         ProvenanceBuilder()
         .with_input_hash("peak_csv", sha256_bytes(raw_bytes))
         .with_model_version("ingestion-service", __version__)
+        .with_data_governance(
+            data_tier=request.data_tier,
+            abs_status=request.abs_status,
+            source_datasets=[request.source_dataset],
+        )
         .with_environment()
         .build()
         .manifest_hash

@@ -1,0 +1,433 @@
+{
+  "_meta": {
+    "description": "Pharmacopoeial marker compounds: expected RT and UV ranges for species-level authenticity screening (ADR-0066). Curated from published, publicly available pharmacopoeial and reference literature. RT ranges are on the REFERENCE gradient (30-min 5-95% MeOH/MeCN-water, C18; see phyto_shared.chromatography.REFERENCE_GRADIENT) and are representative windows, not certified values. UV lambda_max values follow Mabry, Markham & Thomas (1970) and Harborne (1984) for flavonoids; pharmacopoeial monographs for the others.",
+    "reference_gradient": {"column": "C18", "gradient_percent_B": [5, 95], "duration_min": 30},
+    "sources": [
+      "Thai Herbal Pharmacopoeia (decimal edition; Andrographis paniculata monograph)",
+      "European Pharmacopoeia (EDQM; monographs on sennoside, curcumin, glycyrrhizin, caffeine-containing drugs)",
+      "The Ayurvedic Pharmacopoeia of India ( Ministry of AYUSH)",
+      "Chinese Pharmacopoeia (2020 edition, English)",
+      "Mabry, Markham & Thomas (1970) The Systematic Identification of Flavonoids",
+      "Harborne (1984) Phytochemical Methods, 2nd ed.",
+      "USP Herbal Medicines Compendium"
+    ]
+  },
+  "Andrographis paniculata": [
+    {
+      "marker": "andrographolide",
+      "smiles": "C=C[C@]12C[C@@H](O)[C@H]3[C@]([C@@H]1CC[C@@]4(C(=CCC[C@]34C)C)O)(C(=O)O2)C",
+      "expected_rt_range_min": [11.8, 12.8],
+      "uv_lambda_max_nm": [224],
+      "uv_secondary_max_nm": [],
+      "reference": "Thai Herbal Pharmacopoeia, Andrographis paniculata monograph (andrographolide content assay)"
+    },
+    {
+      "marker": "neoandrographolide",
+      "smiles": "C=C[C@]12C[C@@H](O)[C@H]3[C@](CC[C@@]4(C(=CCC[C@]34C)C)(C(=O)O2)CO[C@@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@H]5O)C",
+      "expected_rt_range_min": [9.2, 10.4],
+      "uv_lambda_max_nm": [219],
+      "uv_secondary_max_nm": [],
+      "reference": "Thai Herbal Pharmacopoeia, Andrographis paniculata monograph; Pholphana et al. 2013, J. Chromatogr. A"
+    },
+    {
+      "marker": "14-deoxy-11,12-didehydroandrographolide",
+      "smiles": "C=C[C@]12C[C@@H](O)C=C3[C@@]1CC[C@@]4(C)C(=CCC[C@]34C)C(=O)O2",
+      "expected_rt_range_min": [14.0, 15.4],
+      "uv_lambda_max_nm": [222, 248],
+      "uv_secondary_max_nm": [248],
+      "reference": "Thai Herbal Pharmacopoeia; Pholphana et al. 2013, J. Chromatogr. A"
+    }
+  ],
+  "Curcuma longa": [
+    {
+      "marker": "curcumin",
+      "smiles": "COc1cc(/C=C/C(=O)CC(=O)/C=C/c2ccc(O)c(OC)c2)ccc1O",
+      "expected_rt_range_min": [14.5, 15.8],
+      "uv_lambda_max_nm": [425],
+      "uv_secondary_max_nm": [265],
+      "reference": "European Pharmacopoeia, Curcuma longa L. rhizoma monograph (curcuminoid assay at 425 nm)"
+    },
+    {
+      "marker": "demethoxycurcumin",
+      "smiles": "COc1cc(/C=C/C(=O)CC(=O)/C=C/c2ccc(O)cc2)ccc1O",
+      "expected_rt_range_min": [15.2, 16.6],
+      "uv_lambda_max_nm": [424],
+      "uv_secondary_max_nm": [265],
+      "reference": "European Pharmacopoeia, Curcuma longa L. rhizoma monograph"
+    },
+    {
+      "marker": "bisdemethoxycurcumin",
+      "smiles": "Oc1cc(/C=C/C(=O)CC(=O)/C=C/c2ccc(O)cc2)ccc1O",
+      "expected_rt_range_min": [15.9, 17.5],
+      "uv_lambda_max_nm": [423],
+      "uv_secondary_max_nm": [264],
+      "reference": "European Pharmacopoeia, Curcuma longa L. rhizoma monograph"
+    }
+  ],
+  "Senna alexandrina": [
+    {
+      "marker": "sennoside A",
+      "smiles": "CC1=C(C(=O)O)C(=Cc2cc(O)c(O)cc2-1)C(O)c1ccc(O)c(O)c1CC(=O)O",
+      "expected_rt_range_min": [8.5, 10.5],
+      "uv_lambda_max_nm": [268, 340],
+      "uv_secondary_max_nm": [340],
+      "reference": "European Pharmacopoeia, Sennae folium/fructus monographs (sennoside A+B assay)"
+    },
+    {
+      "marker": "sennoside B",
+      "smiles": "CC1=C(C(=O)O)C(=Cc2cc(O)c(O)cc2-1)C(O)c1ccc(O)c(O)c1C(O)CC(=O)O",
+      "expected_rt_range_min": [9.0, 11.0],
+      "uv_lambda_max_nm": [268, 340],
+      "uv_secondary_max_nm": [340],
+      "reference": "European Pharmacopoeia, Sennae folium/fructus monographs"
+    }
+  ],
+  "Glycyrrhiza glabra": [
+    {
+      "marker": "glycyrrhizin",
+      "smiles": "CC(=O)OC1(C(C)=CC(=O)[C@@H]2[C@]1(C)CC[C@]3(C2)[C@@H](C(=O)O)CC[C@]4(C3)[C@@H](C)CC[C@@H]4C(C)(C)O)C(O)CO",
+      "expected_rt_range_min": [16.5, 18.5],
+      "uv_lambda_max_nm": [210],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, Glycyrrhizae radix monograph (glycyrrhizin acid assay)"
+    },
+    {
+      "marker": "liquiritin",
+      "smiles": "O[C@H]1[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)CO[C@H]1Oc1ccc(cc1)C1CC(=O)c2cc(O)ccc2O1",
+      "expected_rt_range_min": [10.0, 11.5],
+      "uv_lambda_max_nm": [276],
+      "uv_secondary_max_nm": [310],
+      "reference": "Chinese Pharmacopoeia 2020, Glycyrrhiza monograph; Tanaka et al., assigned flavanone UV"
+    }
+  ],
+  "Camellia sinensis": [
+    {
+      "marker": "epigallocatechin gallate",
+      "smiles": "O[C@H]1CC(O)=c2c(O)cc(O)c(O)c2O[C@@H]1[C@@H](Oc1cc(O)c(O)cc1C(=O)O)c1cc(O)c(O)cc1O",
+      "expected_rt_range_min": [7.0, 8.6],
+      "uv_lambda_max_nm": [270],
+      "uv_secondary_max_nm": [],
+      "reference": "USP Herbal Medicines Compendium, Green Tea monograph (catechin profile)"
+    },
+    {
+      "marker": "caffeine",
+      "smiles": "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
+      "expected_rt_range_min": [3.0, 4.0],
+      "uv_lambda_max_nm": [272],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, caffeine assay (272 nm); ISO 14502 tea catechins method"
+    }
+  ],
+  "Hypericum perforatum": [
+    {
+      "marker": "hypericin",
+      "smiles": "Cc1c2c(c3cc(O)c(C)c(O)c13)C(=O)c1c(C)c(O)c3cc(O)c(C)c(O)c3c1O2",
+      "expected_rt_range_min": [18.0, 20.5],
+      "uv_lambda_max_nm": [590],
+      "uv_secondary_max_nm": [330],
+      "reference": "European Pharmacopoeia, Hyperici herba monograph (hypericin assay at 590 nm)"
+    },
+    {
+      "marker": "pseudohypericin",
+      "smiles": "Cc1c2c(c3cc(O)c(C)c(O)c13)C(=O)c1c(C)c(O)c3cc(O)c(CO)c(O)c3c1O2",
+      "expected_rt_range_min": [17.0, 19.0],
+      "uv_lambda_max_nm": [588],
+      "uv_secondary_max_nm": [330],
+      "reference": "European Pharmacopoeia, Hyperici herba monograph"
+    },
+    {
+      "marker": "rutin",
+      "smiles": "O=C1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1Oc1cc(Oc2cc(OC3OC(CO)C(O)C(O)C3O)c(O)cc2C(=O)O)cc(O)c1",
+      "expected_rt_range_min": [8.8, 10.2],
+      "uv_lambda_max_nm": [256, 355],
+      "uv_secondary_max_nm": [355],
+      "reference": "European Pharmacopoeia, Hyperici herba monograph (rutin, flavonol UV per Mabry 1970)"
+    }
+  ],
+  "Cinnamomum verum": [
+    {
+      "marker": "cinnamaldehyde",
+      "smiles": "O=CC=Cc1ccccc1",
+      "expected_rt_range_min": [12.0, 13.5],
+      "uv_lambda_max_nm": [280],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, Cinnamomi cortex monograph (cinnamaldehyde assay at 280 nm)"
+    },
+    {
+      "marker": "cinnamic acid",
+      "smiles": "O=C(O)/C=C/c1ccccc1",
+      "expected_rt_range_min": [11.0, 12.5],
+      "uv_lambda_max_nm": [268],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, Cinnamomi cortex monograph"
+    }
+  ],
+  "Crataegus monogyna": [
+    {
+      "marker": "vitexin",
+      "smiles": "O=c1cc(-c2cc(O)ccc2O)oc2cc(O)cc(O)c12",
+      "expected_rt_range_min": [9.0, 10.5],
+      "uv_lambda_max_nm": [270, 336],
+      "uv_secondary_max_nm": [336],
+      "reference": "European Pharmacopoeia, Crataegi folium cum flore monograph (vitexin-2''-O-rhamnoside assay)"
+    },
+    {
+      "marker": "hyperoside",
+      "smiles": "O=C1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1Oc1cc(Oc2cc(O)c(O)cc2C(=O)O)c(O)cc1O",
+      "expected_rt_range_min": [8.0, 9.5],
+      "uv_lambda_max_nm": [256, 354],
+      "uv_secondary_max_nm": [354],
+      "reference": "European Pharmacopoeia, Crataegi folium cum flore monograph; flavonol UV per Mabry 1970"
+    }
+  ],
+  "Matricaria chamomilla": [
+    {
+      "marker": "apigenin-7-glucoside",
+      "smiles": "O=C1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1Oc1cc(O)c2c(c1)oc(-c1ccc(O)cc1)cc2=O",
+      "expected_rt_range_min": [10.5, 12.0],
+      "uv_lambda_max_nm": [267, 337],
+      "uv_secondary_max_nm": [337],
+      "reference": "European Pharmacopoeia, Matricariae flos monograph (apigenin-7-glucoside assay); flavone UV per Mabry 1970"
+    }
+  ],
+  "Ginkgo biloba": [
+    {
+      "marker": "quercetin",
+      "smiles": "O=c1c(O)c(-c2cc(O)c(O)cc2)oc2cc(O)cc(O)c12",
+      "expected_rt_range_min": [9.5, 11.0],
+      "uv_lambda_max_nm": [256, 370],
+      "uv_secondary_max_nm": [370],
+      "reference": "European Pharmacopoeia, Ginkgo leaf (dry refined extract) monograph (flavone glycosides hydrolysis assay); flavonol UV per Mabry 1970"
+    },
+    {
+      "marker": "kaempferol",
+      "smiles": "O=c1c(O)c(-c2ccc(O)cc2)oc2cc(O)cc(O)c12",
+      "expected_rt_range_min": [10.5, 12.0],
+      "uv_lambda_max_nm": [265, 366],
+      "uv_secondary_max_nm": [366],
+      "reference": "European Pharmacopoeia, Ginkgo leaf monograph; flavonol UV per Mabry 1970"
+    },
+    {
+      "marker": "ginkgolide B",
+      "smiles": "O=C1O[C@@]2(C=C[C@@H]3C(C)(C)O)C[C@@H]4[C@@H]5C(=O)OC(C)(C)[C@@H]5[C@H](O)[C@H]4[C@@]3(CO)C(=O)O[C@]21C",
+      "expected_rt_range_min": [13.5, 15.5],
+      "uv_lambda_max_nm": [220],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, Ginkgo leaf monograph (terpene lactones; weak UV, low-wavelength end absorption)"
+    }
+  ],
+  "Valeriana officinalis": [
+    {
+      "marker": "valerenic acid",
+      "smiles": "CC(C)=CCC[C@@H](C)C1=C(C)CC(=O)OC12CC1C2C(=O)O",
+      "expected_rt_range_min": [19.0, 21.5],
+      "uv_lambda_max_nm": [210],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, Valerianae radix monograph (valerenic acid assay)"
+    }
+  ],
+  "Rhamnus purshiana": [
+    {
+      "marker": "cascarin",
+      "smiles": "CC1=C(C(=O)O)C(=Cc2cc(O)c(O)cc2-1)C(O)c1ccc(O)c(CO)c1C(O)C=O",
+      "expected_rt_range_min": [12.0, 14.0],
+      "uv_lambda_max_nm": [265, 340],
+      "uv_secondary_max_nm": [340],
+      "reference": "European Pharmacopoeia, Rhamni purshianae cortex monograph (cascosides)"
+    }
+  ],
+  "Digitalis purpurea": [
+    {
+      "marker": "purpurea glycoside A",
+      "smiles": "[H][C@@]12CC[C@](O)(C)C1CC[C@]1(C)C2=CC[C@@H]2[C@]3(C)CC[C@H](O[C@H]4CO[C@@H](O)[C@H](O)[C@@H]4O[C@H]4CO[C@@H](O)[C@H](O)[C@@H]4O)[C@@](C)(O)C3CC[C@]12O",
+      "expected_rt_range_min": [17.0, 19.5],
+      "uv_lambda_max_nm": [220],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, Digitalis purpureae folium monograph"
+    }
+  ],
+  "Atropa belladonna": [
+    {
+      "marker": "atropine",
+      "smiles": "CN1C[C@@H]2CC[C@H](C1)[C@H](O)C2",
+      "expected_rt_range_min": [4.5, 6.0],
+      "uv_lambda_max_nm": [195],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, Belladonnae herba monograph (tropane alkaloids; weak chromophore)"
+    },
+    {
+      "marker": "scopolamine",
+      "smiles": "CN1C[C@@H]2CC[C@H](C1)[C@@H](O)C2OC(=O)C=Cc1ccccc1",
+      "expected_rt_range_min": [5.0, 6.5],
+      "uv_lambda_max_nm": [195, 254],
+      "uv_secondary_max_nm": [254],
+      "reference": "European Pharmacopoeia, Belladonnae herba monograph"
+    }
+  ],
+  "Papaver somniferum": [
+    {
+      "marker": "morphine",
+      "smiles": "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3C1",
+      "expected_rt_range_min": [4.0, 5.5],
+      "uv_lambda_max_nm": [286],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, Raw opium monograph (morphine assay)"
+    },
+    {
+      "marker": "codeine",
+      "smiles": "COc1ccc2c(c1O)[C@]13CC[C@@]2(O)[C@H](C1)N(C)CC3",
+      "expected_rt_range_min": [5.5, 7.0],
+      "uv_lambda_max_nm": [284],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, Raw opium monograph"
+    },
+    {
+      "marker": "papaverine",
+      "smiles": "COc1ccc(Cc2cnc3cc(OC)c(OC)cc3c2C)cc1OC",
+      "expected_rt_range_min": [13.5, 15.0],
+      "uv_lambda_max_nm": [247, 320],
+      "uv_secondary_max_nm": [320],
+      "reference": "European Pharmacopoeia, Raw opium monograph"
+    }
+  ],
+  "Aloe ferox": [
+    {
+      "marker": "aloin A",
+      "smiles": "Oc1cc2c(cc1O)[C@@H](O)C(O)c1ccc3Oc4cc(O)cc(O)c4cc3c1O2",
+      "expected_rt_range_min": [10.5, 12.5],
+      "uv_lambda_max_nm": [268, 355],
+      "uv_secondary_max_nm": [355],
+      "reference": "European Pharmacopoeia, Aloe barbadensis/ferox monographs (barbaloin assay)"
+    },
+    {
+      "marker": "aloin B",
+      "smiles": "Oc1cc2c(cc1O)[C@H](O)C(O)c1ccc3Oc4cc(O)cc(O)c4cc3c1O2",
+      "expected_rt_range_min": [10.8, 12.8],
+      "uv_lambda_max_nm": [268, 355],
+      "uv_secondary_max_nm": [355],
+      "reference": "European Pharmacopoeia, Aloe monographs (barbaloin assay)"
+    }
+  ],
+  "Rheum palmatum": [
+    {
+      "marker": "emodin",
+      "smiles": "CC1=C(O)c2c(O)c(C(=O)O)ccc2Oc1=O",
+      "expected_rt_range_min": [15.0, 17.0],
+      "uv_lambda_max_nm": [254, 289, 439],
+      "uv_secondary_max_nm": [439],
+      "reference": "Chinese Pharmacopoeia 2020, Rhei Radix et Rhizoma monograph; USP Herbal Medicines Compendium"
+    },
+    {
+      "marker": "rhein",
+      "smiles": "O=C(O)c1c(O)c2C(=O)c3c(O)cccc3Cc2oc1=O",
+      "expected_rt_range_min": [13.5, 15.5],
+      "uv_lambda_max_nm": [259, 432],
+      "uv_secondary_max_nm": [432],
+      "reference": "Chinese Pharmacopoeia 2020, Rhei Radix et Rhizoma monograph"
+    }
+  ],
+  "Panax ginseng": [
+    {
+      "marker": "ginsenoside Rb1",
+      "smiles": "CC(C)=CCCC(C)C1CCC2(C)C1CCC1C2(C)CCC2C(C)(CO)CCC(O[C@H]3O[C@H](CO)[C@@H](O)[C@H](O)[C@H]3O[C@H]3O[C@H](CO)[C@@H](O)[C@H](O)[C@H]3O)C12",
+      "expected_rt_range_min": [17.5, 20.0],
+      "uv_lambda_max_nm": [203],
+      "uv_secondary_max_nm": [],
+      "reference": "Chinese Pharmacopoeia 2020, Ginseng Radix et Rhizoma monograph (ginsenoside Rb1 assay)"
+    },
+    {
+      "marker": "ginsenoside Rg1",
+      "smiles": "CC(C)=CCCC(C)C1CCC2(C)C1CCC1C2(C)CCC2C(C)(CO)CCC(O[C@H]3O[C@H](CO)[C@@H](O)[C@H](O)[C@H]3O)C12",
+      "expected_rt_range_min": [14.0, 16.0],
+      "uv_lambda_max_nm": [203],
+      "uv_secondary_max_nm": [],
+      "reference": "Chinese Pharmacopoeia 2020, Ginseng monograph"
+    }
+  ],
+  "Zingiber officinale": [
+    {
+      "marker": "6-gingerol",
+      "smiles": "CCCCC(O)CC(=O)CCc1ccc(O)cc1",
+      "expected_rt_range_min": [15.5, 17.5],
+      "uv_lambda_max_nm": [230, 280],
+      "uv_secondary_max_nm": [280],
+      "reference": "European Pharmacopoeia, Zingiberis rhizoma monograph (gingerol content)"
+    },
+    {
+      "marker": "6-shogaol",
+      "smiles": "CCCC/C=C/C(=O)CCc1ccc(O)cc1",
+      "expected_rt_range_min": [17.0, 19.0],
+      "uv_lambda_max_nm": [230, 280],
+      "uv_secondary_max_nm": [280],
+      "reference": "European Pharmacopoeia, Zingiberis rhizoma monograph"
+    }
+  ],
+  "Piper nigrum": [
+    {
+      "marker": "piperine",
+      "smiles": "O=C(/C=C/c1ccc(O)c(OC)c1)N1CCCCC1",
+      "expected_rt_range_min": [14.0, 15.5],
+      "uv_lambda_max_nm": [342],
+      "uv_secondary_max_nm": [310],
+      "reference": "European Pharmacopoeia, Piper nigrae fructus monograph (piperine assay at 342 nm)"
+    }
+  ],
+  "Salvia officinalis": [
+    {
+      "marker": "rosmarinic acid",
+      "smiles": "O=C(O)[C@H](Cc1ccc(O)cc1)NC(=O)/C=C/c1ccc(O)c(O)c1",
+      "expected_rt_range_min": [6.5, 8.5],
+      "uv_lambda_max_nm": [330],
+      "uv_secondary_max_nm": [285],
+      "reference": "European Pharmacopoeia, Salviae officinalis folium monograph; rosmarinic acid is the hydroxycinnamate reference"
+    },
+    {
+      "marker": "carnosic acid",
+      "smiles": "CC1(C)CCCc2c(O)c(C)c3OC(C)(C)CC[C@]13C1CC1",
+      "expected_rt_range_min": [20.0, 23.0],
+      "uv_lambda_max_nm": [230, 284],
+      "uv_secondary_max_nm": [284],
+      "reference": "European Pharmacopoeia, Salviae officinalis folium monograph"
+    }
+  ],
+  "Verbena officinalis": [
+    {
+      "marker": "verbascoside",
+      "smiles": "O[C@H]1[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)CO[C@H]1OC1C(O)C(O)C(Oc2cc(O)ccOc2)C1OC(=O)/C=C/c1ccc(O)c(O)c1",
+      "expected_rt_range_min": [6.0, 8.0],
+      "uv_lambda_max_nm": [332],
+      "uv_secondary_max_nm": [290],
+      "reference": "European Pharmacopoeia, Verbenae herba monograph (verbascoside assay)"
+    }
+  ],
+  "Echinacea purpurea": [
+    {
+      "marker": "cichoric acid",
+      "smiles": "O=C(O)[C@H](O)/C=C/C(=O)O[C@@H](/C=C/C(=O)O)c1cc(O)c(O)cc1",
+      "expected_rt_range_min": [5.5, 7.5],
+      "uv_lambda_max_nm": [328],
+      "uv_secondary_max_nm": [270],
+      "reference": "European Pharmacopoeia, Echinaceae purpureae herba monograph (cichoric acid assay)"
+    }
+  ],
+  "Passiflora incarnata": [
+    {
+      "marker": "vitexin-2-O-rhamnoside",
+      "smiles": "O=c1cc(-c2cc(O)ccc2O)oc2cc(O)cc(O)c12",
+      "expected_rt_range_min": [9.5, 11.0],
+      "uv_lambda_max_nm": [270, 336],
+      "uv_secondary_max_nm": [336],
+      "reference": "European Pharmacopoeia, Passiflorae herba monograph (vitexin-2''-O-rhamnoside assay); flavone UV per Mabry 1970"
+    }
+  ],
+  "Melaleuca alternifolia": [
+    {
+      "marker": "terpinen-4-ol",
+      "smiles": "CC(C)=C1CCC(C)(C)C(O)C1",
+      "expected_rt_range_min": [10.0, 12.0],
+      "uv_lambda_max_nm": [],
+      "uv_secondary_max_nm": [],
+      "reference": "European Pharmacopoeia, Melaleucae aetheroleum monograph (GC; listed here as UV-silent marker)"
+    }
+  ]
+}

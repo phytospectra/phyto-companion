@@ -1976,3 +1976,139 @@ own enforcement surface.
   from their documentation and are unverifiable until the hosts answer;
   they are defensively parsed and never crash the prior.
   - **Production data addendum (sizes and sources).** The three pilot snapshot files carry 17 organism–compound entries total (`knapsack_snapshot.json` 42 lines, `lotus_snapshot.json` 74 lines, `npass_snapshot.json` 26 lines). Before the first pilot user, replace each with the full dump: LOTUS (~750,000 organism–compound pairs, Zenodo CC0), KNApSAcK (~50,000 species-metabolite pairs, downloadable core table), NPASS (~35,000 compounds with species source, static export). The live-API code paths remain in place and are used when the dumps are absent; the snapshots are the offline and CI fallback, not the primary source.
+
+### ADR-0055: Minimum viable isolation record
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Platform owner (MVP scoping); implemented as one increment across `shared/phyto_shared`, `services/isolation`, `services/elucidation`, `services/orchestrator`.
+- **Context:** Every phytochemist fractionates an extract, spots TLC plates, and weighs the isolated compound — but the platform treated structure elucidation as if the sample fell from the sky. The bench observations that constrain a candidate list (which fractions a compound elutes in, which TLC reagents fire, how much material was recovered) were nowhere in the data model, so the rerankers could not use them. The temptation is to model the full isolation graph (sub-fractionation as first-class edges, TLC plate images, cross-lab comparison) before anyone has used the simple version; that is how a platform ships a graph nobody populates.
+- **Decision:** Ship the minimum viable isolation record (ADR-0055):
+  * `phyto_shared.isolation` defines `Fraction`, `TLCResponse`, `TLCObservation`, `IsolationCompound`, `IsolationRecord` — fractionation, TLC, and yield as structured Pydantic models, validated at the boundary (Rf 0–1, purity a fraction, fraction references checked).
+  * Reagent responses are TAGGED, not free text: a closed `TLCReagent` vocabulary (Naturstoff, Dragendorff, vanillin_H2SO4, Liebermann_Burchard, FeCl3, UV254/365, ninhydrin, anisaldehyde) with response kinds `positive_strong / positive_weak / negative / absorbing / fluorescent`. Colour is recorded as optional free text but only reagents whose hint is colour-dependent (vanillin) read it, and only taught colours (yellow; pink/red) carry weight. An untaught colour is an explicit no-signal, never a guess.
+  * Fraction polarity is a DECLARED tier (`very_nonpolar … very_polar`), not a solvent name: solvents vary across labs, tiers do not. The solvent string is kept for provenance.
+  * `phyto_shared.isolation_prior` turns the record into heuristic priors: `polarity_from_fractions` (tier estimate + confidence falling with the elution spread), `class_from_tlc` (ranked class list from reagent responses), `abundance_from_yield` (% w/w). Every function is documented as a prior, not a measurement.
+  * The isolation reranker (`elucidation.isolation_reranker`) adjusts candidate scores: polarity match +0.15 (confidence-scaled) / contradiction −0.25; TLC class in the predicted set +0.20 / no overlap with a non-empty list −0.30; flash-UV λmax inside the chromophore band +0.15 / outside −0.30. One `EvidenceItem` per contributing signal and a separate `isolation_bonus` field so every adjustment is visible and undoable. Bonus/penalty never force a verdict — the spectral ranker already excluded what needed excluding. The layer runs after the UV/RT signals in the spectral ranking and BEFORE the taxon prior reranker: bench isolation of THIS sample is more specific than what the species is generally reported to contain.
+  * The identify workflow plans an optional `load-isolation-record` task when the user supplies an `extract_id` with a record; without one the layer is skipped with the visible note "isolation layer skipped: no record". Structure prediction (logP tiers, glycoside SMARTS, chromophore bands) is documented heuristic calibration, and unparseable SMILES predict nothing rather than contradicting.
+  * The isolation service (`services/isolation`) persists records per user — Firestore in the cloud plane, in-process locally — with per-user access control enforced through the existing auth middleware and re-checked in every store read.
+  * DEFERRED until the MVP is validated by real users: the full isolation graph (sub-fractionation as a first-class edge structure), TLC plate image upload, and cross-lab comparison.
+- **Alternatives considered:** (a) Free-text bench notes parsed by an LLM — rejected: the same observation ("Naturstoff positive, yellow spot") becomes structured evidence only if it enters the system structured; parsing is a lossy layer that can silently disagree. (b) Solvent names as the polarity key — rejected: "EtOAc fraction" means different things in different labs and in normal- vs reversed-phase practice; the tier is the portable fact. (c) Hard filters (e.g. a Dragendorff-positive compound excludes non-alkaloid candidates) — rejected: TLC reagents are suggestive, not specific (Dragendorff fires on some lactones; FeCl3 on any decent phenol), and a hard filter would let a weak bench observation veto a strong spectral match. (d) Building the full isolation graph now — deferred per the MVP framing above.
+- **Consequences:** Bench observations become ranking priors with full evidence provenance; the frontend evidence panel can render the isolation chain alongside UV/RT/taxon evidence. The MVP vocabulary (reagents, response kinds, tiers) is closed, so supporting a new reagent or response kind is a deliberate model change. Unmeasured honesty: the priors are calibrated on common natural products and a handful of literature windows — a candidate whose class has no chromophore band is not UV-cross-checked, and fraction tiers are the user's declaration, not a measurement. The full isolation graph remains future work; the record's `isolation_chain` field (free list of parent fraction ids) preserves enough provenance for that migration without committing to an edge schema now.
+
+### ADR-0061: Home-library reference standards — Level-1 matching and RT offset calibration
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Platform owner (analytical-chemistry scope); implemented as one increment across `shared/phyto_shared`, `services/calibration`, `services/orchestrator`, `services/elucidation`.
+- **Context:** A phytochemist's first question about an unknown peak is not "what does the NMR say?" but "is this one of MY standards?". Every lab runs authentic reference standards under its own LC method, and the platform had no place to put them: the identify workflow ranked candidates on spectra alone, and an observed RT or PDA spectrum was dropped because nothing could use it. The MSI Level-1 convention (identification confirmed by an authentic standard on orthogonal properties) was unreachable, and the systematic gap between the retention model's predicted RT and the user's own method had no calibration handle.
+- **Decision:** Add a per-user, per-LC-method home library of reference standards:
+  * `shared/phyto_shared.chromatography` defines `LCMethod` (column phase, gradient, temperature, flow — no default method exists on purpose), `ReferenceStandard` (name, SMILES, observed `rt_min`, optional UV spectrum and MS2), `uv_cosine` and `ms2_cosine` (GNPS-style similarity, shared contract with the elucidation ranker).
+  * `services/calibration` stores standards keyed `(user, method_id)` behind a `HomeLibraryStore` protocol (in-process locally, Firestore in the cloud plane at `users/{uid}/methods/{method_id}/standards/{name}`). **Method isolation is structural**: every lookup is keyed by (user, method), so standards from one method can never match peaks run under another.
+  * **Level-1 matching** (`POST /calibrate/match`): an observed peak matches a stored standard when EVERY supplied property agrees within tight tolerances — RT ±0.1 min, UV cosine > 0.95, MS2 cosine > 0.85 (at least one property must be checkable; a UV-less standard can still match on RT + MS2). A full match is stamped on the candidate as an MSI Level-1 identification with `strength 1.0`.
+  * **RT offset calibration**: the difference between a standard's observed RT and the retention model's predicted RT is computed per (user, method) and applied to every other candidate's predicted RT in the same method — the delta absorbs the systematic method-vs-model gap instead of poisoning every comparison.
+  * In the layer chain the standard matched BY PROPERTIES names a structure; the rank it applies to is found by InChIKey join on the candidate SMILES, so a Level-1 stamp can never attach to a different structure than the one the standard certifies.
+- **Alternatives considered:** (a) Free-text "my library" spreadsheet upload parsed at query time — rejected: the match is only as trustworthy as the parse; standards enter structured or not at all. (b) Global (cross-user, cross-method) standard library — rejected: RTs are method-specific by nature and a shared library would invite cross-method matching, the exact failure the structural keying prevents. (c) Matching on name similarity — rejected: the same compound carries different names per vendor; the join keys are structure (InChIKey) and orthogonal properties, never strings.
+- **Consequences:** Users gain the strongest possible evidence tier once they have run standards, and the platform can finally consume observed RT/UV/MS2 for the peak. The library's coverage is the user's own bench work, so the layer is skipped — visibly, "no reference standards" — for users who have none. Level-1 stamps are only as honest as the stored standards' metadata; a standard entered with a wrong SMILES certifies the wrong structure, which the InChIKey join makes visible but cannot prevent.
+
+### ADR-0062: UV chromophore classification from PDA spectra
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Platform owner (analytical-chemistry scope); implemented across `shared/phyto_shared`, `services/elucidation`, `services/orchestrator`.
+- **Context:** HPLC-PDA runs produce an absorbance spectrum per peak, and sixty years of phytochemistry know what a flavonol's Band I/Band II look like (Mabry 1970; Harborne 1984) — but the platform discarded the PDA spectrum because the ranking pipeline was NMR/MS-only. The UV layer is the cheapest orthogonal evidence there is: the PDA detector is already on the instrument, and a flavonoid-class candidate contradicted by a terpene-like spectrum is wrong in a way the NMR score cannot see.
+- **Decision:** Add a rule-based UV classifier and a post-ranking reranker:
+  * `phyto_shared.uv_chromophore.classify_uv` reads `[(wavelength_nm, absorbance)]` and returns one of 13 classes (flavone, flavonol, flavanone, isoflavone, chalcone, anthocyanin, coumarin, phenolic acid, isoquinoline and indole alkaloid, xanthone, terpene-like, unclassified) with a confidence in [0,1] and diagnosis notes. Band I = highest local maximum above 300 nm, Band II = highest in 240–300 nm; visible absorption above 450 nm is the anthocyanin signal; the rule windows follow Mabry/Harborne widened for solvent shifts (5–15 nm). `predict_class_from_smiles` is the structural counterpart for candidates.
+  * `elucidation.uv_reranker.rerank_with_uv` adjusts scores ADDITIVELY (never touching `candidate_ranker`): observed class in the candidate's predicted classes +0.20, directional incompatibility −0.30, undeterminable 0.00. Bonuses respect each rank's `ranking_convention` (ADR-0008) — a bonus ADDS to higher-is-better and SUBTRACTS from lower-is-better.
+  * A low-confidence observed classification (below 0.6) is a no-op: a shaky class must not move scores. A small documented equivalence whitelist (flavone/flavonol share the chromen-4-one core; phenolic_acid shares the hydroxycinnamate chromophore) prevents adjacent classes from reading as contradictions; the classifier itself flags flavone-vs-flavonol and coumarin-vs-phenolic-acid ambiguity in its notes rather than guessing.
+  * The layer is skipped — visibly — when no PDA spectrum was supplied.
+- **Alternatives considered:** (a) Learned classifier (CNN on PDA spectra) — rejected for the pilot: no curated public training set was available, and the rule set is auditable line by line, which a learned model is not. (b) Hard class filter (a flavonoid spectrum excludes non-flavonoid candidates) — rejected: the classifier is a screening tool with documented window overlaps (flavone/flavonol near 345–355 nm); a hard filter would compound its edge-case errors into false negatives. (c) Feeding raw spectra into similarity scoring against predicted spectra — rejected: predicting absorbance spectra from SMILES is unreliable; class-level comparison is the robust granularity.
+- **Consequences:** Every PDA-bearing run gains a visible chromophore evidence item per candidate. The classifier is calibrated on the classic flavonoid/coumarin literature; alkaloid and terpene classes are coarse (terpene-like really means "no useful UV chromophore"). Solvent and pH shift λmax by 5–15 nm and the 15 nm tolerance in every UV comparison is the honest reflection of that. The confidence gate means weak or overlapped spectra silently contribute nothing — reported as a skip, never as a match.
+
+### ADR-0063: Retention-time prediction — method-scoped, soft by design
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Platform owner (analytical-chemistry scope); implemented across `shared/phyto_shared`, `services/retention`, `services/elucidation`, `services/orchestrator`.
+- **Context:** Observed RT was unusable without a prediction to compare it against. RT prediction is HIGHLY method-dependent: a model trained on one column/gradient/temperature pair must not be presented as an RT oracle for another method. And a 2025 literature check (Malm & Kruve) found RT prediction underperforms RT projection in some regimes, meaning a hard RT gate would compound a known weakness into false negatives. Public natural-product-specific RT training data surveyed 2026-10-22 was too sparse to fine-tune on without overfitting.
+- **Decision:** Add a retention service and a soft RT reranker:
+  * `services/retention` serves `predict_rt(smiles, method)` where every `RetentionPrediction` carries the `method_id` it is valid for plus an honest interval. Production model lineage is documented: METLIN SMRT (~80k compounds, open) as base training data; NP fine-tuning deferred. The pilot ships (a) a hand-curated 20-compound lookup on the reference gradient (30-min 5→95% C18) and (b) a logP descriptor baseline with a deliberately wide interval; a user method that differs materially from the reference gradient gets the wide baseline rather than silently transferred lookup values.
+  * `elucidation.rt_reranker.rerank_with_rt` adjusts scores ADDITIVELY: |predicted − offset-calibrated − observed| > rt_tolerance → −0.25; within tolerance/2 → +0.15; else 0.00. **RT never excludes a candidate** — scores move, and every movement is attached as evidence naming the prediction that caused it.
+  * The home-library RT offset (ADR-0061), when available, is applied to every candidate's predicted RT before comparison.
+  * The layer is skipped — visibly — without `lc_method` or an observed RT.
+- **Alternatives considered:** (a) Hard RT filter — rejected per the Malm & Kruve finding: a wrong prediction would silently delete the true candidate, the worst failure mode a ranking aid can have. (b) Fine-tuned GNN now — rejected: the 2026-10-22 survey found public NP RT data too sparse; shipping it would overfit; the model id/version plumbing is in place for when it lands. (c) One global method ("just use 30-min C18") — rejected: predictions outside their training method are fiction; the method_id scoping makes transfer explicit instead of implicit.
+- **Consequences:** Observed RT finally moves scores, visibly, with its prediction attached. The pilot's RT numbers are literature-typical, not laboratory-grade — the ±0.6 min lookup interval and the wide baseline interval say so. RT predictions remain valid ONLY for the method they were made under, and the service refuses to pretend otherwise. When a fine-tuned model replaces the lookup, the version string changes and the fallback stays.
+
+### ADR-0064: Retention-index normalization via co-injected anchor series
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Platform owner (analytical-chemistry scope); implemented across `shared/phyto_shared`, `services/elucidation`, `services/orchestrator`.
+- **Context:** RT is method-bound (ADR-0063), but phytochemists compare runs across labs, columns and months. The established fix (Aalizadeh et al. 2022) is a retention INDEX: co-inject a homologous series (e.g. the cocamide diethanolamide homologues), let each homologue's RT define an axis point indexed by chain length, and interpolate every peak's RI = 100·n + 100·(RT − RT_n)/(RT_n+1 − RT_n) between bracketing homologues. RI is portable across methods in a way RT can never be. The feature is opt-in by nature: it requires the user to have co-injected anchors.
+- **Decision:** Add RI math and an RI reranking path:
+  * `phyto_shared.chromatography` defines `AnchorStandard` (chain length + observed RT) and `AnchorCalibration` (validated monotonic), plus `rt_to_ri` / `ri_to_rt` piecewise-linear interpolation and `build_anchor_calibration`. Fewer than two anchors raises `InvalidInputError` — a one-anchor "RI" is not an axis.
+  * `CandidateRank` gains `ri_used`: when anchors were supplied the RT reranker compares retention INDICES instead of RTs, ignoring the RT offset (it is absorbed by the RI axis), and the evidence names the RI basis.
+  * In the layer chain the RI path replaces the RT path whenever `anchor_series` has ≥ 2 members; with fewer anchors the chain falls back to method-specific RT (ADR-0063) rather than guessing an axis.
+- **Alternatives considered:** (a) Universal RT scaling factors from column literature — rejected: less accurate than an in-run axis and silently method-dependent, the exact problem RI solves. (b) Always-on synthetic anchors (simulated homologues) — rejected: a fabricated axis is worse than none; the anchors must be REAL injections. (c) Krz-Marquart or cubic-spline interpolation — deferred: piecewise-linear between bracketing homologues is the Aalizadeh convention, auditable, and adequate for the anchor densities real runs produce.
+- **Consequences:** Cross-method and cross-lab RT comparison becomes possible when the user invests in anchors, and the RI number is reproducible from the stored anchors alone. The layer stays honestly opt-in: without anchors the chain reports "RI skipped" and falls back to RT, so no user is forced to buy a standard series to use the platform. RI windows in curated data (e.g. pharmacopoeial markers) can now be quoted against a portable axis instead of one lab's gradient.
+
+### ADR-0065: Peak purity — co-elution detection forces AMBIGUOUS below threshold
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Platform owner (analytical-chemistry scope); implemented across `shared/phyto_shared`, `services/orchestrator`.
+- **Context:** A peak that looks clean in the chromatogram can still be a co-elution, and an NMR identification made on a contaminated peak silently describes a mixture. Two cheap orthogonal signals expose it: UV spectral drift across the peak (a pure peak has the same chromophore at apex and edges; a mixture drifts) and mass-channel misalignment (a shoulder carrying a different m/z than the apex is a different compound).
+- **Decision:** Add `phyto_shared.peak_purity.peak_purity` and enforce its consequence:
+  * The score is 0–1: UV agreement across apex/left/right shoulders weighted 0.7, apex-vs-shoulder m/z alignment weighted 0.3 (aligned 1.0 / drifting 0.6 / misaligned 0.2; missing channels 0.8 — unconfirmed, not failed). The MS tolerance is max(0.05 Da, 50 ppm).
+  * Below `PURITY_AMBIGUITY_THRESHOLD` (0.5) the layer chain FORCES the verdict to AMBIGUOUS on every rank, appends the caveat "Peak appears to be a mixture; identification may refer to the dominant component" to the evidence graph gaps, and stamps a `peak_purity_override` evidence item — the override is an action with provenance, not a hidden penalty.
+  * The score is stamped on every rank (`purity_score`) regardless of threshold, so a clean pass is also visible.
+- **Alternatives considered:** (a) Score-based soft penalty only — rejected: a contaminated peak is not a slightly worse identification, it is a different claim ("dominant component of a mixture"); the verdict must say so. (b) Full purity algorithms (spectral deconvolution, apex-vs-apex MS/MS matching) — deferred: the two cheap signals catch the common case and never mislead; deconvolution can come later behind the same score field. (c) Treating missing MS channels as failure — rejected: an NMR+UV run with no MS shoulder still yields meaningful UV drift evidence; unconfirmed (0.8) is the honest middle.
+- **Consequences:** Identifications made on mixed peaks can no longer parade as confident — the AMBIGUOUS verdict with the caveat travels into the report. The threshold (0.5) is a constant, deliberately coarse; users see the score itself and can judge 0.55 for themselves. Purity is computed upstream (whoever holds the chromatographic data) and enters the chain as a number — the chain enforces the consequence, it does not own the raw peak shapes.
+
+### ADR-0066: Pharmacopoeial marker prior — species authenticity as expectations, not proof
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Platform owner (analytical-chemistry scope); implemented across `services/taxon_prior`, `services/orchestrator`, `data/`.
+- **Context:** Pharmacopoeias (IP, USP, Ph. Eur., ChP) define quality-control markers for medicinal plants: named compounds with expected RT windows and UV maxima under reference conditions. For a user who declares "this sample is Curcuma longa" and has NO reference standards in the home library (ADR-0061), those monograph entries are the only available chromatographic expectation — a free prior that says what the literature says this species's QC markers look like. The temptation to reverse the logic — marker hit "proves" the species — is exactly backwards and had to be designed out.
+- **Decision:** Add a curated marker file and a marker-evaluation layer:
+  * `data/pharmacopoeial_markers.json`: 26 species, each with named markers carrying SMILES, expected RT range (min, against the documented reference gradient), expected UV maxima (primary/secondary, nm), and a per-entry `reference` citing the pharmacopoeial source. Invalid entries are dropped at load with a logged reason, never propagated; a missing file degrades to "no markers available" rather than failing.
+  * `taxon_prior.markers` evaluates each marker against the observed peak: RT inside the window ± 0.5 min grace, UV maximum within 15 nm of any expected maximum. Checks with no input stay `None` — an unchecked expectation is never reported as met.
+  * The layer chain attaches the marker check as EVIDENCE to every rank (the check is about the PEAK/species authenticity, not about one candidate): supporting markers +0.30 strength per evidence item, a small +0.05 score bonus when any marker supports, and each item carries its pharmacopoeial reference so the report cites the monograph per marker.
+  * **Honest scope (the design-out):** markers are EXPECTATIONS, not observations. A marker miss is evidence AGAINST the species-level identity claim; a marker hit supports it weakly (+0.05). Neither ever flips a candidate verdict on its own.
+- **Alternatives considered:** (a) Scraping pharmacopoeial PDFs at runtime — rejected: licensing (monographs are copyrighted) and parsing fragility; the curated file carries explicit per-entry references instead. (b) Marker hit as a hard species-identity certificate — rejected: an RT window met is consistent with many species; the prior supports, never proves. (c) Folding markers into the taxon prior databases (ADR-0054) — rejected: different epistemics — taxon priors say what a species is REPORTED to contain, markers say what a pharmacopoeia EXPECTS to find under QC conditions; conflating them would corrupt both provenance chains.
+- **Consequences:** Even standard-less users get a visible literature-anchored chromatographic check when their species has a monograph. The marker file is the maintenance burden: entries are reference-gradient-relative (documented in `REFERENCE_GRADIENT`, ADR-0063), so users on very different methods get grace-band-limited comparisons and the report's RT wording stays honest. Species without monographs fall through with a visible "no curated markers" skip. The licence status of each cited monograph must be re-verified when the file is refreshed (see DATA_SOURCES.md).
+
+### ADR-0056: Public-by-default data tiering with proprietary escalation
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** The platform will launch globally and accept contributions from
+  users in many jurisdictions. A future proprietary data asset requires day-one
+  provenance labelling, a ToS that grants the platform commercial rights, and
+  ABS-clear collection for any data that ever enters the proprietary tier.
+  Publishing openly does not extinguish ABS obligations; the obligation
+  attaches to the physical sample, not the data licence. Separately, NP-MRD
+  data is licensed CC-BY-NC by its depositors and cannot be used in any
+  commercial context.
+- **Decision:** Three data tiers — public (CC0), proprietary (licensed), and
+  training_only (internal use, unpublished). Every spectrum and isolation
+  record is labelled with its tier and ABS status; every provenance manifest
+  carries both; the provenance validator rejects proprietary-tier analyses
+  that use non-commercial sources; isolation records default to training_only
+  and can only be promoted by curators. The revenue model is software,
+  services, and institutional licenses — not data sales in the near term. The
+  proprietary tier is a preserved option, not the primary business.
+- **Alternatives considered:** Publish everything under CC0 with no commercial
+  path (rejected: forfeits optionality that costs nothing to preserve); treat
+  all data as proprietary from day one (rejected: contradicts the global
+  academic launch and the trust-building that public registries depend on);
+  rely on "publish then license later" (rejected: not legally coherent; a CC0
+  publication cannot be re-licensed).
+- **Consequences:** Every contribution carries a small labelling burden (tier
+  + ABS status + source dataset) at upload. Most data will default to
+  training_only for the first year; that is acceptable. Public-tier is the
+  trustworthy open registry that builds reputation. Proprietary tier is
+  dormant until an ABS agreement and a substantial corpus exist. The ToS must
+  be finalized with a lawyer before the first external user; the
+  DATA_GOVERNANCE.md checklist is the brief.

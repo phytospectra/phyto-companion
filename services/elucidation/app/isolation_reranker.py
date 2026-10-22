@@ -214,9 +214,10 @@ def predicted_polarity_tier(smiles: str) -> PolarityTier | None:
     if mol.HasSubstructMatch(p["quaternary_n"]):
         # A permanent cation partitions with the aqueous end, always.
         return "very_polar"
-    # thresholds: < -1 very_polar | < 1.5 polar | < 3.5 mid | < 5.5
-    # nonpolar | else very_nonpolar
-    tier_index = sum(1 for cut in _LOGP_TIERS if logp >= cut)
+    # POLARITY_TIERS runs least-to-most polar, so the index DESCENDS
+    # with logP: logP < -1 -> very_polar (index 4), logP >= 5.5 ->
+    # very_nonpolar (index 0).
+    tier_index = 4 - sum(1 for cut in _LOGP_TIERS if logp >= cut)
     n_sugars = len(mol.GetSubstructMatches(p["pyranose"]))
     if n_sugars >= 2:
         tier_index = max(tier_index, 4)
@@ -301,8 +302,13 @@ def rerank_with_isolation(
             )
 
         # -- SMARTS-predicted class vs the TLC reagent responses --------
+        # Bare UV254 "aromatic" is not diagnostic (every natural product
+        # absorbs): overlap must be on a reagent-derived class, and only
+        # when the plate showed NONE of them may UV254 carry the match.
         if tlc_classes:
-            overlap = [c for c in tlc_classes if c in classes]
+            diagnostic = [c for c in tlc_classes if c != "aromatic"]
+            pool = diagnostic or tlc_classes
+            overlap = [c for c in pool if c in classes]
             if overlap:
                 delta = TLC_MATCH_BONUS
                 feature = (
