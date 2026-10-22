@@ -92,7 +92,7 @@ inference, submits real GNPS jobs, trains models, or processes spectral files >1
 | `services/nmr_search` | Structure search by observed HSQC peaks against NP-MRD, BMRB and nmrshiftdb2, with per-record licence metadata and a commercial-tier filter |
 | `services/llm` | Grounded Tier-3 generation; provider-agnostic (Vertex AI primary, OpenRouter fallback); refuses any request without retrieved context |
 | `services/orchestrator` | Planner agent, specialist agents (Spectroscopist, Metabolomist, Chemist, Biologist, QA/Critic), tool tiering, sandboxed code-as-actions, LLM-as-judge, audit logging, human-in-the-loop checkpoints |
-| `services/frontend` | Browser-based UI: guided workflows, spectrum viewers, network visualization, candidate tables, uncertainty badges, evidence panels |
+| `services/frontend` | Browser-based UI: guided workflows, spectrum viewers, network visualization, candidate tables, uncertainty badges, evidence panels — developed and published as a separate repository: [phytospectra/phyto-companion-frontend](https://github.com/phytospectra/phyto-companion-frontend) |
 | `shared/phyto_shared` | Pydantic models, JSON schemas, provenance/SHA256 utilities, uncertainty quantification, constants (solvents, adducts, MSI levels), domain exceptions |
 | `infrastructure/` | Terraform for GCP (Cloud Run, Vertex AI, Cloud SQL, BigQuery, GCS, IAM) + Cloud Build CI/CD |
 
@@ -263,7 +263,10 @@ Step-by-step delivery (per the working plan — each step awaits review before t
 
 ## License & Citation
 
-The software is available under the [Apache License 2.0](LICENSE). The curated
+The software is available under the [Apache License 2.0](LICENSE). The
+frontend application is maintained and published separately at
+[phytospectra/phyto-companion-frontend](https://github.com/phytospectra/phyto-companion-frontend),
+also under Apache License 2.0. The curated
 pharmacopoeial marker data in `data/pharmacopoeial_markers.json` is released
 under [CC0 1.0](data/LICENSE) (public domain); third-party datasets referenced
 by the platform remain governed per-source by
