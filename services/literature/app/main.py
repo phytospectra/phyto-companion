@@ -17,7 +17,7 @@ from functools import lru_cache
 from fastapi import APIRouter, FastAPI, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field
 
-from phyto_shared.exceptions import CloudServiceError
+from phyto_shared.exceptions import CloudServiceError, InvalidInputError
 from phyto_shared.literature_models import (
     LiteratureSearchRequest,
     LiteratureSearchResult,
@@ -190,6 +190,37 @@ def literature_target(
         clause += f" AND ({request.context})"
     return _guarded_search(
         clause, request.max_results, None, "literature.target", request.model_dump(), response
+    )
+
+
+class SpeciesLiteratureRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    compound_name: str = Field(..., min_length=1, max_length=200)
+    species_name: str = Field(..., min_length=1, max_length=200)
+    max_results: int = Field(default=10, ge=1, le=100)
+
+
+@router.post("/literature/species_search", response_model=LiteratureResponse)
+def literature_species_search(
+    request: SpeciesLiteratureRequest, response: Response
+) -> LiteratureResponse:
+    """Papers reporting this compound FROM this species (ADR-0052).
+
+    The (compound AND species) query built by ``build_species_query``
+    constrains retrieval to the organism, so hits are usable as
+    ``reported_in_species_paper`` provenance on candidates and as LLM
+    context for mechanism hypotheses.
+    """
+    from .species_search import build_species_query
+
+    try:
+        query = build_species_query(request.compound_name, request.species_name)
+    except InvalidInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _guarded_search(
+        query, request.max_results, None,
+        "literature.species_search", request.model_dump(), response,
     )
 
 

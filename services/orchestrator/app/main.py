@@ -22,6 +22,7 @@ Run locally::
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 import uuid
@@ -66,6 +67,8 @@ from .tool_registry import DEFAULT_REGISTRY, MockToolExecutor
 from .tool_tiering import ExecutionContext, HumanCheckpoint
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -538,11 +541,16 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     try:
+        if request.sample_metadata is not None and request.sample_metadata.solvent_warning():
+            # Unknown solvent is a warning, not an error (ADR-0052): the
+            # solvent compatibility filter is skipped, the run proceeds.
+            logger.warning("%s", request.sample_metadata.solvent_warning())
         graph = runtime.planner.plan(
             run_id=run_id,
             workflow=request.workflow,
             dry_run=request.dry_run,
             modalities=modalities,
+            sample_metadata=request.sample_metadata,
         )
     except KeyError:
         raise HTTPException(

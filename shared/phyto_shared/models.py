@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .constants import ADDUCT_MASSES, ConfidenceVerdict, ELEMENT_MASSES, ELEMENT_VALENCES
 from .exceptions import InvalidInputError
+from .taxonomy_models import ReportedCompound
 
 __all__ = [
     "StrictModel",
@@ -402,6 +403,19 @@ class CandidateRank(StrictModel):
         default=None,
         description="Modalities scored for this rank and the cross-modal gap; "
         "required reading before treating a rank as fused evidence (ADR-0050)",
+    )
+    taxon_prior_match: Literal["species", "genus", "family", "none"] = Field(
+        default="none",
+        description="Strongest taxonomic level at which this candidate is "
+        "reported from the sample's taxon; set by the taxonomy reranker "
+        "(ADR-0052). 'none' means no prior evidence OR the reranker did "
+        "not run -- check taxon_prior_provenance to distinguish.",
+    )
+    taxon_prior_provenance: list[ReportedCompound] = Field(
+        default_factory=list,
+        description="The database reports behind taxon_prior_match: which "
+        "database reported the compound, from which organism, at which "
+        "taxonomic depth, and under which reference (ADR-0054)",
     )
 
     @model_validator(mode="after")

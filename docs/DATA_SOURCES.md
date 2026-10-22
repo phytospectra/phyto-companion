@@ -90,7 +90,40 @@ paths.
 
 ---
 
-## 5. Pending Datasets
+## 5. Taxon Prior Databases (LOTUS, KNApSAcK, NPASS) — pilot snapshots
+
+Added 2026-10-22 for the taxonomy-aware reranking layer (ADR-0052, ADR-0054).
+All three live interfaces were probed on 2026-10-22; none was usable, so the
+pilot ships curated snapshots under `services/taxon_prior/app/data/`.
+
+| Field | LOTUS | KNApSAcK | NPASS |
+|---|---|---|---|
+| Dataset | LOTUS natural products (dereferenced organism–compound links) | KNApSAcK species–metabolite core | NPASS natural product activity–species database |
+| Live interface | `https://api.lotus.naturalproducts.net` | `http://www.knapsackfamily.com/KNApSAcK_core/` | `http://bcs.cmus.ac.kr:8313/NPASS2/` |
+| Probe result (2026-10-22) | connection refused | 301 redirect; no stable JSON API | host unreachable |
+| Pilot integration | snapshot `lotus_snapshot.json` + coded live path | snapshot `knapsack_snapshot.json` (static by design) | snapshot `npass_snapshot.json` + coded live path |
+| Snapshot size | 9 entries | 5 entries | 3 entries |
+| Licence | open (CC-BY-style per LOTUS releases; verify at refresh) | academic use (verify at refresh) | academic use (verify at refresh) |
+| Committed to git? | **Yes** — curated pilot fixtures | **Yes** | **Yes** |
+| Integration mode | **Local + cloud (snapshot), live path retained** | **Local + cloud (snapshot only)** | **Local + cloud (snapshot), live path retained** |
+
+> **Provenance note.** Snapshot entries carry a `reference` field naming the
+> original source; every reranked candidate exposes these as
+> `taxon_prior_provenance` (ADR-0052). Replacing a snapshot with a full
+> database export is a data refresh, not a code change; re-verify the licence
+> column at each refresh.
+
+## 6. Taxonomy Resolution (GBIF, ITIS)
+
+| Field | GBIF (primary) | ITIS (fallback) |
+|---|---|---|
+| Endpoint | `https://api.gbif.org/v1/species/match`, `/v1/species/{key}` | `https://www.itis.gov/ITISWebService/jsonservice/` |
+| Probe result (2026-10-22) | working (exact match, confidence 99) | working |
+| Auth | none | none |
+| Integration mode | live (cloud plane); `MockTaxonomyClient` locally | live fallback (cloud plane) |
+| Decision | ADR-0053 | ADR-0053 |
+
+## 7. Pending Datasets
 
 - **Owner-specific experimental Bruker acquisitions:** Not present in the analyzed workspace.
   When provided, Bruker raw parsing will be integrated and validated separately (ADR-0024).

@@ -15,14 +15,16 @@ from __future__ import annotations
 import hashlib
 from typing import Any, Callable
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from phyto_shared.constants import ToolTier
+from phyto_shared.constants import ConfidenceVerdict, ToolTier
 from phyto_shared.exceptions import CloudServiceError, InvalidInputError
 from phyto_shared.literature_models import PaperHit
 from phyto_shared.models import (
     Candidate,
+    CandidateRank,
     EvidenceGraph,
+    EvidenceItem,
     FusedNetwork,
     MolecularFormula,
     MSPeak,
@@ -33,6 +35,7 @@ from phyto_shared.nmr_search_models import (
     NMRSpectrumHit,
     NMRSpectrumSearchRequest,
 )
+from phyto_shared.taxonomy_models import TaxonPrior, TaxonResolution
 
 __all__ = [
     "ToolSpec",
@@ -146,6 +149,51 @@ class NMRPeakSearchOutput(_Contract):
     query_peak_count: int = Field(ge=1)
 
 
+# --- Tier 1: taxonomy and taxon prior (ADR-0052/0053/0054) ----------------
+
+
+class ResolveSpeciesInput(_Contract):
+    name: str = Field(..., min_length=1)
+
+
+class ResolveSpeciesOutput(_Contract):
+    resolution: TaxonResolution
+    lineage_depth: int = Field(..., ge=0, description="lineage ranks resolved")
+
+
+class TaxonPriorBuildInput(_Contract):
+    species: str | None = None
+    genus: str | None = None
+    family: str | None = None
+
+    @model_validator(mode="after")
+    def _at_least_one_rank(self) -> "TaxonPriorBuildInput":
+        if not (self.species or self.genus or self.family):
+            raise ValueError("provide at least one of species, genus, family")
+        return self
+
+
+class TaxonPriorBuildOutput(_Contract):
+    prior: TaxonPrior
+    n_species: int = Field(..., ge=0)
+    n_genus: int = Field(..., ge=0)
+    n_family: int = Field(..., ge=0)
+
+
+class SpeciesPaperSearchInput(_Contract):
+    """PubMed (compound AND species) search (ADR-0052 literature grounding)."""
+
+    compound_name: str = Field(..., min_length=1)
+    species_name: str = Field(..., min_length=1)
+    max_results: int = Field(default=5, ge=1, le=100)
+
+
+class SpeciesPaperSearchOutput(_Contract):
+    papers: list[PaperHit] = Field(default_factory=list)
+    total_count: int = Field(ge=0)
+    source_counts: dict[str, int] = Field(default_factory=dict)
+
+
 # --- Tier 2 ---------------------------------------------------------------
 
 
@@ -206,6 +254,36 @@ class NMRNetworkingInput(_Contract):
 
 class NMRNetworkingOutput(_Contract):
     network: FusedNetwork
+
+
+class RankCandidatesInput(_Contract):
+    """Elucidation ranking input, with optional taxonomy-aware reranking.
+
+    ``taxon_prior`` and ``apply_taxon_prior`` are the ADR-0052 wiring: the
+    prior arrives from the build-taxon-prior task, and when the user
+    supplied no species/family the planner never sets the flag, so the
+    ranker returns the spectral ranking untouched (with the skip logged).
+    """
+
+    h_1d: list[float] | None = None
+    c_1d: list[float] | None = None
+    hsqc: list[tuple[float, float]] | None = None
+    ms2: list[tuple[float, float]] | None = None
+    formula: str = Field(..., min_length=1)
+    solvent: str | None = None
+    taxon_prior: TaxonPrior | None = None
+    apply_taxon_prior: bool = False
+
+
+class RankCandidatesOutput(_Contract):
+    ranks: list[CandidateRank] = Field(default_factory=list)
+    top_candidate_name: str | None = None
+    top_evidence_graph: EvidenceGraph | None = None
+    taxon_prior_applied: bool = Field(
+        default=False,
+        description="False when the reranker did not run (no metadata, empty "
+        "prior) -- the ranks are then the unmodified spectral ranking",
+    )
 
 
 # --- Tier 3 ---------------------------------------------------------------
@@ -341,6 +419,9 @@ TIER1_TOOL_NAMES = (
     "io.parse_peak_csv",
     "literature.search",
     "nmr_search.peaks",
+    "taxonomy.resolve_species",
+    "taxon_prior.build",
+    "literature.search_compound_in_species",
 )
 TIER2_TOOL_NAMES = (
     "gnps.submit_job",
@@ -350,6 +431,7 @@ TIER2_TOOL_NAMES = (
     "hungarian.match",
     "nmr_networking.build",
     "qa.verify_grounding",
+    "elucidation.rank_candidates",
 )
 TIER3_TOOL_NAMES = (
     "llm.explain",
@@ -409,6 +491,24 @@ def build_default_registry() -> ToolRegistry:
             "Search NP-MRD, BMRB and nmrshiftdb2 by observed HSQC peak list",
             2.0, True, NMRPeakSearchInput, NMRPeakSearchOutput,
         ),
+        (
+            "taxonomy.resolve_species",
+            "Resolve a species name to a canonical taxon and lineage "
+            "(GBIF primary, ITIS fallback; ADR-0053)",
+            1.0, True, ResolveSpeciesInput, ResolveSpeciesOutput,
+        ),
+        (
+            "taxon_prior.build",
+            "Query LOTUS/KNApSAcK/NPASS for compounds reported from the "
+            "sample's taxon at species, genus and family level (ADR-0054)",
+            3.0, True, TaxonPriorBuildInput, TaxonPriorBuildOutput,
+        ),
+        (
+            "literature.search_compound_in_species",
+            "PubMed search constrained to (compound AND species): papers "
+            "reporting this compound from this organism (ADR-0052)",
+            2.0, True, SpeciesPaperSearchInput, SpeciesPaperSearchOutput,
+        ),
     ]
     tier2: list[tuple[str, str, float, bool, type, type]] = [
         (
@@ -447,6 +547,12 @@ def build_default_registry() -> ToolRegistry:
             "Independently audit a Tier-3 text: grounding score, uncited claims "
             "and fabricated citations",
             0.2, False, QAVerifyInput, QAVerifyOutput,
+        ),
+        (
+            "elucidation.rank_candidates",
+            "Rank structural candidates against observed spectra, then rerank "
+            "with the taxon prior and solvent compatibility (ADR-0052)",
+            2.0, False, RankCandidatesInput, RankCandidatesOutput,
         ),
     ]
     tier3: list[tuple[str, str, float, bool, type, type]] = [
@@ -752,6 +858,206 @@ def _mock_nmr_search(inp: NMRPeakSearchInput) -> NMRPeakSearchOutput:
     )
 
 
+# ---------------------------------------------------------------------------
+# Taxonomy-aware mocks (ADR-0052).  These delegate to the sibling services'
+# own mock clients when those packages are importable (the local test plane
+# aliases every service), and fail explicitly otherwise: fabricating an
+# inline taxonomy would duplicate fixture data and silently diverge from
+# the services' behaviour.
+# ---------------------------------------------------------------------------
+
+
+def _taxonomy_mock():
+    from taxonomy.clients import MockTaxonomyClient
+
+    return MockTaxonomyClient()
+
+
+def _mock_resolve_species(inp: ResolveSpeciesInput) -> ResolveSpeciesOutput:
+    try:
+        client = _taxonomy_mock()
+    except ImportError as exc:
+        raise CloudServiceError(
+            "taxonomy service not staged in this plane; cannot resolve species",
+            context={"name": inp.name},
+        ) from exc
+    resolution = client.resolve(inp.name)
+    if resolution is None:
+        raise InvalidInputError(
+            "mock taxonomy does not know this species", context={"name": inp.name}
+        )
+    return ResolveSpeciesOutput(
+        resolution=resolution, lineage_depth=len(resolution.lineage)
+    )
+
+
+def _mock_taxon_prior_build(inp: TaxonPriorBuildInput) -> TaxonPriorBuildOutput:
+    try:
+        from taxon_prior.prior import build_taxon_prior
+    except ImportError as exc:
+        raise CloudServiceError(
+            "taxon_prior service not staged in this plane; cannot build prior",
+            context={"species": inp.species},
+        ) from exc
+    prior = build_taxon_prior(
+        inp.species, inp.genus, inp.family, resolver=_taxonomy_mock()
+    )
+    return TaxonPriorBuildOutput(
+        prior=prior,
+        n_species=len(prior.species_compounds),
+        n_genus=len(prior.genus_compounds),
+        n_family=len(prior.family_compounds),
+    )
+
+
+def _mock_species_paper_search(
+    inp: SpeciesPaperSearchInput,
+) -> SpeciesPaperSearchOutput:
+    """Two deterministic (compound AND species) hits, PubMed-sourced.
+
+    The titles name both the compound and the species so downstream
+    consumers (and tests) can see the query actually constrained the
+    retrieval to the organism.
+    """
+    papers = [
+        PaperHit(
+            pmid="20000001",
+            doi="10.1000/mock.species.1",
+            title=(
+                f"{inp.compound_name} isolated from {inp.species_name} and "
+                "characterised by NMR"
+            ),
+            abstract=(
+                f"Bioactivity-guided isolation of {inp.compound_name} from "
+                f"{inp.species_name}; full NMR and HRMS assignment."
+            ),
+            year=2021,
+            authors=["D. Naturalproducts"],
+            journal="Journal of Natural Products",
+            source="PubMed",
+            url="https://pubmed.ncbi.nlm.nih.gov/20000001/",
+        ),
+        PaperHit(
+            pmid="20000002",
+            doi="10.1000/mock.species.2",
+            title=f"Chemical constituents of {inp.species_name}: {inp.compound_name} and related metabolites",
+            abstract=(
+                f"Phytochemical investigation of {inp.species_name} affording "
+                f"{inp.compound_name} among the major constituents."
+            ),
+            year=2019,
+            authors=["E. Ethnobotanist"],
+            journal="Phytochemistry",
+            source="PubMed",
+            url="https://pubmed.ncbi.nlm.nih.gov/20000002/",
+        ),
+    ][: inp.max_results]
+    return SpeciesPaperSearchOutput(
+        papers=papers,
+        total_count=len(papers),
+        source_counts={"PubMed": len(papers)},
+    )
+
+
+# Fixture library for the mock ranker: formula/mass verified via RDKit.
+_MOCK_RANK_LIBRARY: tuple[tuple[str, str, dict[str, int], float, float], ...] = (
+    # (name, smiles, formula counts, exact mass, mock spectral distance)
+    ("caffeine", "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
+     {"C": 8, "H": 10, "N": 4, "O": 2}, 194.080376, 1.00),
+    ("quercetin", "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12",
+     {"C": 15, "H": 10, "O": 7}, 302.042653, 1.10),
+    ("panduratin A", "CC(C)=CCC[C@@H](C)C(=O)c1c(O)cc(O)c(C)c1",
+     {"C": 16, "H": 22, "O": 3}, 262.156895, 1.15),
+)
+
+
+def _mock_rank_candidates(inp: RankCandidatesInput) -> RankCandidatesOutput:
+    """Deterministic mock spectral ranking + the REAL taxonomy reranker.
+
+    The mock distance is a fixture (the real ranker lives in the
+    elucidation service), but the reranking is genuinely executed when
+    the prior is present: the whole point of the identify workflow is
+    that ADR-0052's bonus/evidence logic runs end to end.  Without the
+    reranker importable the tool still returns the spectral ranking and
+    marks ``taxon_prior_applied=False`` explicitly rather than failing --
+    the skip is visible, not silent.
+    """
+    ranks: list[CandidateRank] = []
+    for name, smiles, counts, mass, distance in _MOCK_RANK_LIBRARY:
+        candidate = Candidate(
+            id=name.lower().replace(" ", "-"),
+            name=name,
+            smiles=smiles,
+            formula=MolecularFormula(counts=counts),
+            exact_mass=mass,
+            provenance="experimental",
+            source="orchestrator mock library",
+        )
+        ranks.append(
+            CandidateRank(
+                candidate=candidate,
+                score=distance,
+                ranking_convention="lower_is_better",
+                coverage=0.5,
+                verdict=ConfidenceVerdict.TENTATIVE,
+                evidence_graph=EvidenceGraph(
+                    node_id=candidate.id,
+                    claim=f"identity: {name}",
+                    evidence=[
+                        EvidenceItem(
+                            source_spectrum="observed:mock",
+                            spectral_feature="fixture spectral distance",
+                            relation="matched:mock",
+                            strength=round(max(0.0, 1.0 - distance / 4.0), 4),
+                        )
+                    ],
+                    confidence=0.5,
+                ),
+            )
+        )
+    ranks.sort(key=lambda r: r.score)
+
+    if not inp.apply_taxon_prior or inp.taxon_prior is None:
+        import logging
+
+        logging.getLogger(__name__).info(
+            "taxon prior skipped: no metadata"
+        )
+        top = ranks[0] if ranks else None
+        return RankCandidatesOutput(
+            ranks=ranks,
+            top_candidate_name=top.candidate.name if top else None,
+            top_evidence_graph=top.evidence_graph if top else None,
+            taxon_prior_applied=False,
+        )
+
+    try:
+        from elucidation.taxonomy_reranker import rerank_with_taxon_prior
+    except ImportError:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "elucidation service not staged in this plane; spectral ranking "
+            "returned without taxon reranking"
+        )
+        top = ranks[0] if ranks else None
+        return RankCandidatesOutput(
+            ranks=ranks,
+            top_candidate_name=top.candidate.name if top else None,
+            top_evidence_graph=top.evidence_graph if top else None,
+            taxon_prior_applied=False,
+        )
+
+    reranked = rerank_with_taxon_prior(ranks, inp.taxon_prior, inp.solvent)
+    top = reranked[0] if reranked else None
+    return RankCandidatesOutput(
+        ranks=reranked,
+        top_candidate_name=top.candidate.name if top else None,
+        top_evidence_graph=top.evidence_graph if top else None,
+        taxon_prior_applied=True,
+    )
+
+
 def _mock_qa_verify(inp: QAVerifyInput) -> QAVerifyOutput:
     """The grounding audit IS the real implementation -- no mock needed."""
     from phyto_shared.grounding import GROUNDING_MIN_SCORE, compute_grounding
@@ -789,7 +1095,11 @@ _MOCK_IMPLEMENTATIONS: dict[str, Callable[[Any], Any]] = {
     "stats.fdr_correction": _mock_fdr,
     "io.parse_peak_csv": _mock_parse_csv,
     "literature.search": _mock_literature_search,
+    "literature.search_compound_in_species": _mock_species_paper_search,
     "nmr_search.peaks": _mock_nmr_search,
+    "taxonomy.resolve_species": _mock_resolve_species,
+    "taxon_prior.build": _mock_taxon_prior_build,
+    "elucidation.rank_candidates": _mock_rank_candidates,
     "gnps.submit_job": _mock_gnps_submit,
     "gnps.fetch_results": _mock_gnps_fetch,
     "sirius.predict_formula": _mock_sirius,

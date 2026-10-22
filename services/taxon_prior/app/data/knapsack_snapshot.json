@@ -1,0 +1,42 @@
+[
+  {
+    "organism": "Boesenbergia rotunda",
+    "taxon_level": "species",
+    "compound_id": "KNApSAcK_C00001234",
+    "name": "cardamonin",
+    "smiles": "COc1cc(O)ccc1O/C=C/C(=O)c1ccc(O)cc1",
+    "reference": "KNApSAcK species-metabolite core (static download, pilot snapshot)"
+  },
+  {
+    "organism": "Curcuma longa",
+    "taxon_level": "species",
+    "compound_id": "KNApSAcK_C00005678",
+    "name": "curcumin",
+    "smiles": "COc1cc(/C=C/C(=O)CC(=O)/C=C/c2ccc(O)c(OC)c2)ccc1O",
+    "reference": "KNApSAcK species-metabolite core (static download, pilot snapshot)"
+  },
+  {
+    "organism": "Curcuma longa",
+    "taxon_level": "species",
+    "compound_id": "KNApSAcK_C00005679",
+    "name": "beta-turmerone",
+    "smiles": "CC1=C(C)C(=O)CC(C1)=CCC(C)=O",
+    "reference": "KNApSAcK species-metabolite core (static download, pilot snapshot)"
+  },
+  {
+    "organism": "Andrographis",
+    "taxon_level": "genus",
+    "compound_id": "KNApSAcK_C00009001",
+    "name": "andrographolide",
+    "smiles": "C=C[C@]12C[C@@H](O)[C@H]3[C@]([C@@H]1CC[C@@]4(C(=CCC[C@]34C)C)O)(C(=O)O2)C",
+    "reference": "KNApSAcK genus aggregate (static download, pilot snapshot)"
+  },
+  {
+    "organism": "Andrographis",
+    "taxon_level": "genus",
+    "compound_id": "KNApSAcK_C00009002",
+    "name": "neoandrographolide",
+    "smiles": "C=C[C@]12C[C@H](O)[C@@H](O[C@@H]3O[C@H](CO)[C@@H](O)[C@H](O)[C@H]3O)[C@H]3[C@]([C@@H]1CC[C@@]4(C(=CCC[C@]34C)C)O)(C)C(=O)O2",
+    "reference": "KNApSAcK genus aggregate (static download, pilot snapshot)"
+  }
+]

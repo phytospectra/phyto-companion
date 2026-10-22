@@ -1831,3 +1831,147 @@ own enforcement surface.
   `docs/WORKING_PRACTICES.md`. Attribution now depends on authors remembering
   to name the chat, which is exactly what the rule asks of them. This ADR does
   not change any code or runtime behaviour.
+
+---
+
+### ADR-0052: Taxonomy-aware reranking of structural candidates
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** A ranked candidate list from spectral matching alone ignores
+  the strongest prior a natural-products sample carries: the organism it came
+  from. Compounds reported from the same species (or genus/family) in LOTUS,
+  KNApSAcK and NPASS are far more likely a priori than database look-alikes
+  with equal spectral distance, and the extraction solvent modulates which
+  lipophilicity range the extract plausibly contains. The reranking must be
+  additive: `candidate_ranker`'s scoring logic is validated and must not be
+  touched, and a taxon prior is evidence to be weighed, never a filter.
+- **Decision:** A post-ranking reranker
+  (`services/elucidation/app/taxonomy_reranker.py`,
+  `rerank_with_taxon_prior`) consumes the ranked list and adjusts each
+  candidate's score by a bonus keyed to the strongest taxonomic level at
+  which its InChIKey is reported from the sample's taxon: species +0.30,
+  genus +0.15, family +0.05, no match 0.00. When the user supplied an
+  extraction solvent and a logP is computable (RDKit Crippen), the bonus is
+  multiplied by a smooth solvent-compatibility curve in [0, 1]
+  (`shared/phyto_shared/solvent_prior.py`) — a soft multiplier with no hard
+  exclusion at any finite logP. Scores keep their `ranking_convention`
+  (bonus subtracts from lower-is-better distances, adds to similarities);
+  the sort is stable so equal adjusted scores preserve input order. Each
+  matched candidate carries a `taxon_prior` EvidenceItem (source = the
+  database that supplied the prior, strength = applied bonus), a
+  `taxon_prior_match` level field, and full `taxon_prior_provenance`
+  (`ReportedCompound` records: database, organism, level, reference).
+  Candidates with a confirmed PubMed (compound AND species) hit additionally
+  get `reported_in_species_paper` evidence, which also flows to the LLM as
+  context for mechanism hypotheses. When the user supplied no species or
+  family, the reranker does not run: the orchestrator logs "taxon prior
+  skipped: no metadata" and proceeds with the original ranking. Unknown
+  solvents are a warning (filter skipped), never an error.
+- **Alternatives considered:** re-weighting inside `candidate_ranker`
+  (rejected: the task and the platform's modularity forbid modifying
+  validated scoring); a hard exclusion of compounds never reported from the
+  taxon (rejected: it would erase genuinely novel metabolites, which are the
+  platform's headline use case); a fixed additive bonus independent of
+  solvent (rejected: a hexane extract reporting a logP-1 glycoside is
+  chemically implausible and the bonus should say so); boosting by number of
+  database reports rather than taxonomic depth (rejected: report counts
+  measure database coverage, not evidence strength); making the prior a
+  filter on candidate generation (rejected: post-ranking is auditable and
+  reversible — the evidence item states the bonus, so a reader can undo it).
+- **Consequences:** A species-level report can lift a candidate past a
+  slightly better spectral match — intended: two candidates within ~0.3
+  distance units are spectrally indistinguishable given ShiftMPNN's error,
+  and the taxon prior is exactly the independent evidence that separates
+  them. `margin`, `ranking_interval` and `tied_candidates` are left
+  untouched by the reranker and still describe the spectral-only ranking;
+  the `taxon_prior` evidence item is the honest record of the adjustment.
+  The prior is only as good as its databases (see ADR-0054): absence of a
+  report is weak evidence of absence, which is why "no match" scores 0.00
+  rather than negative.
+
+---
+
+### ADR-0053: Taxonomy resolution source — GBIF primary, ITIS fallback
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** The taxon prior (ADR-0052) keys on a canonical name plus
+  lineage (species -> genus -> family), so every run needs one resolver that
+  returns stable taxon keys and a full hierarchy. The resolver must also fail
+  honestly: a fabricated lineage would silently poison every downstream
+  prior level.
+- **Decision:** GBIF (`/v1/species/match`) is the primary resolver: it is a
+  documented, stable, key-returning fuzzy matcher that answers with the full
+  kingdom..species lineage in one request (verified live on 2026-10-22:
+  exact match, confidence 99, for the pilot species). ITIS
+  (`searchByScientificName` + `getFullHierarchyFromTSN`) is the fallback for
+  names GBIF does not know; its "Division" rank is normalised to phylum.
+  `resolve_species` raises `InvalidInputError` when NEITHER provider
+  resolves the name (an empty prior must be built from an honest "no
+  reports", not a guessed lineage) and `CloudServiceError` when both were
+  unreachable (a network failure is not a taxonomy verdict). Lineage walks
+  (`get_lineage`) use the GBIF full-record rank fields in one request.
+  Live transports are injectable so resolution logic is offline-testable.
+- **Alternatives considered:** ITIS primary (rejected: two requests per
+  resolve and no fuzzy matching, so every typo fails); GBIF alone
+  (rejected: single point of failure, and GBIF's backbone rejects some
+  orthographic variants ITIS accepts); Wikidata/GBIF backbone lookups by
+  free text (rejected: no rank guarantees); failing the whole workflow on
+  an unresolvable name (rejected for genus/family-only runs, where nothing
+  needs resolving; kept as an error when a user-supplied species name
+  resolves nowhere, because that input is wrong, not merely unrecorded).
+- **Consequences:** Two providers must stay behind one `TaxonomyClient`
+  protocol; `MockTaxonomyClient` implements it with the real GBIF usageKeys
+  so local-plane runs and tests see production-shaped data. Rate limits are
+  a cloud-plane concern (GBIF is generous; ITIS has none documented);
+  caching resolutions per run is future work.
+
+---
+
+### ADR-0054: Taxon prior databases — LOTUS, KNApSAcK, NPASS, with per-candidate provenance
+
+- **Date:** 2026-10-22
+- **Status:** accepted
+- **Deciders:** Project owner
+- **Context:** "Compounds reported from this taxon" is scattered across
+  three complementary natural-product databases with very different API
+  stability: all three were probed live on 2026-10-22 — GBIF-style clean
+  REST none of them has. LOTUS's documented API host
+  (`api.lotus.naturalproducts.net`) refused connections; KNApSAcK's site
+  redirects and exposes no stable JSON query API (its core IS a downloadable
+  species-metabolite table); NPASS's web endpoints (`bcs.cmus.ac.kr:8313`)
+  were unreachable. The pilot must still run offline, deterministically, and
+  without network in the local plane.
+- **Decision:** All three are integrated behind one `TaxonPriorClient`
+  protocol (`query_taxon(name, level) -> list[ReportedCompound]`). For the
+  pilot each client serves a small curated snapshot under
+  `services/taxon_prior/app/data/` (compound, SMILES, organism, taxon level,
+  reference; InChIKey computed from SMILES at load): this is the documented
+  pilot approach for KNApSAcK (its species-metabolite core is a static
+  download by nature) and for LOTUS/NPASS, whose live paths remain coded
+  (LOTUS API organism query; NPASS web endpoints) and degrade to the
+  snapshot on any transport error rather than failing the prior. Reports
+  deduplicate by InChIKey with species-level provenance preferred over
+  genus over family, and every reranked candidate carries its full
+  `ReportedCompound` provenance list (which database, which organism, which
+  level, which reference) — the bonus is never an unexplained number.
+- **Alternatives considered:** live-API-only clients (rejected: all three
+  endpoints failed the 2026-10-22 probe; the feature would be dead on
+  arrival and untestable offline); one database only (rejected: coverage of
+  the three overlaps only partially — e.g. the pilot's cardamonin genus
+  report exists only in LOTUS while the species report exists in KNApSAcK);
+  full database exports in git (rejected for the pilot: hundreds of MB;
+  snapshots are replaced by a data refresh, not a code change); dedup by
+  compound name (rejected: the same metabolite carries different names per
+  database; InChIKey is the only stable join key).
+- **Consequences:** Pilot priors are only as complete as the curated
+  snapshots — a compound missing from a snapshot reads as "no report", so
+  production must swap in full exports before the bonus weights mean
+  anything quantitatively; the code path does not change. Snapshot
+  freshness becomes an operational concern (recorded in
+  `docs/DATA_SOURCES.md`). Live LOTUS/NPASS response shapes were written
+  from their documentation and are unverifiable until the hosts answer;
+  they are defensively parsed and never crash the prior.

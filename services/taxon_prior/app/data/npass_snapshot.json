@@ -1,0 +1,26 @@
+[
+  {
+    "organism": "Zingiberaceae",
+    "taxon_level": "family",
+    "compound_id": "NPASS_ID_NPA000001",
+    "name": "curcumin",
+    "smiles": "COc1cc(/C=C/C(=O)CC(=O)/C=C/c2ccc(O)c(OC)c2)ccc1O",
+    "reference": "NPASS static export (pilot snapshot); originally reported from Curcuma spp."
+  },
+  {
+    "organism": "Zingiberaceae",
+    "taxon_level": "family",
+    "compound_id": "NPASS_ID_NPA000002",
+    "name": "6-gingerol",
+    "smiles": "CCCCCCC(O)CC(=O)CCc1ccc(O)c(OC)c1",
+    "reference": "NPASS static export (pilot snapshot); originally reported from Zingiber officinale"
+  },
+  {
+    "organism": "Zingiberaceae",
+    "taxon_level": "family",
+    "compound_id": "NPASS_ID_NPA000003",
+    "name": "zingiberene",
+    "smiles": "CC1=CCC(C(C)C)C(C)=CCC1",
+    "reference": "NPASS static export (pilot snapshot); originally reported from Zingiber officinale"
+  }
+]

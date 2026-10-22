@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "phyto-companion-taxonomy"
+version = "0.1.0"
+description = "PhytoCompanion taxonomy service: species resolution (GBIF primary, ITIS fallback) and lineage walks"
+requires-python = ">=3.11"
+license = { text = "TBD" }
+dependencies = [
+    "phyto-companion-shared>=0.1.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "requests>=2.31",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

@@ -11,6 +11,7 @@ verification, and logging only.
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -22,6 +23,7 @@ from phyto_shared.constants import ObservationModality, ToolTier, single_family_
 from phyto_shared.exceptions import InvalidInputError, ToolTierViolationError
 from phyto_shared.literature_models import PaperHit
 from phyto_shared.provenance import sha256_dict
+from phyto_shared.schemas import SampleMetadata
 
 from .audit_logger import ChainedAuditLogger
 from .qa_critic_agent import QACriticAgent
@@ -44,12 +46,15 @@ __all__ = [
     "WORKFLOW_MODALITY_REQUIREMENTS",
 ]
 
+logger = logging.getLogger(__name__)
+
 WorkflowName = Literal[
     "single_compound",
     "compare_extracts",
     "novelty_scan",
     "build_network",
     "mechanism_hypothesis",
+    "identify",
 ]
 
 
@@ -513,6 +518,135 @@ _TEMPLATES: dict[WorkflowName, Any] = {
     "mechanism_hypothesis": _mechanism_hypothesis_tasks,
 }
 
+
+# ---------------------------------------------------------------------------
+# Identify workflow (taxonomy-aware, ADR-0052)
+# ---------------------------------------------------------------------------
+
+
+def _identify_tasks(sample_metadata: SampleMetadata | None) -> list[Task]:
+    """Ingest -> resolve taxonomy -> build prior -> rank+rerank -> explain.
+
+    The two taxonomy tasks exist ONLY when the user supplied a species or
+    family: a prior built on a guessed organism would be fabrication, so
+    planning drops both steps (and the rerank flag) when the metadata is
+    absent, and the skip is logged and recorded on the graph instead of
+    passing silently (ADR-0052).  Task outputs -- the resolution, the
+    prior, the ranked candidates -- are the run's artifacts and are what
+    dependent tasks and the share view consume.
+    """
+    metadata = sample_metadata
+    has_taxon = bool(metadata and metadata.has_taxon_hint())
+    solvent = metadata.extraction_solvent if metadata else None
+
+    tasks: list[Task] = [
+        Task(
+            id="ingest-peaks",
+            description="Parse the uploaded peak list (ingestion)",
+            tool="io.parse_peak_csv",
+            inputs={"path": "fixtures/sample_peaks.csv"},
+        ),
+    ]
+    if has_taxon:
+        tasks.extend(
+            [
+                Task(
+                    id="resolve-taxonomy",
+                    description="Resolve the sample's species via the taxonomy service (GBIF, ITIS fallback)",
+                    tool="taxonomy.resolve_species",
+                    inputs={"name": metadata.species or ""},
+                    depends_on=["ingest-peaks"],
+                ),
+                Task(
+                    id="build-taxon-prior",
+                    description="Query LOTUS/KNApSAcK/NPASS for compounds reported from the taxon",
+                    tool="taxon_prior.build",
+                    inputs={
+                        "species": metadata.species,
+                        "genus": metadata.genus,
+                        "family": metadata.family,
+                    },
+                    depends_on=["resolve-taxonomy"],
+                    consumes=["resolve-taxonomy"],
+                ),
+            ]
+        )
+    else:
+        logger.info("taxon prior skipped: no metadata")
+    tasks.append(
+        Task(
+            id="elucidate",
+            description=(
+                "Rank structural candidates against the spectra, then rerank "
+                "with the taxon prior and solvent compatibility (ADR-0052)"
+                if has_taxon
+                else "Rank structural candidates against the spectra"
+            ),
+            tool="elucidation.rank_candidates",
+            inputs={
+                "h_1d": [7.4, 6.9],
+                "c_1d": [130.0, 115.0],
+                "hsqc": [[6.9, 115.0]],
+                "formula": "C16H22O3",
+                "solvent": solvent,
+                "apply_taxon_prior": has_taxon,
+            },
+            depends_on=(
+                ["ingest-peaks", "build-taxon-prior"] if has_taxon else ["ingest-peaks"]
+            ),
+            consumes=["ingest-peaks"] + (["build-taxon-prior"] if has_taxon else []),
+        )
+    )
+    if metadata and metadata.species:
+        tasks.append(
+            Task(
+                id="literature-ground",
+                description=(
+                    "Search PubMed for the top candidate reported from the "
+                    "sample species (compound AND species)"
+                ),
+                tool="literature.search_compound_in_species",
+                inputs={"species_name": metadata.species, "max_results": 5},
+                depends_on=["elucidate"],
+                consumes=["elucidate"],
+            )
+        )
+    tasks.extend(
+        [
+            Task(
+                id="approve-claim",
+                description=(
+                    "HUMAN CHECKPOINT: review evidence (including taxon prior) "
+                    "before any CONFIRMED identification claim"
+                ),
+                tool=None,
+                requires_checkpoint=HumanCheckpoint.BEFORE_CONFIRMED_CLAIM,
+                depends_on=(
+                    ["elucidate", "literature-ground"]
+                    if metadata and metadata.species
+                    else ["elucidate"]
+                ),
+                consumes=["elucidate"],
+            ),
+            Task(
+                id="confirm-identity",
+                description="Record the identification claim after approval",
+                tool=None,
+                depends_on=["approve-claim"],
+                consumes=["approve-claim"],
+            ),
+            Task(
+                id="explain-result",
+                description="Generate a natural-language explanation of the evidence",
+                tool="llm.explain",
+                inputs={"evidence_graph": _EVIDENCE_GRAPH},
+                depends_on=["confirm-identity"],
+                consumes=["confirm-identity"],
+            ),
+        ]
+    )
+    return tasks
+
 # Minimum evidence a workflow needs to be worth running at all: AT LEAST ONE
 # of these modalities must have been observed.  Per-task pruning alone is not
 # enough, because a template can keep a path that reaches no defensible
@@ -534,20 +668,53 @@ WORKFLOW_MODALITY_REQUIREMENTS: dict[WorkflowName, frozenset[ObservationModality
         {ObservationModality.HSQC, ObservationModality.MS2}
     ),
     "mechanism_hypothesis": frozenset({ObservationModality.HSQC}),
+    "identify": frozenset(
+        {ObservationModality.H_1D, ObservationModality.C_1D,
+         ObservationModality.HSQC, ObservationModality.MS2}
+    ),
 }
 
 
 # Tasks whose inputs are completed from a dependency's output before execution.
 # Each entry maps an input key to (source_task_id, output_field).  Keeping this
 # declarative means the engine has one auditable place where dataflow happens,
-# rather than per-template glue code.
+# rather than per-template glue code.  A source task that the graph does not
+# contain (the identify workflow drops the taxonomy pair when the user supplied
+# no species/family) leaves the input key absent on purpose.
 _INPUT_WIRING: dict[str, dict[str, tuple[str, str]]] = {
     "hypothesize-mechanism": {"context_papers": ("literature-search", "papers")},
     "verify-grounding": {
         "text": ("hypothesize-mechanism", "hypothesis"),
         "context_papers": ("literature-search", "papers"),
     },
+    "elucidate": {"taxon_prior": ("build-taxon-prior", "prior")},
+    "literature-ground": {"compound_name": ("elucidate", "top_candidate_name")},
+    "explain-result": {"evidence_graph": ("elucidate", "top_evidence_graph")},
 }
+
+
+def _species_aware_literature(tasks: list[Task], species: str) -> list[Task]:
+    """Make a mechanism-hypothesis literature step species-aware (ADR-0052).
+
+    ``search_compound_in_species`` narrows PubMed to (compound AND
+    species), so the papers handed to ``llm.hypothesize`` as
+    ``context_papers`` become "reported from THIS organism" evidence --
+    exactly the context a mechanism hypothesis for a natural product
+    needs, instead of a generic compound query.
+    """
+    for task in tasks:
+        if task.id == "literature-search":
+            task.tool = "literature.search_compound_in_species"
+            task.inputs = {
+                "compound_name": "andrographolide",  # the workflow's top candidate
+                "species_name": species,
+                "max_results": 5,
+            }
+            task.description = (
+                "Retrieve literature for the top candidate reported from "
+                f"{species} (PubMed compound AND species query)"
+            )
+    return tasks
 
 
 def _missing_modality_requirement(
@@ -689,6 +856,7 @@ class PlannerAgent:
         workflow: WorkflowName,
         dry_run: bool,
         modalities: frozenset[ObservationModality] | None = None,
+        sample_metadata: SampleMetadata | None = None,
     ) -> TaskGraph:
         """Build the task graph for one workflow.
 
@@ -702,8 +870,20 @@ class PlannerAgent:
         gets an NMR workflow that says what it could not do, instead of a
         fused workflow that fails at the SIRIUS step or, worse, silently
         reports success without the mass constraint.
+
+        ``sample_metadata`` carries the biological provenance (species/
+        genus/family, extraction solvent) that drives the identify
+        workflow's taxonomy steps (ADR-0052).  Without a species or
+        family the taxonomy tasks are simply not planned and the skip is
+        logged -- an unknown organism is not an error, but a fabricated
+        lineage would be.
         """
-        tasks = _TEMPLATES[workflow]()
+        if workflow == "identify":
+            tasks = _identify_tasks(sample_metadata)
+        else:
+            tasks = _TEMPLATES[workflow]()
+            if workflow == "mechanism_hypothesis" and sample_metadata and sample_metadata.species:
+                tasks = _species_aware_literature(tasks, sample_metadata.species)
         # Planning-time validation: every referenced tool must exist.
         for task in tasks:
             if task.tool is not None:
@@ -842,10 +1022,16 @@ class WorkflowEngine:
         left exactly as planned.  A dependency that did not produce the
         expected field leaves the key absent, and the tool's input schema then
         rejects the call -- failing loudly rather than running on stale or
-        fabricated evidence.
+        fabricated evidence.  A wiring SOURCE the graph does not contain
+        (the identify workflow plans no taxonomy tasks without metadata)
+        is treated the same way: the key stays absent and the tool decides
+        what an absent prior means.
         """
         inputs = dict(task.inputs)
+        known_ids = {known.id for known in graph.tasks}
         for key, (source_task_id, field) in _INPUT_WIRING.get(task.id, {}).items():
+            if source_task_id not in known_ids:
+                continue
             source = graph.task_by_id(source_task_id)
             if source.output is not None and field in source.output:
                 inputs[key] = source.output[field]

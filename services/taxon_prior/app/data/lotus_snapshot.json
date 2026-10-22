@@ -1,0 +1,74 @@
+[
+  {
+    "organism": "Boesenbergia rotunda",
+    "taxon_level": "species",
+    "compound_id": "LTS0000001",
+    "name": "panduratin A",
+    "smiles": "CC(C)=CCC[C@@H](C)C(=O)c1c(O)cc(O)c(C)c1",
+    "reference": "LOTUS pilot snapshot (dereferenced export); Tan et al., J. Nat. Prod. 1991"
+  },
+  {
+    "organism": "Boesenbergia rotunda",
+    "taxon_level": "species",
+    "compound_id": "LTS0000002",
+    "name": "pinostrobin",
+    "smiles": "COc1ccc2c(c1)OC(C)CC2=O",
+    "reference": "LOTUS pilot snapshot (dereferenced export)"
+  },
+  {
+    "organism": "Boesenbergia rotunda",
+    "taxon_level": "species",
+    "compound_id": "LTS0000003",
+    "name": "pinocembrin",
+    "smiles": "O=c1cc(-c2ccccc2O)oc2cc(O)ccc12",
+    "reference": "LOTUS pilot snapshot (dereferenced export)"
+  },
+  {
+    "organism": "Boesenbergia",
+    "taxon_level": "genus",
+    "compound_id": "LTS0000101",
+    "name": "cardamonin",
+    "smiles": "COc1cc(O)ccc1O/C=C/C(=O)c1ccc(O)cc1",
+    "reference": "LOTUS pilot snapshot: genus-level aggregate over Boesenbergia spp."
+  },
+  {
+    "organism": "Curcuma longa",
+    "taxon_level": "species",
+    "compound_id": "LTS0000010",
+    "name": "curcumin",
+    "smiles": "COc1cc(/C=C/C(=O)CC(=O)/C=C/c2ccc(O)c(OC)c2)ccc1O",
+    "reference": "LOTUS pilot snapshot (dereferenced export)"
+  },
+  {
+    "organism": "Curcuma longa",
+    "taxon_level": "species",
+    "compound_id": "LTS0000011",
+    "name": "demethoxycurcumin",
+    "smiles": "COc1cc(/C=C/C(=O)CC(=O)/C=C/c2ccc(O)cc2)ccc1O",
+    "reference": "LOTUS pilot snapshot (dereferenced export)"
+  },
+  {
+    "organism": "Curcuma longa",
+    "taxon_level": "species",
+    "compound_id": "LTS0000012",
+    "name": "ar-turmerone",
+    "smiles": "CC(C)c1cccc(C(C)=CCC(C)=O)c1",
+    "reference": "LOTUS pilot snapshot (dereferenced export)"
+  },
+  {
+    "organism": "Curcuma",
+    "taxon_level": "genus",
+    "compound_id": "LTS0000110",
+    "name": "germacrone",
+    "smiles": "CC(=O)C(=C)C=CC(C)=CCC(C)=C1CCC=C(C)C1",
+    "reference": "LOTUS pilot snapshot: genus-level aggregate over Curcuma spp."
+  },
+  {
+    "organism": "Andrographis paniculata",
+    "taxon_level": "species",
+    "compound_id": "LTS0000020",
+    "name": "andrographolide",
+    "smiles": "C=C[C@]12C[C@@H](O)[C@H]3[C@]([C@@H]1CC[C@@]4(C(=CCC[C@]34C)C)O)(C(=O)O2)C",
+    "reference": "LOTUS pilot snapshot (dereferenced export)"
+  }
+]

@@ -20,6 +20,7 @@ __all__ = [
     "PHARMACOLOGY_DISCLAIMER",
     "SpectrumUploadRequest",
     "SpectrumUploadResponse",
+    "SampleMetadata",
     "AnalysisRequest",
     "AnalysisResponse",
     "NetworkRequest",
@@ -67,6 +68,57 @@ class SpectrumUploadResponse(StrictModel):
 # ---------------------------------------------------------------------------
 
 
+class SampleMetadata(StrictModel):
+    """User-supplied biological provenance of one sample.
+
+    Species/genus/family drive the taxonomy-aware reranker (ADR-0052):
+    when at least one of them is present the identify workflow resolves
+    the taxon and builds a compound prior; when none is, the reranker is
+    skipped rather than run on a guessed organism.  The extraction
+    solvent modulates the prior bonus softly -- an unknown solvent is a
+    WARNING (the solvent filter is skipped), never an error: rejecting a
+    sample because its solvent was phrased unusually would trade a
+    heuristic for a hard failure.
+    """
+
+    species: str | None = Field(default=None, min_length=1)
+    genus: str | None = Field(default=None, min_length=1)
+    family: str | None = Field(default=None, min_length=1)
+    extraction_solvent: str | None = Field(
+        default=None,
+        description="Primary extraction solvent; see "
+        "phyto_shared.solvent_prior.KNOWN_SOLVENTS",
+    )
+
+    def has_taxon_hint(self) -> bool:
+        """True when at least one taxonomic rank was supplied."""
+        return bool(self.species or self.genus or self.family)
+
+    def solvent_is_known(self) -> bool:
+        """True when the solvent, if supplied, has a compatibility profile."""
+        if self.extraction_solvent is None:
+            return True
+        from .solvent_prior import KNOWN_SOLVENTS, normalise_solvent
+
+        try:
+            normalise_solvent(self.extraction_solvent)
+        except Exception:
+            return False
+        return True
+
+    def solvent_warning(self) -> str | None:
+        """The warning to surface for an unrecognised solvent, else None."""
+        if self.extraction_solvent is None or self.solvent_is_known():
+            return None
+        from .solvent_prior import KNOWN_SOLVENTS
+
+        return (
+            f"unknown extraction solvent {self.extraction_solvent!r}: the "
+            "solvent compatibility filter will be skipped (known solvents: "
+            f"{', '.join(sorted(KNOWN_SOLVENTS))})"
+        )
+
+
 class AnalysisRequest(StrictModel):
     sample_id: str = Field(..., min_length=1)
     workflow: Literal[
@@ -75,6 +127,7 @@ class AnalysisRequest(StrictModel):
         "novelty_scan",
         "build_network",
         "mechanism_hypothesis",
+        "identify",
     ]
     parameters: dict[str, Any] = Field(default_factory=dict)
     modalities: list[str] = Field(
@@ -84,6 +137,14 @@ class AnalysisRequest(StrictModel):
         "then unconstrained and treats every workflow step as possible. "
         "When set, steps the supplied evidence cannot support are pruned and "
         "reported instead of being run (ADR-0050).",
+    )
+    sample_metadata: SampleMetadata | None = Field(
+        default=None,
+        description="Biological provenance of the sample (species/genus/"
+        "family, extraction solvent). When a taxon hint is present the "
+        "identify workflow resolves the taxonomy and reranks candidates "
+        "against the taxon prior (ADR-0052); otherwise that step is "
+        "skipped with a logged reason.",
     )
     dry_run: bool = Field(
         default=False,

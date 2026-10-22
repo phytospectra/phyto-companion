@@ -42,3 +42,8 @@ _alias_package("billing", "billing")
 _alias_package("literature", "literature")
 _alias_package("llm", "llm")
 _alias_package("nmr_search", "nmr_search")
+# Taxonomy services (ADR-0052/0053/0054): same aliasing contract, and the
+# taxon_prior service imports ``taxonomy.clients`` exactly as it will in
+# the container once staged.
+_alias_package("taxonomy", "taxonomy")
+_alias_package("taxon_prior", "taxon_prior")
