@@ -3,9 +3,11 @@ name = "phyto-companion"
 version = "0.1.0"
 description = "Agentic AI companion for academic natural product drug discovery (monorepo root)"
 requires-python = ">=3.11"
-license = { text = "TBD" }
+license = { text = "Apache-2.0" }
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["shared"]
-addopts = "-q"

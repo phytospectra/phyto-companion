@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Phytospectra — a phytointelligence platform for NMR–MS natural products analysis"
+abstract: >-
+  Phytospectra unifies NMR spectroscopy, mass spectrometry, and metabolomics
+  into a single agentic workflow: a complex plant extract goes in; ranked,
+  evidence-graded structural and biological hypotheses come out.
+type: software
+authors:
+  - family-names: Banerjee
+    given-names: Subhadip
+    email: ami.subhadipbanerjee@gmail.com
+    affiliation: "[AFFILIATION TBD]"
+    orcid: "[ORCID TBD]"
+  - family-names: Charoensub
+    given-names: Rawiwan
+    affiliation: "[AFFILIATION TBD]"
+    orcid: "[ORCID TBD]"
+  - family-names: Jayadee
+    given-names: Wutichai
+    affiliation: "[AFFILIATION TBD]"
+    orcid: "[ORCID TBD]"
+  - family-names: Cordell
+    given-names: Geoffrey
+    affiliation: "[AFFILIATION TBD]"
+    orcid: "[ORCID TBD]"
+repository-code: "https://github.com/phytospectra/phyto-companion"
+url: "https://phytospectra.com"
+license: Apache-2.0
+version: "0.1.0"
+date-released: "[DATE TBD — to be filled at Zenodo release]"
+keywords:
+  - cheminformatics
+  - natural products
+  - NMR
+  - mass spectrometry
+  - metabolomics
+  - evidence architecture

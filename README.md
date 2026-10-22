@@ -2,7 +2,7 @@
 
 **An agentic AI companion for academic natural product drug discovery.**
 
-Phytospectra unifies NMR spectroscopy, mass spectrometry, infrared spectroscopy, and
+Phytospectra unifies NMR spectroscopy, mass spectrometry, and
 metabolomics into a single agentic workflow: a complex plant extract goes in; ranked,
 evidence-graded structural and biological hypotheses come out.
 
@@ -148,14 +148,18 @@ phyto-companion/
 
 ## Quick Start (Local Development)
 
-Requirements: Python 3.11+, Docker Desktop, ~2 GB free RAM. No GPU, no GCP account,
+Prerequisites: uv (https://docs.astral.sh/uv/) and Python 3.12+. On macOS:
+`brew install uv`; on Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`.
+
+Requirements: Python 3.12+, Docker Desktop, ~2 GB free RAM. No GPU, no GCP account,
 no large databases needed.
 
 ```bash
 cd phyto-companion
 
 # 1. Create an isolated environment and install dependencies
-make install          # .venv via uv; pydantic, pytest, fastapi, uvicorn, httpx
+make install          # .venv via uv; pydantic, fastapi, rdkit, numpy, scipy,
+                      # pandas, networkx, scikit-learn, matplotlib, pytest, httpx, stripe
 
 # 2. Run the test suite — all external services mocked, LLM stubbed
 make test             # pytest (shared + orchestrator; <1 s, no cloud calls)
@@ -259,6 +263,9 @@ Step-by-step delivery (per the working plan — each step awaits review before t
 
 ## License & Citation
 
-To be decided with the research group (open-source intended for the academic core;
-freemium hosting for advanced tiers). Every analysis emits a provenance manifest and
-model/version metadata so results remain citable and reproducible.
+The software is available under the [Apache License 2.0](LICENSE). The curated
+pharmacopoeial marker data in `data/pharmacopoeial_markers.json` is released
+under [CC0 1.0](data/LICENSE) (public domain); third-party datasets referenced
+by the platform remain governed per-source by
+[DATA_SOURCES.md](docs/DATA_SOURCES.md). Citation metadata is provided in
+[CITATION.cff](CITATION.cff).

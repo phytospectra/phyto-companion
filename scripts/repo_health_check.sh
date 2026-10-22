@@ -164,15 +164,15 @@ hdr "5. TESTS"
 if [ "$SKIP_TESTS" -eq 1 ]; then warn "Tests skipped (--skip-tests)"
 elif [ ! -d tests ]; then fail "No tests/ directory"
 else
-  if COLL=$("$PY" -m pytest --collect-only 2>&1 | tail -1); then pass "pytest collection: $COLL"; else fail "pytest collection FAILED"; fi
+  if COLL=$("$PY" -m pytest --collect-only -q 2>&1 | tail -1); then pass "pytest collection: $COLL"; else fail "pytest collection FAILED"; fi
   for feat in isolation data_governance chromatography layer_chain auth; do
-    N=$("$PY" -m pytest --collect-only 2>/dev/null | grep -cE "test_${feat}|${feat}_test" || true)
+    N=$("$PY" -m pytest --collect-only -q 2>/dev/null | grep -cE "test_${feat}|${feat}_test" || true)
     [ "$N" -gt 0 ] && echo "    ${feat}: $N test(s)"
   done
   if [ "$FAST" -eq 1 ]; then
-    run_check "Tests pass (fast: -x)" "Tests FAILED (fast)" "$PY" -m pytest -x
+    run_check "Tests pass (fast: -x)" "Tests FAILED (fast)" "$PY" -m pytest -q -x
   else
-    if "$PY" -m pytest >/tmp/rhc_test 2>&1; then
+    if "$PY" -m pytest -q >/tmp/rhc_test 2>&1; then
       SUMMARY=$(grep -E '[0-9]+ passed' /tmp/rhc_test | tail -1)
       pass "Full suite: $SUMMARY"
     else
@@ -225,8 +225,11 @@ else
   cd "$REPO_ROOT" || exit 1
 fi
 
-hdr "7. FRONTEND ↔ BACKEND CONTRACT (heuristic)"
-if [ -n "$FRONTEND" ]; then
+hdr "7. FRONTEND ↔ BACKEND CONTRACT (check_fe_contract.py)"
+if [ -n "$FRONTEND" ] && [ -f "$REPO_ROOT/scripts/check_fe_contract.py" ]; then
+  run_check "FE contract types match BE surface" "FE contract check FAILED" \
+    "$PY" "$REPO_ROOT/scripts/check_fe_contract.py"
+elif [ -n "$FRONTEND" ]; then
   BE=$(grep -rl 'class CandidateRank' --include='*.py' shared services 2>/dev/null | head -1)
   FE=$(grep -rl 'CandidateRank' --include='*.ts' --include='*.tsx' "$FRONTEND/src" 2>/dev/null | grep -iE '(type|schema|api)' | head -1)
   if [ -n "$BE" ] && [ -n "$FE" ]; then

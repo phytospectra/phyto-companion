@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "phyto-companion-ingestion"
 version = "0.1.0"
-description = "PhytoCompanion ingestion service: NMR, MS, and IR parsers and validators"
+description = "PhytoCompanion ingestion service: NMR parsers and validators"
 requires-python = ">=3.11"
 license = { text = "TBD" }
 dependencies = [
