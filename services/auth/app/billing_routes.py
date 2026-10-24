@@ -26,7 +26,7 @@ import secrets
 from typing import Any, Protocol
 
 import stripe
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from phyto_shared.plans import PLAN_FEATURES, plan_at_or_above

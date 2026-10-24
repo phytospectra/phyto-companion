@@ -13,10 +13,9 @@ uncited prose would make every test of grounding vacuous.
 
 from __future__ import annotations
 
-import hashlib
 import os
 import re
-from typing import Literal, Protocol
+from typing import Protocol
 
 from phyto_shared.exceptions import CloudServiceError
 from phyto_shared.literature_models import LLMOperation, PaperHit

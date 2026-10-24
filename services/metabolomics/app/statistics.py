@@ -7,10 +7,10 @@ commercial license required); PLS-DA is sufficient (ADR-0015).
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 from scipy import stats
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.decomposition import PCA

@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from phyto_shared.constants import (
     ELEMENT_MASSES,

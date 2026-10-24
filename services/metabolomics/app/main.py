@@ -21,7 +21,7 @@ from auth.config import AuthConfig
 from auth.install import install_auth
 
 from . import __version__
-from .differential_analysis import compare_groups, dose_response_analysis, time_course_analysis, volcano_plot_data
+from .differential_analysis import compare_groups, volcano_plot_data
 from .feature_detection import DetectParams, FeatureTable, get_detector
 from .multi_block_fusion import mfa, consensus_pca, permutation_test_fusion, pls_da_concat
 from .normalization import flag_low_quality, normalize, qc_correction

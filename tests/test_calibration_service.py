@@ -3,7 +3,6 @@ store isolation, and the API endpoints."""
 
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 
 from phyto_shared.chromatography import LCMethod, ReferenceStandard

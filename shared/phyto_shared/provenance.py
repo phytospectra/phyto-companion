@@ -20,7 +20,6 @@ import json
 import logging
 import os
 import platform
-import sys
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path

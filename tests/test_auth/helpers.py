@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
-from fastapi.testclient import TestClient
 
 from auth.firebase_auth import MockFirebaseAuthClient
 from auth.middleware import AuthMiddleware

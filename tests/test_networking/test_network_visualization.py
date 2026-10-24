@@ -7,7 +7,6 @@ import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import pytest
 
 from networking.fused_network import fuse_networks
 from networking.gnps_result_parser import parse_graphml
@@ -17,7 +16,6 @@ from networking.network_visualization import (
     to_cytoscape_json,
     to_graphml,
 )
-from networking.nmr_networking import HSQCEdge, HSQCNetwork, HSQCNode
 
 from test_gnps_result_parser import CLASSICAL, FBMN  # fixture texts
 

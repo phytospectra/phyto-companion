@@ -46,7 +46,6 @@ from orchestrator.specialist_agents import (
     SpectroscopistAgent,
 )
 from orchestrator.tool_registry import (
-    DEFAULT_REGISTRY,
     TIER1_TOOL_NAMES,
     TIER2_TOOL_NAMES,
     TIER3_TOOL_NAMES,

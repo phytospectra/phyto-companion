@@ -35,10 +35,10 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from phyto_shared.audit_chain import ChainedAuditLogger
-from phyto_shared.data_governance import ABSStatus, DataTier, DEFAULT_ABS_STATUS, DEFAULT_DATA_TIER
+from phyto_shared.data_governance import ABSStatus, DEFAULT_ABS_STATUS
 from phyto_shared.isolation import (
     IsolationCompound,
     IsolationRecord,

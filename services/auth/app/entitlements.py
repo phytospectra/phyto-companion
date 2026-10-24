@@ -21,10 +21,9 @@ say and easy to get wrong):
 from __future__ import annotations
 
 import threading
-import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Literal, Protocol
+from typing import Protocol
 
 from phyto_shared.plans import PlanName, plan_features
 

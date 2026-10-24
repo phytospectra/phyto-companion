@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict
 from rdkit import Chem
 
 from phyto_shared.exceptions import InvalidInputError
-from phyto_shared.models import Candidate, CandidateRank, EvidenceGraph
+from phyto_shared.models import CandidateRank
 from phyto_shared.provenance import ProvenanceBuilder, sha256_dict
 
 from auth.config import AuthConfig

@@ -7,7 +7,6 @@ rather than hardcoded per call site.
 
 from __future__ import annotations
 
-import pytest
 
 from llm.clients import MockLLMClient
 from llm.tiers import (

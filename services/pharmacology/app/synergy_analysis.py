@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 from phyto_shared.exceptions import InvalidInputError

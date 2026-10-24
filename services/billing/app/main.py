@@ -13,7 +13,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 from fastapi import FastAPI

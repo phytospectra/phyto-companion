@@ -9,7 +9,6 @@ from phyto_shared.models import EvidenceItem
 
 from elucidation.candidate_ranker import (
     ObservedEvidence,
-    parse_formula_string,
     rank_candidates,
 )
 from elucidation.evidence_graph import RichEvidenceGraph, build_evidence_graph

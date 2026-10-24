@@ -13,7 +13,7 @@ import ast
 import shutil
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from phyto_shared.exceptions import SandboxError
 from phyto_shared.provenance import sha256_bytes

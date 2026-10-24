@@ -98,7 +98,7 @@ def render_bibtex(record: CitationRecord) -> str:
         f"  title = {{{record.title}}},",
         f"  author = {{{authors}}},",
         f"  year = {{{year}}},",
-        f"  howpublished = {{Phytospectra}},",
+        "  howpublished = {Phytospectra},",
         f"  note = {{{note}}},",
         f"  url = {{{url}}}",
         "}",

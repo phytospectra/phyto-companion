@@ -4,7 +4,6 @@ executor, and the visible report line."""
 
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 
 from phyto_shared.chromatography import LCMethod, ReferenceStandard

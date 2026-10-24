@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from phyto_shared.exceptions import InsufficientEvidenceError
 from phyto_shared.models import EvidenceGraph, EvidenceItem
 
-from .pathway_mapping import MOCK_TARGET_PATHWAYS, targets_to_pathways
+from .pathway_mapping import targets_to_pathways
 from .target_prediction import TargetPrediction
 
 __all__ = [

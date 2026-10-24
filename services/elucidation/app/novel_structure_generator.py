@@ -18,9 +18,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
 from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors
 
 from phyto_shared.exceptions import InvalidInputError
 from phyto_shared.models import Candidate, MolecularFormula

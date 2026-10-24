@@ -40,7 +40,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 
 from .data_governance import ABSStatus, DataTier, DEFAULT_ABS_STATUS, DEFAULT_DATA_TIER
 from .models import StrictModel

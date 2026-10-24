@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from phyto_shared.exceptions import InvalidInputError
 

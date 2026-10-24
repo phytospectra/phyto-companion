@@ -11,7 +11,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Literal, Protocol, Sequence
+from typing import Literal, Protocol
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field

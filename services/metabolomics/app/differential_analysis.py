@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Literal
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 from scipy.optimize import curve_fit
 from scipy import stats
 

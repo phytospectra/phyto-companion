@@ -27,7 +27,6 @@ import threading
 import time
 import xml.etree.ElementTree as ET
 from typing import Any, Protocol
-from urllib.parse import quote
 
 from phyto_shared.exceptions import CloudServiceError
 from phyto_shared.literature_models import PaperHit

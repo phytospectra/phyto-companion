@@ -22,7 +22,6 @@ import hashlib
 import json
 import os
 import re
-import stat
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
