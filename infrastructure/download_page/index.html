@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Download Phytospectra Desktop</title>
+  <style>
+    :root { --ink:#17324d; --accent:#1a4d8f; --accent2:#b22222; }
+    * { box-sizing:border-box; margin:0; }
+    body { font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+           color:var(--ink); background:#f7f9fc; line-height:1.6; }
+    header { background:linear-gradient(135deg,#0f2c4c 0%,#1a4d8f 100%);
+             color:#fff; padding:64px 24px 48px; text-align:center; }
+    header h1 { font-size:2.2rem; margin-bottom:8px; }
+    header p { opacity:.85; max-width:640px; margin:0 auto; }
+    main { max-width:880px; margin:-24px auto 48px; padding:0 24px; }
+    .card { background:#fff; border-radius:12px; box-shadow:0 6px 24px rgba(15,44,76,.08);
+            padding:32px; margin-bottom:24px; }
+    .downloads { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+    .btn { display:inline-block; padding:14px 28px; border-radius:8px; font-weight:600;
+           text-decoration:none; font-size:1.05rem; transition:transform .1s; }
+    .btn:hover { transform:translateY(-2px); }
+    .btn-mac { background:var(--accent); color:#fff; }
+    .btn-win { background:#2d7d46; color:#fff; }
+    .how { counter-reset:step; }
+    .how li { margin:10px 0 10px 2em; }
+    footer { text-align:center; color:#6b7d90; font-size:.9rem; padding:24px; }
+    .meta { color:#6b7d90; font-size:.9rem; margin-top:8px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Phytospectra Desktop</h1>
+  <p>Point the app at the folder that holds your NMR or LC-MS data.
+     The analysis runs on the Phytospectra cloud; your report — DOCX plus a
+     zipped publication bundle — is written back into the folder you choose.</p>
+</header>
+<main>
+  <div class="card">
+    <div class="downloads">
+      <a class="btn btn-mac" href="downloads/Phytospectra-macos.dmg" download>Download for macOS</a>
+      <a class="btn btn-win" href="downloads/Phytospectra-windows.exe" download>Download for Windows</a>
+    </div>
+    <p class="meta" id="version-note">Latest release: see the
+      <a href="https://github.com/phytospectra/phyto-companion/releases">GitHub releases page</a>
+      for version notes and checksums.</p>
+  </div>
+
+  <div class="card">
+    <h2>How it works</h2>
+    <ol class="how">
+      <li><strong>Sign in</strong> — the app opens your account page in the browser;
+          sign in there and the session is handed back to the app.</li>
+      <li><strong>Choose the data folder</strong> — Bruker experiment directories,
+          zipped Bruker exports, and mzML / mzXML / mgf files are detected automatically.</li>
+      <li><strong>Run the analysis</strong> — processing happens on Google Cloud;
+          only peak lists and metadata leave your workstation.</li>
+      <li><strong>Get the report</strong> — <code>report.docx</code> and a zipped
+          report package appear in your chosen output folder.</li>
+      <li><strong>Buy tokens</strong> — purchases are handled on the account page
+          (Stripe checkout); the desktop app never sees card data.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>Requirements</h2>
+    <p>macOS 12+ (Apple Silicon or Intel) · Windows 10/11 (64-bit) ·
+       Internet connection · A free account includes a monthly analysis allowance;
+       heavier workloads use tokens.</p>
+  </div>
+</main>
+<footer>
+  Phytospectra — an agentic AI companion for natural product drug discovery.
+  <br><a href="https://app.phytospectra.com">Open the web app</a> ·
+  <a href="https://github.com/phytospectra/phyto-companion">Source & citation</a>
+</footer>
+</body>
+</html>
