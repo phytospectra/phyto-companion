@@ -255,7 +255,7 @@ Step-by-step delivery (per the working plan — each step awaits review before t
 - [x] **Step 3** — Orchestrator service
 - [x] **Step 4** — Networking service (GNPS + NMR + fused MS²–HSQC)
 - [x] **Step 5** — Elucidation service
-- [ ] **Step 6** — Metabolomics + pharmacology services (delivered; awaiting review)
+- [x] **Step 6** — Metabolomics + pharmacology services (reviewed — see [REVIEW_metabolomics_pharmacology.md](REVIEW_metabolomics_pharmacology.md))
 - [ ] **Step 7** — Frontend
 - [ ] **Step 8** — Terraform infrastructure + deployment scripts
 - [ ] **Step 9** — Test suite
