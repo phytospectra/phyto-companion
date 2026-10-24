@@ -1,0 +1,56 @@
+# Unified full-plane orchestrator image (deployment, ADR-0039).
+#
+# One Cloud Run service runs the orchestrator with the ENTIRE specialist
+# plane staged on PYTHONPATH, matching the local full-plane boot verified
+# in tests.  Build context is the repository root:
+#   docker build -f infrastructure/Dockerfile.fullplane -t phyto-orchestrator .
+FROM python:3.12-slim
+
+WORKDIR /srv
+
+COPY shared/ /srv/shared/
+
+# Orchestrator + every specialist service it lazily imports, staged exactly
+# as the local full-plane build stages them (services/*/app -> <name>).
+COPY services/orchestrator/pyproject.toml /srv/orchestrator/pyproject.toml
+COPY services/orchestrator/app/ /srv/orchestrator/app/
+COPY services/auth/app/ /srv/auth/
+COPY services/billing/app/ /srv/billing/
+COPY services/ingestion/app/ /srv/ingestion/
+COPY services/nmr_preproc/app/ /srv/nmr_preproc/
+COPY services/metabolomics/app/ /srv/metabolomics/
+COPY services/lcms_preproc/app/ /srv/lcms_preproc/
+COPY services/calibration/app/ /srv/calibration/
+COPY services/isolation/app/ /srv/isolation/
+COPY services/elucidation/app/ /srv/elucidation/
+COPY services/networking/app/ /srv/networking/
+COPY services/nmr_search/app/ /srv/nmr_search/
+COPY services/pharmacology/app/ /srv/pharmacology/
+COPY services/literature/app/ /srv/literature/
+COPY services/llm/app/ /srv/llm/
+COPY services/taxonomy/app/ /srv/taxonomy/
+COPY services/taxon_prior/app/ /srv/taxon_prior/
+COPY services/retention/app/ /srv/retention/
+
+# matplotlib needs Agg in a container (no display); report.py / contour
+# figures are produced server-side.
+ENV MPLBACKEND=Agg
+
+# Runtime dependencies = union of every staged service's declared deps
+# plus the GCP clients used in cloud mode (auth token balance, pubsub
+# audit, Firestore).
+RUN pip install --no-cache-dir /srv/shared \
+    "pydantic>=2" fastapi uvicorn httpx "stripe>=9.0" \
+    firebase-admin google-cloud-firestore google-cloud-pubsub \
+    numpy scipy pandas networkx scikit-learn matplotlib rdkit requests \
+    python-docx \
+    && pip install --no-cache-dir /srv/orchestrator
+
+# taxon_prior bundles its snapshot JSONs inside the package (app/data/),
+# which the COPY above already stages in place.
+
+ENV PHYTO_ENV=cloud
+ENV PYTHONPATH=/srv
+EXPOSE 8080
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
