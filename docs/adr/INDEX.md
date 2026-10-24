@@ -79,3 +79,8 @@ authoritative full text of every numbered decision remains in
 | ADR-0064 | Retention-index normalization via co-injected anchor series | accepted | `services/elucidation/app/rt_reranker.py` |
 | ADR-0065 | Peak purity — co-elution detection forces AMBIGUOUS below threshold | accepted | `shared/phyto_shared/models.py` |
 | ADR-0066 | Pharmacopoeial marker prior — species authenticity as expectations, not proof | accepted | `services/orchestrator/app/layer_chain.py` |
+| ADR-0068 | NMR preprocessing provenance — every parameter recorded as evidence, implemented in-house | accepted | `shared/phyto_shared/metabolomics.py` |
+| ADR-0069 | LC-MS preprocessing adapter policy — adapter only, never a reimplementation | accepted | `services/lcms_preproc/app/main.py` |
+| ADR-0070 | O-PLS regression for continuous Y and VIP as first-class evidence | accepted | `shared/phyto_shared/metabolomics.py` |
+| ADR-0071 | STOCSY as an evidence layer — correlations are hypotheses, never assignments | accepted | `services/metabolomics/app/stocsy.py` |
+| ADR-0072 | Analytical reporting checklist as evidence, with visible gaps | accepted | `shared/phyto_shared/metabolomics.py` |
