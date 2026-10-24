@@ -1,0 +1,53 @@
+# Build Phytospectra Desktop installers for macOS and Windows.
+# Triggered by version tags (v*); artifacts attach to the GitHub release.
+name: desktop-release
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller python-docx numpy scipy matplotlib
+      - name: Build app bundle
+        run: scripts/build_desktop.sh
+      - name: Create DMG
+        run: |
+          cd desktop/dist
+          hdiutil create -volname Phytospectra -srcfolder Phytospectra.app \
+            -ov -format UDZO Phytospectra-macos.dmg || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Phytospectra-macos
+          path: desktop/dist/Phytospectra*
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller python-docx numpy scipy matplotlib
+      - name: Build exe
+        shell: bash
+        run: scripts/build_desktop.sh --onefile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Phytospectra-windows
+          path: desktop/dist/Phytospectra*
