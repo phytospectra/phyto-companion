@@ -97,3 +97,8 @@ _alias_package("isolation", "isolation")
 # standards) and retention (RT/RI prediction) -- same contract.
 _alias_package("calibration", "calibration")
 _alias_package("retention", "retention")
+# Preprocessing services (ADR-0068/0069): NMR pipeline and LC-MS adapter
+# -- same contract; layer_chain imports them exactly as it will in the
+# container.
+_alias_package("nmr_preproc", "nmr_preproc")
+_alias_package("lcms_preproc", "lcms_preproc")
