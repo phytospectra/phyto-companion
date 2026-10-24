@@ -9,7 +9,7 @@ import pytest
 
 from phyto_shared.exceptions import InvalidInputError
 import metabolomics.statistics as stats_module
-from metabolomics.feature_detection import DetectParams, MockDetector, FeatureTable, Feature, SampleMetadata
+from metabolomics.feature_detection import DetectParams, MockDetector, FeatureTable
 from metabolomics.statistics import (
     OPLS_DA_NOT_IMPLEMENTED,
     biomarker_candidates,

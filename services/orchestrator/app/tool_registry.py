@@ -13,6 +13,7 @@ GPU, no Docker.
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 from typing import Any, Callable
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -24,8 +25,9 @@ from phyto_shared.chromatography import (
     ReferenceStandard,
 )
 from phyto_shared.exceptions import CloudServiceError, InvalidInputError
-from phyto_shared.isolation import Fraction, IsolationCompound, IsolationRecord
+from phyto_shared.isolation import IsolationRecord
 from phyto_shared.literature_models import PaperHit
+from phyto_shared.metabolomics import MetabolomicsInput
 from phyto_shared.models import (
     Candidate,
     CandidateRank,
@@ -39,7 +41,6 @@ from phyto_shared.models import (
 )
 from phyto_shared.nmr_search_models import (
     NMRSpectrumHit,
-    NMRSpectrumSearchRequest,
 )
 from phyto_shared.taxonomy_models import TaxonPrior, TaxonResolution
 
@@ -354,6 +355,51 @@ class ApplyChromatographyLayersOutput(_Contract):
     top_candidate_name: str | None = None
 
 
+class MetabolomicsPreprocessInput(_Contract):
+    """Run the in-house preprocessing (nmr_preproc pipeline for raw
+    Bruker directories, lcms_preproc adapter for an MZmine-format CSV)
+    and serialise the result for ``metabolomics.apply_layers``."""
+
+    metabolomics_input: MetabolomicsInput
+
+
+class MetabolomicsPreprocessOutput(_Contract):
+    preprocessing_result: dict[str, Any] | None = None
+    skipped: bool = False
+    reason: str | None = None
+
+
+class ApplyMetabolomicsLayersInput(_Contract):
+    """Metabolomics evidence layers over a preprocessed feature matrix
+    (ADR-0068..ADR-0072).  ``preprocessing_result`` is the output of the
+    nmr_preproc / lcms_preproc service (or None: every layer is then
+    reported skipped, never silent)."""
+
+    metabolomics_input: MetabolomicsInput
+    sample_sheet: dict[str, dict[str, str]] = Field(default_factory=dict)
+    preprocessing_result: dict[str, Any] | None = Field(
+        default=None,
+        description="Serialised PreprocessingResult: matrix (rows x "
+        "buckets), ppm axis, sample_ids and the PreprocessingRecord",
+    )
+    pca_min_samples: int = Field(default=2, ge=2)
+    vip_threshold: float = Field(default=1.0, gt=0)
+    stocsy_r_threshold: float = Field(default=0.7, gt=0, le=1)
+    stocsy_fdr_threshold: float = Field(default=0.05, gt=0, le=1)
+    run_2d_stocsy: bool = True
+
+
+class ApplyMetabolomicsLayersOutput(_Contract):
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    skipped_layers: list[dict[str, str]] = Field(default_factory=list)
+    pca: dict[str, Any] | None = None
+    model: dict[str, Any] | None = None
+    vip_features: list[dict[str, Any]] = Field(default_factory=list)
+    stocsy_correlations: list[dict[str, Any]] = Field(default_factory=list)
+    reporting_checklist: dict[str, Any] | None = None
+    sample_ids: list[str] = Field(default_factory=list)
+
+
 # --- Tier 3 ---------------------------------------------------------------
 
 
@@ -492,6 +538,8 @@ TIER1_TOOL_NAMES = (
     "literature.search_compound_in_species",
     "isolation.load_record",
     "chromatography.apply_layers",
+    "metabolomics.preprocess",
+    "metabolomics.apply_layers",
 )
 TIER2_TOOL_NAMES = (
     "gnps.submit_job",
@@ -592,6 +640,23 @@ def build_default_registry() -> ToolRegistry:
             "markers) over ranked candidates (ADR-0061..ADR-0066)",
             0.5, True,
             ApplyChromatographyLayersInput, ApplyChromatographyLayersOutput,
+        ),
+        (
+            "metabolomics.preprocess",
+            "Run the metabolomics preprocessing (raw Bruker FID -> bucketed "
+            "matrix, or MZmine-format CSV adaptation) and serialise the "
+            "result (ADR-0068, ADR-0069)",
+            2.0, True,
+            MetabolomicsPreprocessInput, MetabolomicsPreprocessOutput,
+        ),
+        (
+            "metabolomics.apply_layers",
+            "Run the metabolomics evidence layers (PCA, supervised model "
+            "PLS-DA / O-PLS regression, VIP selection, STOCSY, reporting "
+            "checklist) over a preprocessed feature matrix "
+            "(ADR-0068..ADR-0072)",
+            1.0, True,
+            ApplyMetabolomicsLayersInput, ApplyMetabolomicsLayersOutput,
         ),
     ]
     tier2: list[tuple[str, str, float, bool, type, type]] = [
@@ -1258,6 +1323,205 @@ def _mock_apply_chromatography_layers(
     )
 
 
+class _PreprocessingResultView:
+    """Duck-typed view over the serialised PreprocessingResult dict
+    (matrix, ppm, sample_ids, record) that layer_chain consumes."""
+
+    def __init__(self, data: dict[str, Any]) -> None:
+        self._data = data
+
+    @property
+    def matrix(self) -> Any:
+        import numpy as np
+
+        return np.asarray(self._data["matrix"], dtype=float)
+
+    @property
+    def ppm(self) -> Any:
+        import numpy as np
+
+        return (
+            np.asarray(self._data["ppm"], dtype=float)
+            if self._data.get("ppm") is not None
+            else None
+        )
+
+    @property
+    def sample_ids(self) -> list[str]:
+        return list(self._data.get("sample_ids", []))
+
+    @property
+    def record(self) -> Any:
+        rec = self._data.get("record")
+        if rec is None:
+            return None
+        from phyto_shared.metabolomics import PreprocessingRecord
+
+        return PreprocessingRecord.model_validate(rec)
+
+
+def _mock_metabolomics_preprocess(
+    inp: MetabolomicsPreprocessInput,
+) -> MetabolomicsPreprocessOutput:
+    """Run the REAL preprocessing for the declared input kind.  Anything
+    unusable raises Skip{Preprocessing,Adaptation}, which becomes a
+    skipped=False-but-empty output carrying the NAMED reason -- the
+    orchestrator reports it, never guesses."""
+    mi = inp.metabolomics_input
+    if mi.kind == "nmr_bruker_dirs":
+        try:
+            from nmr_preproc.pipeline import (
+                SkipPreprocessing,
+                preprocess_experiments,
+            )
+        except ImportError:
+            try:
+                from services.nmr_preproc.app.pipeline import (  # type: ignore
+                    SkipPreprocessing,
+                    preprocess_experiments,
+                )
+            except ImportError:
+                return MetabolomicsPreprocessOutput(
+                    skipped=True,
+                    reason="nmr_preproc service not staged in this plane",
+                )
+        try:
+            result = preprocess_experiments(mi.paths)
+        except SkipPreprocessing as skip:
+            return MetabolomicsPreprocessOutput(skipped=True, reason=skip.reason)
+        return MetabolomicsPreprocessOutput(
+            preprocessing_result={
+                "matrix": result.matrix.tolist(),
+                "ppm": result.ppm.tolist(),
+                "sample_ids": result.sample_ids,
+                "record": result.record.model_dump(mode="json"),
+                "notes": result.notes,
+            }
+        )
+    # feature_table_csv
+    try:
+        from lcms_preproc.adapter import SkipAdaptation, adapt_csv, build_record
+    except ImportError:
+        try:
+            from services.lcms_preproc.app.adapter import (  # type: ignore
+                SkipAdaptation, adapt_csv, build_record,
+            )
+        except ImportError:
+            return MetabolomicsPreprocessOutput(
+                skipped=True,
+                reason="lcms_preproc service not staged in this plane",
+            )
+    import numpy as np
+
+
+    try:
+        first = Path(mi.paths[0])
+        text = first.read_text() if first.exists() else mi.paths[0]
+    except OSError:
+        text = mi.paths[0]
+    try:
+        table = adapt_csv(text)
+    except SkipAdaptation as skip:
+        return MetabolomicsPreprocessOutput(skipped=True, reason=skip.reason)
+    normalisation = "none"
+    matrix = np.array(
+        [
+            [table.intensities[s].get(f, 0.0) for f in table.feature_ids]
+            for s in table.sample_ids
+        ],
+        dtype=float,
+    )
+    record = build_record(table, normalisation)
+    return MetabolomicsPreprocessOutput(
+        preprocessing_result={
+            "matrix": matrix.tolist(),
+            "ppm": None,
+            "sample_ids": table.sample_ids,
+            "record": record.model_dump(mode="json"),
+            "notes": table.notes,
+        }
+    )
+
+
+def _mock_apply_metabolomics_layers(
+    inp: ApplyMetabolomicsLayersInput,
+) -> ApplyMetabolomicsLayersOutput:
+    """Run the REAL metabolomics layer chain over the (serialised)
+    preprocessing result.  A layer that cannot run is reported skipped
+    by the chain itself; this wrapper only translates the boundary."""
+    try:
+        from layer_chain import apply_metabolomics_layers
+    except ImportError:
+        try:
+            from services.orchestrator.app.layer_chain import (
+                apply_metabolomics_layers,
+            )
+        except ImportError:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "metabolomics layer chain not staged in this plane; every "
+                "layer reported skipped"
+            )
+            skipped = [
+                {"layer": tag, "reason": "layer skipped: chain not staged"}
+                for tag in (
+                    "preprocessing", "pca", "supervised_model",
+                    "vip_selection", "stocsy", "reporting_checklist",
+                )
+            ]
+            return ApplyMetabolomicsLayersOutput(
+                evidence=[], skipped_layers=skipped
+            )
+    if inp.preprocessing_result is None:
+        preprocessing: Any = None
+    else:
+        preprocessing = _PreprocessingResultView(inp.preprocessing_result)
+    sheet = inp.sample_sheet
+    sheet_path = inp.metabolomics_input.sample_sheet_path
+    if not sheet and sheet_path:
+        import csv as _csv
+
+        p = Path(sheet_path)
+        text = p.read_text() if p.exists() else sheet_path
+        rows = list(_csv.DictReader(text.splitlines()))
+        sheet = {
+            (row.get("sample_id") or row.get("sample") or ""): {
+                k: v for k, v in row.items() if k not in ("sample_id", "sample")
+            }
+            for row in rows
+        }
+        sheet = {k: v for k, v in sheet.items() if k}
+    result = apply_metabolomics_layers(
+        inp.metabolomics_input,
+        sheet or None,
+        preprocessing,
+        pca_min_samples=inp.pca_min_samples,
+        vip_threshold=inp.vip_threshold,
+        stocsy_r_threshold=inp.stocsy_r_threshold,
+        stocsy_fdr_threshold=inp.stocsy_fdr_threshold,
+        run_2d_stocsy=inp.run_2d_stocsy,
+    )
+    return ApplyMetabolomicsLayersOutput(
+        evidence=[
+            {
+                "source_spectrum": e.source_spectrum,
+                "spectral_feature": e.spectral_feature,
+                "relation": e.relation,
+                "strength": e.strength,
+            }
+            for e in result.evidence
+        ],
+        skipped_layers=result.skipped_layers,
+        pca=result.pca_evidence.model_dump(mode="json") if result.pca_evidence else None,
+        model=result.model_evidence.model_dump(mode="json") if result.model_evidence else None,
+        vip_features=[f.model_dump(mode="json") for f in result.vip_features],
+        stocsy_correlations=[c.model_dump(mode="json") for c in result.stocsy_correlations],
+        reporting_checklist=result.checklist.model_dump(mode="json") if result.checklist else None,
+        sample_ids=result.sample_ids,
+    )
+
+
 def _mock_qa_verify(inp: QAVerifyInput) -> QAVerifyOutput:
     """The grounding audit IS the real implementation -- no mock needed."""
     from phyto_shared.grounding import GROUNDING_MIN_SCORE, compute_grounding
@@ -1302,6 +1566,8 @@ _MOCK_IMPLEMENTATIONS: dict[str, Callable[[Any], Any]] = {
     "isolation.load_record": _mock_isolation_load,
     "elucidation.rank_candidates": _mock_rank_candidates,
     "chromatography.apply_layers": _mock_apply_chromatography_layers,
+    "metabolomics.preprocess": _mock_metabolomics_preprocess,
+    "metabolomics.apply_layers": _mock_apply_metabolomics_layers,
     "gnps.submit_job": _mock_gnps_submit,
     "gnps.fetch_results": _mock_gnps_fetch,
     "sirius.predict_formula": _mock_sirius,

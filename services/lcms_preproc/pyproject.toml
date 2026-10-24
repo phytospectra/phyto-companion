@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "phyto-companion-lcms-preproc"
+version = "0.1.0"
+description = "PhytoCompanion LC-MS feature-table adapter service (ADR-0069)"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "phyto-companion-shared>=0.1.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

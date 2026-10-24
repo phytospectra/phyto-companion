@@ -1,0 +1,42 @@
+name,nucleus,solvent,position,shift,multiplicity,citation
+maackiain,1H,CDCl3,H-1,7.36,d,Teixeira et al. 2018 (Rev. Bras. Farmacogn. 28:333-338)
+maackiain,1H,CDCl3,H-2,6.56,dd,Teixeira et al. 2018
+maackiain,1H,CDCl3,H-4,6.43,d,Teixeira et al. 2018
+maackiain,1H,CDCl3,H-6a,3.48,m,Teixeira et al. 2018
+maackiain,1H,CDCl3,H-6ax,3.65,t,Teixeira et al. 2018
+maackiain,1H,CDCl3,H-6eq,4.23,dd,Teixeira et al. 2018
+maackiain,1H,CDCl3,H-7,6.72,s,Teixeira et al. 2018
+maackiain,1H,CDCl3,H-10,6.44,s,Teixeira et al. 2018
+maackiain,1H,CDCl3,H-11a,5.47,d,Teixeira et al. 2018
+maackiain,1H,CDCl3,OCH2O,5.93,s,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-1,132.2,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-2,110.0,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-3,157.3,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-4,103.9,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-4a,156.9,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-6,66.7,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-6a,40.4,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-6b,118.2,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-7,104.9,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-8,141.9,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-9,148.3,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-10,94.0,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-10a,154.5,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-11a,78.7,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,C-11b,112.8,-,Teixeira et al. 2018
+maackiain,13C,CDCl3,OCH2O,101.5,-,Teixeira et al. 2018
+tectorigenin,1H,acetone-d6,5-OH,12.96,s,J. Braz. Chem. Soc. 1995 / Rong 2023
+tectorigenin,1H,acetone-d6,H-2,8.23,s,J. Braz. Chem. Soc. 1995
+tectorigenin,1H,acetone-d6,H-2'/H-6',7.46,d,J. Braz. Chem. Soc. 1995
+tectorigenin,1H,acetone-d6,H-3'/H-5',6.91,d,J. Braz. Chem. Soc. 1995
+tectorigenin,1H,acetone-d6,H-8,6.40,s,J. Braz. Chem. Soc. 1995
+tectorigenin,1H,acetone-d6,6-OMe,3.84,s,J. Braz. Chem. Soc. 1995
+cudraisoflavone_V,1H,CDCl3,5-OH,13.10,s,Hiep et al. 2015 (model for 6DLTE-12-C)
+cudraisoflavone_V,1H,CDCl3,H-2,7.85,s,Hiep et al. 2015
+cudraisoflavone_V,1H,CDCl3,H-2",4.79,t,Hiep et al. 2015
+cudraisoflavone_V,1H,CDCl3,H-3",3.18,m,Hiep et al. 2015
+cudraisoflavone_V,1H,CDCl3,H-8,6.37,s,Hiep et al. 2015
+cudraisoflavone_V,1H,CDCl3,H-2'/H-6',7.45,d,Hiep et al. 2015
+cudraisoflavone_V,1H,CDCl3,H-3'/H-5',6.99,d,Hiep et al. 2015
+cudraisoflavone_V,1H,CDCl3,H-1''',4.55,d,Hiep et al. 2015
+cudraisoflavone_V,1H,CDCl3,H-2''',5.51,t,Hiep et al. 2015

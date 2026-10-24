@@ -1,0 +1,15 @@
+metabolite,chemical_shift_ppm,linewidth_Hz_base,base_amplitude_au,CV_percent,category
+TSP_ref,0.0,0.8,0.6,5,reference
+Alanine,1.48,1.5,0.28,15,primary
+Malic_acid,2.65,1.8,0.26,18,primary
+Citric_acid_A,2.55,1.6,0.28,15,primary
+Citric_acid_B,2.75,1.6,0.28,15,primary
+Choline,3.2,1.2,0.2,20,primary
+Curcumin_OCH3,3.85,1.5,0.65,12,curcuminoid
+Glucose_beta,4.65,2.0,0.38,15,primary
+Glucose_alpha,5.22,2.0,0.26,15,primary
+Curcumin_enolCH,5.95,1.8,0.55,12,curcuminoid
+Curcumin_ArH,6.75,2.0,0.4,15,curcuminoid
+Demethoxycurcumin_ArH,6.95,2.0,0.28,18,curcuminoid
+Bisdemethoxycurcumin_ArH,7.15,2.2,0.18,20,curcuminoid
+Oxidation_product_marker,7.55,2.5,0.05,25,degradation

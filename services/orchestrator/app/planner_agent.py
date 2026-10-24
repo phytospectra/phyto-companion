@@ -550,6 +550,10 @@ def _identify_tasks(sample_metadata: SampleMetadata | None) -> list[Task]:
     has_standards = bool(metadata and metadata.reference_standards)
     has_anchors = bool(metadata and metadata.anchor_series)
     has_chrom_layers = has_lc or has_standards or has_anchors
+    # Metabolomics layers (ADR-0068..ADR-0072): the whole chain exists only
+    # when a dataset reference was supplied; otherwise every layer is
+    # reported skipped with its reason, never silently.
+    has_metab = bool(metadata and metadata.metabolomics is not None)
 
     tasks: list[Task] = [
         Task(
@@ -638,6 +642,41 @@ def _identify_tasks(sample_metadata: SampleMetadata | None) -> list[Task]:
         )
     else:
         logger.info("chromatography layers skipped: no metadata")
+    if has_metab:
+        tasks.append(
+            Task(
+                id="metabolomics-preprocess",
+                description=(
+                    "Run the metabolomics preprocessing (raw Bruker FID -> "
+                    "bucketed matrix, or MZmine-format CSV adaptation) "
+                    "(ADR-0068, ADR-0069)"
+                ),
+                tool="metabolomics.preprocess",
+                inputs={
+                    "metabolomics_input": metadata.metabolomics.model_dump(),
+                },
+            )
+        )
+        tasks.append(
+            Task(
+                id="apply-metabolomics-layers",
+                description=(
+                    "Run the metabolomics evidence layers (PCA, supervised "
+                    "model PLS-DA / O-PLS regression, VIP selection, STOCSY, "
+                    "reporting checklist) over the preprocessed matrix "
+                    "(ADR-0068..ADR-0072)"
+                ),
+                tool="metabolomics.apply_layers",
+                inputs={
+                    "metabolomics_input": metadata.metabolomics.model_dump(),
+                    "sample_sheet": {},  # filled by the executor from the preprocess output
+                },
+                depends_on=["metabolomics-preprocess"],
+                consumes=["metabolomics-preprocess"],
+            )
+        )
+    else:
+        logger.info("metabolomics layers skipped: no dataset reference")
     tasks.append(
         Task(
             id="elucidate",

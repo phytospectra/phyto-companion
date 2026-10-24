@@ -1,0 +1,14 @@
+{
+  "SF_MHz": 400.13,
+  "O1_ppm": 6.0,
+  "SW_ppm": 12.0,
+  "SW_Hz": 4801.5599999999995,
+  "SI_processed_points": 32768,
+  "OFFSET_ppm": 12.0,
+  "NC_proc": -20,
+  "TD_complex_fid_points": 16384,
+  "solvent": "CD3OD",
+  "reference": "TSP (0.00 ppm)",
+  "pulse_program": "noesygppr1d",
+  "design": "continuous regression (storage_day: 0,7,14,21,28; n=4/timepoint)"
+}

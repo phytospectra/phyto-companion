@@ -14,6 +14,7 @@ from typing import Any, Literal  # noqa: F401  (Literal used below)
 from pydantic import Field, model_validator
 
 from .chromatography import AnchorStandard, LCMethod, ReferenceStandard
+from .metabolomics import MetabolomicsInput
 from .constants import ConfidenceVerdict
 from .data_governance import (
     ABSStatus,
@@ -171,6 +172,15 @@ class SampleMetadata(StrictModel):
         "absorbance), ...]; drives the UV chromophore layer (ADR-0062) and "
         "the marker UV check (ADR-0066).",
     )
+    # --- metabolomics dataset reference (ADR-0068..ADR-0072) ---------------
+    metabolomics: MetabolomicsInput | None = Field(
+        default=None,
+        description="Reference to a metabolomics dataset (raw Bruker NMR "
+        "directories or an MZmine-format feature-table CSV) plus the "
+        "sample sheet. When absent the metabolomics evidence layers "
+        "(PCA, supervised model, VIP, STOCSY) are SKIPPED with a visible "
+        "reason -- never silently (ADR-0068).",
+    )
 
     def has_taxon_hint(self) -> bool:
         """True when at least one taxonomic rank was supplied."""
@@ -180,7 +190,7 @@ class SampleMetadata(StrictModel):
         """True when the solvent, if supplied, has a compatibility profile."""
         if self.extraction_solvent is None:
             return True
-        from .solvent_prior import KNOWN_SOLVENTS, normalise_solvent
+        from .solvent_prior import normalise_solvent
 
         try:
             normalise_solvent(self.extraction_solvent)

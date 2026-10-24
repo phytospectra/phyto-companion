@@ -67,7 +67,6 @@ class TestConsensusPCA:
     def test_informative_blocks_dominate(self):
         blocks, _ = _blocks()
         result = consensus_pca(blocks, n_components=1)
-        ir_index = result.block_names.index("ir") if hasattr(result, "block_names") else 0
         # block order is alphabetical: ir, ms, nmr
         salience = result.block_saliences[0]
         assert salience[0] < max(salience[1], salience[2])

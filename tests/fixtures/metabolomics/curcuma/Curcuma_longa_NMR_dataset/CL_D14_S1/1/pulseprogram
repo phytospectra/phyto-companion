@@ -1,0 +1,5 @@
+;noesygppr1d
+;avance-version (simulated, teaching dataset)
+;1D sequence with water suppression using presaturation during relaxation
+;   delay and mixing time (NOESY-presat), standard profiling experiment
+;$OWNER=workshop
