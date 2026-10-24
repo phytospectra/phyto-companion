@@ -11,3 +11,17 @@ classifiers = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["shared"]
+
+[tool.ruff]
+# Error-class gate only: undefined/unused names and syntax errors.  The
+# style-class rules (import sorting, UP, etc.) are deliberately not part of
+# the gate — see HANDOFF_repo_health.md F7 and the CI lint workflow.
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# AllChem is imported for its Chem.AllChem attribute side-effect (drawer setup).
+"services/nmr_preproc/app/report.py" = ["F401"]

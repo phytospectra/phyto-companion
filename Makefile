@@ -16,14 +16,14 @@ AUTH_PATH := build/auth-path
 PYTHONPATH_WITH_AUTH := PYTHONPATH=shared:$(AUTH_PATH):.
 SHARED := $(PYTHONPATH_WITH_AUTH)
 
-.PHONY: help install test dry-run serve stage-auth
+.PHONY: help install test dry-run lint serve stage-auth
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-10s %s\n", $$1, $$2}'
 
 install: ## Create .venv and install dev/runtime dependencies
 	uv venv --python 3.12 $(VENV) 2>/dev/null || $(PY) -m venv $(VENV)
-	uv pip install --python $(BIN)/python "pydantic>=2" pytest fastapi uvicorn httpx "stripe>=9.0" rdkit numpy scipy pandas networkx scikit-learn matplotlib
+	uv pip install --python $(BIN)/python "pydantic>=2" pytest fastapi uvicorn httpx "stripe>=9.0" rdkit numpy scipy pandas networkx scikit-learn matplotlib ruff
 
 stage-auth: ## Expose services/auth/app as the importable `auth` package
 	@mkdir -p $(AUTH_PATH)
@@ -31,6 +31,9 @@ stage-auth: ## Expose services/auth/app as the importable `auth` package
 
 test: ## Run the local-plane test suite (mocks only, no cloud calls)
 	$(BIN)/python -m pytest
+
+lint: ## Ruff error-class gate (F + E9) over shared/services/scripts/tests
+	$(BIN)/ruff check shared services scripts tests
 
 dry-run: ## Alias for test: the whole suite runs in dry-run mode by design
 	$(BIN)/python -m pytest

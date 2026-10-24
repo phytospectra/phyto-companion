@@ -646,9 +646,10 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
     }
 
     _record_run_events(runtime, request=http_request, run_id=run_id, analysis=request, result=result)
-    citation = None
     if result.status == "complete":
-        citation = _mint_citation(
+        # Minted for its stored side effect; GET /runs/{id}/citation reads it
+        # back from the run entry (the create response carries no citation).
+        _mint_citation(
             runtime, run_id=run_id, analysis=request, request=http_request
         )
 

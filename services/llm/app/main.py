@@ -24,6 +24,7 @@ default -- Vertex in the cloud plane, the offline mock locally.
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
@@ -40,7 +41,7 @@ from . import __version__
 from .clients import LLMClient, MockLLMClient, VertexAILLMClient
 from .grounding import compute_grounding, extract_citations
 from .openrouter_client import OpenRouterLLMClient
-from .tiers import MODEL_TIERS, route_client_for_plan
+from .tiers import route_client_for_plan
 
 router = APIRouter()
 

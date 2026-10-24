@@ -64,6 +64,19 @@ BASELINE_MODEL_VERSION = "0.1.0"
 _GRADIENT_WINDOW_MIN = 30.0 * 0.8  # 24 min
 
 
+def _manifest(payload: BaseModel) -> str:
+    from phyto_shared.provenance import ProvenanceBuilder, sha256_dict
+
+    return (
+        ProvenanceBuilder()
+        .with_input_hash("request", sha256_dict(payload.model_dump()))
+        .with_model_version("retention-service", __version__)
+        .with_environment()
+        .build()
+        .manifest_hash
+    )
+
+
 def _lookup_interval(rt: float) -> tuple[float, float]:
     """Hand-curated table: values are literature-typical, so the interval
     is the +/-0.6 min quoted in ``RetentionPrediction`` docs."""

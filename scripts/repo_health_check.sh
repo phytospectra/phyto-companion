@@ -165,7 +165,10 @@ if [ "$SKIP_TESTS" -eq 1 ]; then warn "Tests skipped (--skip-tests)"
 elif [ ! -d tests ]; then fail "No tests/ directory"
 else
   if COLL=$("$PY" -m pytest --collect-only -q 2>&1 | tail -1); then pass "pytest collection: $COLL"; else fail "pytest collection FAILED"; fi
-  for feat in isolation data_governance chromatography layer_chain auth; do
+  # F6: count actual tests per feature from the collection list, not files.
+  # pytest 9 quiet collect output ends each file's block with "<N> tests" or
+  # "no tests ran"; the lines before it are test node ids.
+  for feat in isolation data_governance chromatography layer_chain auth metabolomics; do
     N=$("$PY" -m pytest --collect-only -q 2>/dev/null | grep -cE "test_${feat}|${feat}_test" || true)
     [ "$N" -gt 0 ] && echo "    ${feat}: $N test(s)"
   done

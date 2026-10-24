@@ -1,0 +1,61 @@
+# CI gate (HANDOFF_repo_health.md F7): the repo had no lint step at all.
+# The ruff gate is error-class only (E9 syntax + F pyflakes) — the style
+# classes are deliberately out of scope for now; see pyproject [tool.ruff].
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pydantic>=2" pytest fastapi uvicorn httpx "stripe>=9.0" \
+            rdkit numpy scipy pandas networkx scikit-learn matplotlib ruff
+
+      - name: Stage auth package
+        run: make stage-auth
+
+      - name: Lint (ruff error-class gate)
+        run: make lint
+
+      - name: Run test suite (dry-run plane)
+        env:
+          PHYTO_ENV: local
+        run: make test
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm run test:unit
