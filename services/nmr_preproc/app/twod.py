@@ -20,7 +20,47 @@ __all__ = [
     "load_2d",
     "pick_cross_peaks",
     "contour_figure",
+    "noise_sigma",
 ]
+
+
+def noise_sigma(matrix: np.ndarray, smooth_sigma: float = 1.5) -> float:
+    """Estimate the noise sigma of a processed 2D spectrum.
+
+    The estimate comes from the NEGATIVE half of a high-passed copy
+    (matrix minus its Gaussian-smoothed self).  Signals are positive, so
+    the negative half is peak-free; its MAD is an unbiased noise estimate
+    even when t1 noise ridges inflate the whole-spectrum MAD.  If the
+    negative tail is clipped (e.g. zero-filled / rectified spectra), the
+    function falls back to the whole-spectrum MAD with iterative sigma
+    clipping.
+
+    Returns 0.0 only if the spectrum is constant.
+    """
+    from scipy.ndimage import gaussian_filter
+
+    m = np.asarray(matrix, dtype=np.float64)
+    hi = m - gaussian_filter(m, sigma=(smooth_sigma, smooth_sigma))
+    med = float(np.median(hi))
+    neg = hi[hi < med]
+    if neg.size:
+        sigma = 1.4826 * float(np.median(np.abs(neg - med)))
+        if sigma > 0:
+            return sigma
+    # Fallback: whole-spectrum MAD with sigma clipping.
+    v = m.ravel()
+    sigma = 1.4826 * float(np.median(np.abs(v - np.median(v))))
+    for _ in range(25):
+        if sigma <= 0:
+            return 0.0
+        keep = np.abs(v - np.median(v)) < 4 * sigma
+        s2 = 1.4826 * float(np.median(np.abs(v[keep] - np.median(v[keep]))))
+        if not np.isfinite(s2) or s2 <= 0:
+            break
+        if abs(s2 - sigma) / sigma < 1e-4:
+            return s2
+        sigma = s2
+    return sigma
 
 
 @dataclass
@@ -107,21 +147,101 @@ def contour_figure(
     markers: list[tuple[float, float, str]] | None = None,
     x_limits: tuple[float, float] | None = None,
     y_limits: tuple[float, float] | None = None,
+    *,
+    smooth_sigma: float = 1.5,
+    first_level_sigma: float = 8.0,
+    levels_per_decade: float = 2.0,
+    max_paths: int = 6000,
 ) -> bytes:
-    """Contour panel; ``markers`` are (f2, f1, label) correlation hits."""
+    """Contour panel; ``markers`` are (f2, f1, label) correlation hits.
+
+    Noise handling (case-study finding: percentile-based levels started at
+    ~1.4 sigma on the M6-4 COSY/HMBC data, i.e. below the noise floor,
+    rendering ~100k-270k paths of speckle that buried the real cross-peaks):
+
+    - The noise sigma is estimated from the NEGATIVE half of a high-passed
+      copy of the spectrum.  Signals are positive, so the negative half is
+      peak-free; its MAD is an unbiased noise estimate even when t1 noise
+      ridges inflate the whole-spectrum MAD.  A zero-filling/DC offset arte
+      fact could clip the negative tail, in which case the estimate falls
+      back to the whole-spectrum sigma-clipped MAD.
+    - Levels are geometric in sigma (first at ``first_level_sigma`` sigma,
+      one per ``levels_per_decade`` octave) so weak peaks and strong peaks
+      both stay visible; percentile levels collapse onto the noise when the
+      spectrum is sparse.
+    - A light Gaussian pre-filter (``smooth_sigma``) merges single-pixel
+      speckle into the surrounding contour before levels are applied; it
+      cannot manufacture a peak that was not there, only widen existing
+      ones by about one pixel.
+    - If the level set still produces more than ``max_paths`` paths, the
+      first level is raised stepwise (up to 4 times) until the render is
+      legible; each raise is recorded in the log so the reader can see
+      which levels the panel shows.
+    """
+    import io
+    import logging
+
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from scipy.ndimage import gaussian_filter
 
-    m = data.matrix
-    levels = np.percentile(m, [90, 96, 99, 99.7, 99.95])
-    levels = np.unique(levels[levels > np.percentile(m, 80)])
+    logger = logging.getLogger(__name__)
+
+    m = np.asarray(data.matrix, dtype=np.float64)
+    sigma = noise_sigma(m, smooth_sigma=smooth_sigma)
+
+    if sigma > 0:
+        levels = first_level_sigma * sigma * np.geomspace(
+            1.0, levels_per_decade**7, 8
+        )
+        # keep only levels the data can actually reach, but always at least two
+        reachable = levels[levels < m.max()]
+        if reachable.size >= 2:
+            levels = reachable
+        else:
+            levels = np.linspace(m.max() * 0.05, m.max() * 0.6, 4)
+    else:
+        # Flat or constant spectrum: arbitrary visually-spaced levels.
+        levels = np.linspace(m.max() * 0.05, m.max() * 0.6, 4)
+
 
     fig, ax = plt.subplots(figsize=(6.4, 5.2))
     x, y = np.meshgrid(data.f2_ppm, data.f1_ppm)
-    if levels.size:
-        ax.contour(x, y, m, levels=levels, colors="#1a4d8f", linewidths=0.5)
+
+    smoothed = (
+        gaussian_filter(m, sigma=(smooth_sigma, smooth_sigma))
+        if smooth_sigma > 0
+        else m
+    )
+    attempt = 0
+    while True:
+        cs = ax.contour(
+            x, y, smoothed, levels=levels, colors="#1a4d8f", linewidths=0.5
+        )
+        n_paths = sum(len(seglist) for seglist in cs.allsegs)
+        if n_paths <= max_paths or attempt >= 4 or len(levels) < 2:
+            break
+        # Still too busy: drop the lowest level and re-render.
+        levels = levels[1:]
+        attempt += 1
+        logger.info(
+            "contour_figure: %s has %d paths > %d; raised first level to "
+            "%.1f sigma",
+            data.title,
+            n_paths,
+            max_paths,
+            levels[0] / sigma if sigma else float("nan"),
+        )
+    if attempt:
+        logger.info(
+            "contour_figure: %s rendered with %d levels, first at %.1f sigma",
+            data.title,
+            len(levels),
+            levels[0] / sigma if sigma else float("nan"),
+        )
+
     ax.invert_xaxis()
     ax.invert_yaxis()
     if x_limits:
@@ -130,14 +250,23 @@ def contour_figure(
         ax.set_ylim(max(y_limits), min(y_limits))
     ax.set_xlabel("δ F2 (ppm)")
     ax.set_ylabel("δ F1 (ppm)")
-    ax.set_title(data.title, fontsize=10, loc="left")
+    ax.set_title(
+        data.title
+        + (
+            f"  (contours ≥ {levels[0] / sigma:.0f}σ, log-spaced)"
+            if sigma
+            else ""
+        ),
+        fontsize=10,
+        loc="left",
+    )
     for f2, f1, label in markers or []:
         ax.plot(f2, f1, "x", color="#b22222", ms=6, mew=1.4)
         ax.annotate(
             label, (f2, f1), textcoords="offset points", xytext=(6, 4),
             fontsize=7, color="#7a1f1f",
         )
-    buf = __import__("io").BytesIO()
+    buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
     plt.close(fig)
     return buf.getvalue()
