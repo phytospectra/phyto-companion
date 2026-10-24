@@ -20,7 +20,7 @@ hidden = [
 ]
 
 a = Analysis(
-    ["__main__.py"],
+    ["phytospectra_desktop/__main__.py"],
     pathex=[".", "report_engine"],
     binaries=[],
     datas=[
