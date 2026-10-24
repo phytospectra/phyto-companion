@@ -390,7 +390,11 @@ def _redact(value: Any) -> Any:
 
 
 _EVIDENCE_OUTPUT_KEYS = frozenset(
-    {"grounding_score", "explanation", "hypothesis", "evidence", "confidence"}
+    {"grounding_score", "explanation", "hypothesis", "evidence", "confidence",
+     # Ranking/proposal outputs feed the desktop report bundle (the
+     # read-only share view is the documented evidence surface).
+     "ranks", "candidate_ranks", "proposals", "assignments", "peaks",
+     "ranking", "claim"}
 )
 
 
