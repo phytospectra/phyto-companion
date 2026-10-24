@@ -71,6 +71,17 @@ _MOCK_KNOWN_LIGANDS: dict[str, list[tuple[str, str, str, float]]] = {
     "VNEYFRNUTPLQCC": [  # kaempferol IK prefix
         ("P35354", "COX-2 / PTGS2", "PMID:11914285", 0.55),
     ],
+    # maackiain IK prefix -- (-)-maackiain is a potent, selective MAO-B
+    # inhibitor from Sophora flavescens roots (Lee et al. 2016,
+    # Bioorg. Med. Chem. Lett. 26:3233-3236; PMID 27575476)
+    "HUKSJTUUSUGIDC": [
+        ("P27338", "MAO-B", "PMID:27575476", 0.78),
+    ],
+    # tectorigenin IK prefix -- reported alpha-glucosidase inhibition and
+    # anti-inflammatory activity (Rong et al. 2023, Molecules 28:5904)
+    "OBBCRPUNCUPUOS": [
+        ("-", "alpha-glucosidase", "Rong et al. 2023, Molecules 28:5904", 0.52),
+    ],
 }
 
 
