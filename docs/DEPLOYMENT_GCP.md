@@ -73,35 +73,60 @@ curl -s -X POST $BASE/runs/<run_id>/approve \
 # -> status complete + citation minted
 ```
 
-## Public domains (phytospectra.com)
+## Public domains (phytospectra.com, phytospectra.org)
 
 The web app is the only Phytospectra client — the desktop app (and with it
-the download site) was removed on 2026-10-26. `phytospectra.com`,
-`www.phytospectra.com` and `app.phytospectra.com` all serve the web app;
-`www.phytospectra.com` is the canonical host (citations, share links and
-Stripe return URLs default to it via `PHYTO_APP_BASE_URL`).
+the download site) was removed on 2026-10-26, and on the same day the .org
+was switched from the planned 301 redirect to serving the same app (ADR-0077).
+Six hostnames serve the web app: `phytospectra.com`, `www.phytospectra.com`,
+`app.phytospectra.com`, `phytospectra.org`, `www.phytospectra.org`,
+`app.phytospectra.org`. `www.phytospectra.com` remains the canonical host
+(citations, share links and Stripe return URLs default to it via
+`PHYTO_APP_BASE_URL`).
 
-Domain registration: Cloudflare (2026-10-21, auto-renew).
+Domain registration: Cloudflare (both zones, 2026-10-21, auto-renew).
 
-Cloud Run domain mappings (all created, service `phyto-frontend`,
-region `us-central1`):
+Cloud Run domain mappings (service `phyto-frontend`, region `us-central1`):
 
-| Domain                 | Status              | DNS records needed                |
-|------------------------|---------------------|-----------------------------------|
-| app.phytospectra.com   | LIVE (cert issued)  | CNAME app → ghs.googlehosted.com. |
-| www.phytospectra.com   | awaiting DNS        | CNAME www → ghs.googlehosted.com. |
-| phytospectra.com (apex)| awaiting DNS        | A @ → 216.239.32/34/36/38.21      |
+| Domain                    | Status                        | DNS records needed                |
+|---------------------------|-------------------------------|-----------------------------------|
+| app.phytospectra.com      | LIVE (cert issued)            | CNAME app → ghs.googlehosted.com. |
+| www.phytospectra.com      | awaiting DNS                  | CNAME www → ghs.googlehosted.com. |
+| phytospectra.com (apex)   | awaiting DNS                  | A @ → 216.239.32/34/36/38.21      |
+| phytospectra.org (apex)   | BLOCKED — domain verification | A @ → 216.239.32/34/36/38.21      |
+| www.phytospectra.org      | BLOCKED — domain verification | CNAME www → ghs.googlehosted.com. |
+| app.phytospectra.org      | BLOCKED — domain verification | CNAME app → ghs.googlehosted.com. |
 
-DNS records (Cloudflare dashboard → phytospectra.com → DNS, or run
+**The .org mappings cannot be created until Google verifies the domain.**
+`gcloud domains verify phytospectra.org` opens Search Console in a browser;
+complete the verification there while signed in as the project owner
+(the .com was already verified this way). Then:
+
+```bash
+gcloud beta run domain-mappings create --project phyto-companion-prod \
+  --region us-central1 --service phyto-frontend --domain phytospectra.org
+gcloud beta run domain-mappings create --project phyto-companion-prod \
+  --region us-central1 --service phyto-frontend --domain www.phytospectra.org
+gcloud beta run domain-mappings create --project phyto-companion-prod \
+  --region us-central1 --service phyto-frontend --domain app.phytospectra.org
+```
+
+DNS records for BOTH zones (Cloudflare dashboard per zone, or run
 `infrastructure/cloudflare_dns_setup.sh` with `CLOUDFLARE_API_TOKEN`; it
-also deletes the stale download-site records pointing at
-`c.storage.googleapis.com`):
+manages `phytospectra.com` and `phytospectra.org` in one pass and also
+deletes the stale download-site records pointing at
+`c.storage.googleapis.com` / the .org redirect placeholders):
 
-- Root: four A records `216.239.32.21`, `216.239.34.21`, `216.239.36.21`,
-  `216.239.38.21` (Google-issued for the apex mapping; a CNAME at the apex
-  is not usable here), Proxy: DNS only.
-- www: CNAME → `ghs.googlehosted.com.`, Proxy: DNS only.
-- app: CNAME → `ghs.googlehosted.com.`, Proxy: DNS only (exists).
+- Per zone, root: four A records `216.239.32.21`, `216.239.34.21`,
+  `216.239.36.21`, `216.239.38.21` (Google-issued for apex mappings; a CNAME
+  at the apex is not usable), Proxy: DNS only.
+- Per zone, www and app: CNAME → `ghs.googlehosted.com.`, Proxy: DNS only.
+
+NOTE: the script writes .org records even before the mappings exist — that
+is harmless (Google simply returns its default until the mapping is created)
+but cert issuance only starts once the mapping is in place. To do it in the
+cleanest order, finish the Search Console verification + mappings first, then
+run the script once.
 
 SSL certificates provision automatically once DNS resolves; allow ~15-60
 min, then confirm with
@@ -111,9 +136,10 @@ phyto-companion-prod --region us-central1` (all conditions `True`).
 Smoke test once certs are provisioned:
 
 ```bash
-curl -I https://phytospectra.com/        # 200, web app
-curl -I https://www.phytospectra.com/    # 200, web app
-curl -I https://app.phytospectra.com/    # 200, web app
+for h in phytospectra.com www.phytospectra.com app.phytospectra.com \
+         phytospectra.org www.phytospectra.org app.phytospectra.org; do
+  curl -sI "https://$h/" | head -1 | sed "s|^|$h: |"
+done
 ```
 
 ## Retired download site
@@ -129,15 +155,10 @@ gcloud storage buckets delete gs://phytospectra.com \
   --project=phyto-companion-prod
 ```
 
-## phytospectra.org
+## phytospectra.org — replaced plan
 
-The .org zone is on the same Cloudflare account. Serve it as a 301 redirect
-to the .com (keeps one canonical host for SSL, SEO and cert management):
-
-1. Cloudflare → phytospectra.org → DNS: add proxied (orange) record
-   `A @ 192.0.2.1` and `CNAME www 192.0.2.1` (placeholder targets; the
-   redirect rule intercepts all traffic).
-2. Rules → Redirect Rules → Create rule:
-   - If: Hostname equals `phytospectra.org` **or** `www.phytospectra.org`
-   - Then: Static redirect, 301, `https://phytospectra.com`,
-     preserve query and path.
+An earlier version of this section served the .org as a Cloudflare 301
+redirect to the .com. Superseded 2026-10-26 (ADR-0077): the .org serves the
+same web app directly — see "Public domains" above. No redirect rule is
+needed; the Cloudflare Redirect Rules for the .org (if any were created)
+can be deleted once the domain mappings are live.

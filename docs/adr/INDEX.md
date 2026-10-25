@@ -88,5 +88,5 @@ authoritative full text of every numbered decision remains in
 | ADR-0074 | Custom equations via a whitelisted AST evaluator — no eval, ever | accepted | `services/nmr_preproc/app/equations.py` |
 | ADR-0075 | (reserved — cited by `services/nmr_preproc/app/consistency.py`; ADR text pending) | reserved (gap) | `docs/DECISIONS.md` |
 | ADR-0076 | (reserved — cited by `shared/phyto_shared/lipid_regions.py` lipid-region exclusion; ADR text pending) | reserved (gap) | `docs/DECISIONS.md` |
-| ADR-0077 | Web app only — the desktop app is removed and www is the canonical host | accepted | `docs/DEPLOYMENT_GCP.md` |
-| ADR-0077 | Web app only — the desktop app is removed and www is the canonical host | accepted | `docs/DEPLOYMENT_GCP.md` |
+| ADR-0077 | Web app only — desktop app removed; all six hostnames on .com and .org serve the web app (www.phytospectra.com canonical) | accepted | `docs/DEPLOYMENT_GCP.md` |
+| ADR-0077 | Web app only — desktop app removed; all six hostnames on .com and .org serve the web app (www.phytospectra.com canonical) | accepted | `docs/DEPLOYMENT_GCP.md` |

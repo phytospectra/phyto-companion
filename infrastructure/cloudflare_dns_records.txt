@@ -1,18 +1,11 @@
-# DNS records in the Cloudflare dashboard for phytospectra.com
-# (Domain registered 2026-10-21 at Cloudflare.)
+# DNS records in the Cloudflare dashboard for BOTH Phytospectra zones
+# (phytospectra.com and phytospectra.org; both registered 2026-10-21 at
+# Cloudflare). Every hostname serves the Cloud Run web app — there is no
+# download site and no .org redirect anymore (ADR-0077).
 #
-# Dashboard path: Cloudflare dashboard -> phytospectra.com -> DNS -> Records -> Add record
+# Dashboard path: Cloudflare dashboard -> <zone> -> DNS -> Records -> Add record
 #
-# --- Web app (phytospectra.com, www.phytospectra.com, app.phytospectra.com) ---
-# All three hostnames serve the Cloud Run frontend (phyto-frontend,
-# us-central1). There is no separate download site anymore: the desktop app
-# was removed and the web app is the only Phytospectra client.
-#
-# Cloud Run domain mappings already created (2026-10-26):
-#   gcloud beta run domain-mappings list --project phyto-companion-prod --region us-central1
-#     phytospectra.com       phyto-frontend   (needs A records at the apex)
-#     www.phytospectra.com   phyto-frontend   (needs CNAME)
-#     app.phytospectra.com   phyto-frontend   (LIVE, DNS + cert done)
+# Per zone, the same three-record shape applies:
 #
 # 1. Root — Google issued A records for the apex (a CNAME cannot coexist
 #    with other apex records, and Cloudflare flattening is not needed):
@@ -27,18 +20,32 @@
 # 2. www
 #    Type: CNAME   Name: www   Target: ghs.googlehosted.com.   Proxy: DNS only
 #
-# 3. app (already live)
+# 3. app
 #    Type: CNAME   Name: app   Target: ghs.googlehosted.com.   Proxy: DNS only
 #
-# IMPORTANT: if the old GCS download-site records still exist (root/www ->
-# c.storage.googleapis.com), replace them with the records above — do not
-# keep both. SSL certs provision automatically once DNS points at Google;
-# allow ~15-60 min, then check `gcloud beta run domain-mappings describe`.
+# These can also be applied by script, both zones in one pass:
+#   export CLOUDFLARE_API_TOKEN=...          # Zone.DNS Edit on both zones
+#   DRY_RUN=1 infrastructure/cloudflare_dns_setup.sh   # preview
+#   infrastructure/cloudflare_dns_setup.sh             # apply
+# The script deletes stale address records at those names (old download-site
+# CNAMEs, .org redirect placeholders) and leaves MX/TXT records untouched.
+#
+# IMPORTANT — Cloud Run domain mappings must exist for SSL to be issued:
+#   gcloud beta run domain-mappings list --project phyto-companion-prod --region us-central1
+# .com mappings: all three created (app.phytospectra.com LIVE).
+# .org mappings: NOT yet created — gcloud domains verify phytospectra.org
+# opens Search Console; complete verification in the browser, then create the
+# three .org mappings (commands in docs/DEPLOYMENT_GCP.md).
+#
+# SSL certs provision automatically once DNS points at Google and the mapping
+# exists; allow ~15-60 min, then check `gcloud beta run domain-mappings describe`.
 #
 # Smoke-test once certs are provisioned:
-#   curl -I https://phytospectra.com/        (expect 200, web app)
-#   curl -I https://www.phytospectra.com/    (expect 200, web app)
-#   curl -I https://app.phytospectra.com/    (expect 200, web app)
+#   for h in phytospectra.com www.phytospectra.com app.phytospectra.com \
+#            phytospectra.org www.phytospectra.org app.phytospectra.org; do
+#     curl -sI "https://$h/" | head -1 | sed "s|^|$h: |"
+#   done
+#   (expect HTTP/2 200 on all six)
 #
 # --- Cleanup of the retired download site ------------------------------------
 # Buckets gs://phytospectra.com, gs://www.phytospectra.com and
