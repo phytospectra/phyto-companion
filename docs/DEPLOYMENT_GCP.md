@@ -72,3 +72,43 @@ curl -s -X POST $BASE/runs/<run_id>/approve \
   -d '{"checkpoint":"before_confirmed_claim","actor":"me"}'
 # -> status complete + citation minted
 ```
+
+## Public domains (phytospectra.com)
+
+Both domains are registered at Cloudflare (2026-10-21, auto-renew). The GCP
+side is ready; only the DNS records in the Cloudflare dashboard are missing.
+
+Already done on the GCP side:
+
+- Download site: bucket `gs://phytospectra-downloads` with website config
+  (`index.html` / `404.html`), public via `allUsers:objectViewer`. Installers
+  live under `downloads/` (macOS zip, Windows exe, SHA256SUMS.txt).
+- Web app: Cloud Run service `phyto-frontend`
+  (https://phyto-frontend-819429615655.us-central1.run.app).
+- Orchestrator: `phyto-orchestrator` (real Firebase auth, dry_run off).
+
+Records to add (Cloudflare dashboard → phytospectra.com → DNS, or run
+`infrastructure/cloudflare_dns_setup.sh` with `CLOUDFLARE_API_TOKEN`):
+
+| Type  | Name | Target                     | Purpose            |
+|-------|------|----------------------------|--------------------|
+| CNAME | @    | c.storage.googleapis.com   | download site      |
+| CNAME | www  | c.storage.googleapis.com   | download site      |
+| CNAME | app  | ghs.googlehosted.com       | web app (Cloud Run)|
+
+Then:
+
+```bash
+gcloud domains verify app.phytospectra.com
+gcloud beta run domain-mappings create --project phyto-companion-prod \
+  --region us-central1 --service phyto-frontend --domain app.phytospectra.com
+# follow its instructions to verify; SSL cert provisioning takes ~15-60 min
+```
+
+Smoke test once DNS propagates:
+
+```bash
+curl -I https://phytospectra.com/          # 200, download page
+curl -I https://phytospectra.com/downloads/Phytospectra-macos.zip
+curl -I https://app.phytospectra.com/      # 200, web app
+```
