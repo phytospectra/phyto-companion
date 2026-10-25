@@ -11,12 +11,10 @@ than silently rendering a speckle field.
 
 from __future__ import annotations
 
-import io
 import zipfile
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from nmr_preproc.twod import TwoDData, contour_figure, noise_sigma, pick_cross_peaks
 from nmr_preproc.report import (
@@ -124,7 +122,6 @@ class TestContourFigure:
         import matplotlib
 
         matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
 
         # smoke check only: PNG bytes change when the sigma floor changes
         png2 = contour_figure(d, first_level_sigma=16.0)
