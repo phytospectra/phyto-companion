@@ -13,7 +13,7 @@ from google.cloud import storage
 # Primary bucket is named after the domain (GCS CNAME hosting requires the
 # bucket name to match the Host header); the -downloads bucket is kept as a
 # mirror so legacy storage.googleapis.com links stay valid.
-BUCKETS = ["phytospectra.com", "phytospectra-downloads"]
+BUCKETS = ["phytospectra.com", "www.phytospectra.com", "phytospectra-downloads"]
 FILES = [
     ("Phytospectra-macos.zip", "application/zip"),
     ("Phytospectra-windows.exe", "application/octet-stream"),
