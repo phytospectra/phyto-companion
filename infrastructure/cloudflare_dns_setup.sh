@@ -34,13 +34,26 @@ import urllib.parse
 import urllib.request
 
 zone_name = sys.argv[1]
-token = os.environ["CLOUDFLARE_API_TOKEN"]
+token = os.environ["CLOUDFLARE_API_TOKEN"].strip()
 dry_run = os.environ.get("DRY_RUN", "0").lower() in {"1", "true", "yes"}
 api = os.environ.get("CF_API_BASE", "https://api.cloudflare.com/client/v4").rstrip("/")
 
 # Google-issued targets for the Cloud Run domain mappings.
 APEX_IPS = ["216.239.32.21", "216.239.34.21", "216.239.36.21", "216.239.38.21"]
 WEB_CNAME = "ghs.googlehosted.com."
+
+# Catch the copy-paste failure that produced Cloudflare error 6111 ("Invalid
+# format for Authorization header") before spending a request on it.
+PLACEHOLDERS = {"PLACEHOLDER", "YOUR_TOKEN", "TOKEN", "...", "<token>", "xxx"}
+if token.upper() in {p.upper() for p in PLACEHOLDERS} or len(token) < 20:
+    raise SystemExit(
+        "CLOUDFLARE_API_TOKEN does not look like a real token "
+        f"(got {len(token)} characters).\n"
+        "Create one: https://dash.cloudflare.com/profile/api-tokens ->\n"
+        '  Create Token -> template "Edit zone DNS", scope: phytospectra.com\n'
+        "then paste the generated value, e.g.:\n"
+        "  export CLOUDFLARE_API_TOKEN=AbCdEf0123456789_-real-token-here"
+    )
 
 
 def call(method, path, body=None):
@@ -58,7 +71,16 @@ def call(method, path, body=None):
             detail = json.dumps(json.loads(detail).get("errors", detail))
         except ValueError:
             pass
-        raise SystemExit(f"Cloudflare API {method} {path} failed ({exc.code}): {detail}")
+        hint = ""
+        if exc.code in (400, 401, 403) and ("6111" in detail or "6003" in detail
+                                            or "10000" in detail):
+            hint = ("\nHint: the token string itself was rejected. Re-copy it from\n"
+                    "https://dash.cloudflare.com/profile/api-tokens — it must be one\n"
+                    "unbroken ~40-character value, with no quotes or placeholder text.")
+        elif exc.code == 403:
+            hint = ("\nHint: this token lacks Zone.DNS Edit on phytospectra.com.\n"
+                    "Edit the token's permissions in the Cloudflare dashboard.")
+        raise SystemExit(f"Cloudflare API {method} {path} failed ({exc.code}): {detail}{hint}")
     except urllib.error.URLError as exc:
         raise SystemExit(f"Cannot reach Cloudflare: {exc.reason}")
     if not payload.get("success"):
