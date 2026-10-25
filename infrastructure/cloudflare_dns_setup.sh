@@ -1,67 +1,138 @@
 #!/usr/bin/env bash
-# Create the DNS records for phytospectra.com via the Cloudflare API.
-# Requires a Cloudflare API token with Zone.DNS Edit permission:
-#   export CLOUDFLARE_API_TOKEN=...   (create one at
-#   https://dash.cloudflare.com/profile/api-tokens)
-# Idempotent: re-running skips records that already exist.
+# Point phytospectra.com at the Cloud Run web app, via the Cloudflare API.
 #
-# All hostnames serve the Cloud Run web app (phyto-frontend). The apex uses
-# the A records Google issued with the phytospectra.com domain mapping; www
-# and app use the CNAME.
+#   export CLOUDFLARE_API_TOKEN=...        # Zone.DNS Edit on phytospectra.com
+#   DRY_RUN=1 infrastructure/cloudflare_dns_setup.sh   # preview, changes nothing
+#   infrastructure/cloudflare_dns_setup.sh             # apply
+#
+# Create a token at https://dash.cloudflare.com/profile/api-tokens
+# (template "Edit zone DNS", scoped to phytospectra.com).
+#
+# Desired end state — every hostname serves the web app (Cloud Run
+# phyto-frontend); there is no download site any more:
+#   phytospectra.com      A 216.239.32.21 / .34.21 / .36.21 / .38.21  (DNS only)
+#   www.phytospectra.com  CNAME ghs.googlehosted.com.                 (DNS only)
+#   app.phytospectra.com  CNAME ghs.googlehosted.com.                 (DNS only)
+#
+# Old address records at those names (the GCS download-site CNAMEs) are
+# removed; unrelated record types at the apex (MX, TXT, SPF) are left alone.
+# Idempotent: a second run finds the desired state and changes nothing.
 
 set -euo pipefail
 
-: "${CLOUDFLARE_API_TOKEN:?Set CLOUDFLARE_API_TOKEN first}"
-ZONE_NAME="${ZONE_NAME:-phytospectra.com}"
-API="https://api.cloudflare.com/client/v4"
+: "${CLOUDFLARE_API_TOKEN:?Set CLOUDFLARE_API_TOKEN to a Cloudflare token with Zone.DNS Edit on phytospectra.com}"
 
-api() {
-  curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-    -H "Content-Type: application/json" "$@"
-}
+export ZONE_NAME="${ZONE_NAME:-phytospectra.com}"
+export DRY_RUN="${DRY_RUN:-0}"
 
-zone_id=$(api "${API}/zones?name=${ZONE_NAME}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"][0]["id"])')
-echo "zone ${ZONE_NAME} -> ${zone_id}"
+python3 - "$ZONE_NAME" <<'PY'
+import json
+import os
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 
-existing=$(api "${API}/zones/${zone_id}/dns_records?per_page=100" | python3 -c 'import sys,json;print(" ".join(f"{r[\"type\"]}:{r[\"name\"]}" for r in json.load(sys.stdin)["result"]))')
+zone_name = sys.argv[1]
+token = os.environ["CLOUDFLARE_API_TOKEN"]
+dry_run = os.environ.get("DRY_RUN", "0").lower() in {"1", "true", "yes"}
+api = os.environ.get("CF_API_BASE", "https://api.cloudflare.com/client/v4").rstrip("/")
 
-add_record() { # type name content proxied
-  local type="$1" name="$2" content="$3" proxied="${4:-false}"
-  local fqdn="${name}.${ZONE_NAME}"
-  [[ "$name" == "@" ]] && fqdn="${ZONE_NAME}"
-  if [[ " $existing " == *" ${type}:${fqdn} "* ]]; then
-    echo "skip existing ${type} ${fqdn}"; return
-  fi
-  api -X POST "${API}/zones/${zone_id}/dns_records" \
-    --data "{\"type\":\"${type}\",\"name\":\"${name}\",\"content\":\"${content}\",\"proxied\":${proxied},\"ttl\":3600}" \
-    | python3 -c 'import sys,json;r=json.load(sys.stdin);print("created" if r["success"] else r.get("errors"))'
-}
+# Google-issued targets for the Cloud Run domain mappings.
+APEX_IPS = ["216.239.32.21", "216.239.34.21", "216.239.36.21", "216.239.38.21"]
+WEB_CNAME = "ghs.googlehosted.com."
 
-delete_record() { # type name — remove a stale record (e.g. old download site)
-  local type="$1" name="$2"
-  local fqdn="${name}.${ZONE_NAME}"
-  [[ "$name" == "@" ]] && fqdn="${ZONE_NAME}"
-  local ids
-  ids=$(api "${API}/zones/${zone_id}/dns_records?type=${type}&name=${fqdn}" \
-    | python3 -c 'import sys,json;print(" ".join(r["id"] for r in json.load(sys.stdin)["result"]))')
-  for id in $ids; do
-    api -X DELETE "${API}/zones/${zone_id}/dns_records/${id}" \
-      | python3 -c 'import sys,json;r=json.load(sys.stdin);print("deleted" if r["success"] else r.get("errors"))'
-  done
-}
 
-# Retire the old download-site records (GCS website endpoints), if present.
-delete_record CNAME '@'
-delete_record CNAME 'www'
+def call(method, path, body=None):
+    url = f"{api}{path}"
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            payload = json.loads(resp.read() or b"{}")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")
+        try:
+            detail = json.dumps(json.loads(detail).get("errors", detail))
+        except ValueError:
+            pass
+        raise SystemExit(f"Cloudflare API {method} {path} failed ({exc.code}): {detail}")
+    except urllib.error.URLError as exc:
+        raise SystemExit(f"Cannot reach Cloudflare: {exc.reason}")
+    if not payload.get("success"):
+        raise SystemExit(f"Cloudflare API error on {method} {path}: {payload.get('errors')}")
+    return payload.get("result")
 
-# Web app on all hostnames (Cloud Run frontend phyto-frontend).
-# Apex: A records issued by the phytospectra.com Cloud Run domain mapping.
-for ip in 216.239.32.21 216.239.34.21 216.239.36.21 216.239.38.21; do
-  add_record A '@' "${ip}."
-done
-# www + app: CNAME to Google's Cloud Run endpoint.
-add_record CNAME 'www' 'ghs.googlehosted.com.'
-add_record CNAME 'app' 'ghs.googlehosted.com.'
 
-echo "done. SSL certs provision automatically (~15-60 min). Smoke-test:"
-echo "  curl -I https://phytospectra.com/   https://www.phytospectra.com/   https://app.phytospectra.com/"
+zones = call("GET", f"/zones?name={urllib.parse.quote(zone_name)}")
+if not zones:
+    raise SystemExit(f"Zone {zone_name} not found — check the token's zone permission.")
+zone_id = zones[0]["id"]
+print(f"zone {zone_name} -> {zone_id}")
+
+existing = call("GET", f"/zones/{zone_id}/dns_records?per_page=100")
+
+# Only address records are ours to manage; MX/TXT/NS/SRV at the apex stay.
+ADDRESS_TYPES = {"A", "AAAA", "CNAME"}
+
+desired = {}
+for ip in APEX_IPS:
+    desired.setdefault(zone_name, []).append({"type": "A", "name": zone_name, "content": ip})
+desired.setdefault(f"www.{zone_name}", []).append(
+    {"type": "CNAME", "name": f"www.{zone_name}", "content": WEB_CNAME})
+desired.setdefault(f"app.{zone_name}", []).append(
+    {"type": "CNAME", "name": f"app.{zone_name}", "content": WEB_CNAME})
+
+deletions, creations = [], []
+
+for name, wanted in desired.items():
+    current = [r for r in existing if r["name"] == name and r["type"] in ADDRESS_TYPES]
+
+    def same(record, want):
+        return (
+            record["type"] == want["type"]
+            and record["content"].rstrip(".") == want["content"].rstrip(".")
+            and record.get("proxied") is False
+        )
+
+    matched = []
+    for want in wanted:
+        hit = next((r for r in current if r not in matched and same(r, want)), None)
+        if hit is None:
+            creations.append(dict(want, proxied=False, ttl=3600))
+        else:
+            matched.append(hit)
+    # Anything address-typed at this name that is not part of the wanted set
+    # goes: stale download-site CNAMEs, proxied copies, extra AAAA records.
+    deletions.extend(r for r in current if r not in matched)
+
+print(f"\n{'DRY RUN — nothing will change' if dry_run else 'Applying changes'}")
+for record in deletions:
+    print(f"  delete {record['type']:<5} {record['name']:<26} {record['content']}"
+          + ("  (proxied)" if record.get("proxied") else ""))
+for record in creations:
+    print(f"  create {record['type']:<5} {record['name']:<26} {record['content']}")
+
+if not deletions and not creations:
+    print("  already up to date")
+    raise SystemExit(0)
+
+if dry_run:
+    raise SystemExit(0)
+
+# Deletes first: Cloudflare refuses an A record where a CNAME still sits.
+for record in deletions:
+    call("DELETE", f"/zones/{zone_id}/dns_records/{record['id']}")
+    print(f"  deleted {record['type']} {record['name']}")
+for record in creations:
+    call("POST", f"/zones/{zone_id}/dns_records", record)
+    print(f"  created {record['type']} {record['name']} -> {record['content']}")
+PY
+
+echo
+echo "DNS updated. Google provisions the SSL certificate automatically"
+echo "(~15-60 min after the records are live). Check with:"
+echo "  gcloud beta run domain-mappings list --project phyto-companion-prod --region us-central1"
+echo "Then smoke-test: curl -I https://phytospectra.com/ https://www.phytospectra.com/ https://app.phytospectra.com/"
