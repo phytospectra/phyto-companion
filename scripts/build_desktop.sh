@@ -40,7 +40,7 @@ if [[ "${1:-}" == "--onefile" ]]; then
     --paths . --paths report_engine \
     --add-data "report_engine/nmr_preproc$( [[ "$(uname)" == Darwin ]] && echo ':' || echo ';' )nmr_preproc" \
     --hidden-import nmr_preproc --hidden-import nmr_preproc.report \
-    __main__.py
+    phytospectra_desktop/__main__.py
 else
   "$PY" -m PyInstaller --clean -y Phytospectra.spec
 fi
