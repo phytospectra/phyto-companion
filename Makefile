@@ -28,7 +28,7 @@ help: ## List available targets
 
 install: ## Create .venv and install dev/runtime dependencies
 	uv venv --python 3.12 $(VENV) 2>/dev/null || $(PY) -m venv $(VENV)
-	uv pip install --python $(BIN)/python "pydantic>=2" pytest fastapi uvicorn httpx "stripe>=9.0" rdkit numpy scipy pandas networkx scikit-learn matplotlib ruff
+	uv pip install --python $(BIN)/python "pydantic>=2" pytest fastapi uvicorn httpx "stripe>=9.0" rdkit numpy scipy pandas networkx scikit-learn matplotlib python-docx ruff
 
 stage-auth: ## Expose services/auth/app as the importable `auth` package
 	@mkdir -p $(AUTH_PATH)
