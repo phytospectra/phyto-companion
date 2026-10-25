@@ -5,7 +5,7 @@
 # Type "CNAME" targets below are fully-qualified; Cloudflare flattens CNAME at
 # the zone apex (root) automatically, so record 1 works as written.
 #
-# --- Download site (desktop app, pytospectra.com) -----------------------------
+# --- Download site (desktop app, phytospectra.com) ----------------------------
 # 1. Root -> GCS website endpoint (bucket: phytospectra-downloads)
 #    Type: CNAME   Name: @   Target: c.storage.googleapis.com.   Proxy: DNS only (grey cloud) or Proxied
 #

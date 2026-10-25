@@ -65,6 +65,6 @@ Windows: run the same script with PyInstaller to produce `Phytospectra.exe`,
 then wrap with Inno Setup / NSIS. GitHub Actions workflows for both
 platforms live in `.github/workflows/desktop-release.yml`.
 
-The app is distributed for download at **https://pytospectra.com**; the
+The app is distributed for download at **https://phytospectra.com**; the
 download links are managed by the site's hosting configuration
 (`infrastructure/download_page/`).
