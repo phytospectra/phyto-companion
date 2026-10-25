@@ -40,11 +40,20 @@ if [[ "${1:-}" == "--onefile" ]]; then
     --paths . --paths report_engine \
     --add-data "report_engine/nmr_preproc$( [[ "$(uname)" == Darwin ]] && echo ':' || echo ';' )nmr_preproc" \
     --hidden-import nmr_preproc --hidden-import nmr_preproc.report \
-    phytospectra_desktop/__main__.py
+    launch.py
 else
   "$PY" -m PyInstaller --clean -y Phytospectra.spec
 fi
 
+if [[ "$(uname)" == Darwin && -d dist/Phytospectra.app ]]; then
+  echo "== zipping .app =="
+  ditto -c -k --keepParent dist/Phytospectra.app dist/Phytospectra-macos.zip
+fi
+
 echo "== done =="
 ls -la dist/ | head -5
-echo "App bundle: $(pwd)/dist/Phytospectra/"
+if [[ -d dist/Phytospectra.app ]]; then
+  echo "App bundle: $(pwd)/dist/Phytospectra.app"
+else
+  echo "App bundle: $(pwd)/dist/Phytospectra/"
+fi

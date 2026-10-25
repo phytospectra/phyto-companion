@@ -1,6 +1,8 @@
 # CI gate (HANDOFF_repo_health.md F7): the repo had no lint step at all.
 # The ruff gate is error-class only (E9 syntax + F pyflakes) — the style
 # classes are deliberately out of scope for now; see pyproject [tool.ruff].
+# (The frontend has its own repo, phytospectra/phyto-companion-frontend;
+# frontend/ here is a local working copy and is git-ignored.)
 name: CI
 
 on:
@@ -35,27 +37,3 @@ jobs:
         env:
           PHYTO_ENV: local
         run: make test
-
-  frontend:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck
-        run: npx tsc --noEmit
-
-      - name: Unit tests
-        run: npm run test:unit

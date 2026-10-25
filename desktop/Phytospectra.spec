@@ -20,7 +20,7 @@ hidden = [
 ]
 
 a = Analysis(
-    ["phytospectra_desktop/__main__.py"],
+    ["launch.py"],
     pathex=[".", "report_engine"],
     binaries=[],
     datas=[
@@ -52,3 +52,21 @@ coll = COLLECT(
     a.datas,
     name="Phytospectra",
 )
+
+
+import sys
+
+if sys.platform == "darwin":
+    app = BUNDLE(
+        coll,
+        name="Phytospectra.app",
+        icon="assets/icon.icns" if os.path.exists("assets/icon.icns") else None,
+        bundle_identifier="com.phytospectra.desktop",
+        info_plist={
+            "CFBundleName": "Phytospectra",
+            "CFBundleDisplayName": "Phytospectra",
+            "CFBundleShortVersionString": "0.1.0",
+            "LSMinimumSystemVersion": "12.0",
+            "NSHighResolutionCapable": True,
+        },
+    )

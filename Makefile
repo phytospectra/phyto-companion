@@ -12,6 +12,11 @@ BIN := $(VENV)/bin
 # expose `app` -- colliding with the running service's own package -- so the
 # package is staged in build/auth-path as `auth`, exactly as the Dockerfiles
 # stage it as /srv/auth.  `build/` is already git-ignored.
+# CI installs dependencies into the system interpreter; fall back to PATH
+# binaries when the local .venv is absent.
+PY_BIN := $(if $(wildcard $(BIN)/python),$(BIN)/python,$(PY))
+RUFF := $(if $(wildcard $(BIN)/ruff),$(BIN)/ruff,ruff)
+
 AUTH_PATH := build/auth-path
 PYTHONPATH_WITH_AUTH := PYTHONPATH=shared:$(AUTH_PATH):.
 SHARED := $(PYTHONPATH_WITH_AUTH)
@@ -30,13 +35,13 @@ stage-auth: ## Expose services/auth/app as the importable `auth` package
 	@ln -sfn ../../services/auth/app $(AUTH_PATH)/auth
 
 test: ## Run the local-plane test suite (mocks only, no cloud calls)
-	$(BIN)/python -m pytest
+	$(PY_BIN) -m pytest
 
 lint: ## Ruff error-class gate (F + E9) over shared/services/scripts/tests
-	$(BIN)/ruff check shared services scripts tests
+	$(RUFF) check shared services scripts tests
 
 dry-run: ## Alias for test: the whole suite runs in dry-run mode by design
-	$(BIN)/python -m pytest
+	$(PY_BIN) -m pytest
 
 serve: stage-auth ## Run the orchestrator API locally (mock tools, no cloud, port 8000)
 	$(SHARED) $(BIN)/python -m uvicorn app.main:app --app-dir services/orchestrator --port 8000

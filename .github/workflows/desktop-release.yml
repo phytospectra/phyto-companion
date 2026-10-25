@@ -24,30 +24,11 @@ jobs:
           pip install pyinstaller python-docx numpy scipy matplotlib
       - name: Build app bundle
         run: scripts/build_desktop.sh
-      - name: Wrap into .app and zip
+      - name: Verify app bundle + zip
         run: |
+          ls desktop/dist/Phytospectra.app/Contents/MacOS/ >/dev/null
           cd desktop/dist
-          APP=Phytospectra.app
-          mkdir -p "$APP/Contents/MacOS"
-          cp -R Phytospectra/Phytospectra "$APP/Contents/MacOS/"
-          cp -R Phytospectra/_internal "$APP/Contents/MacOS/_internal"
-          chmod +x "$APP/Contents/MacOS/Phytospectra"
-          cat > "$APP/Contents/Info.plist" <<'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>CFBundleName</key><string>Phytospectra</string>
-            <key>CFBundleDisplayName</key><string>Phytospectra</string>
-            <key>CFBundleExecutable</key><string>Phytospectra</string>
-            <key>CFBundleIdentifier</key><string>com.phytospectra.desktop</string>
-            <key>CFBundleVersion</key><string>0.1.0</string>
-            <key>CFBundleShortVersionString</key><string>0.1.0</string>
-            <key>CFBundlePackageType</key><string>APPL</string>
-            <key>LSMinimumSystemVersion</key><string>12.0</string>
-            <key>NSHighResolutionCapable</key><true/>
-          </dict></plist>
-          PLIST
-          ditto -c -k --keepParent "$APP" Phytospectra-macos.zip
+          [[ -f Phytospectra-macos.zip ]] || ditto -c -k --keepParent Phytospectra.app Phytospectra-macos.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Phytospectra-macos
