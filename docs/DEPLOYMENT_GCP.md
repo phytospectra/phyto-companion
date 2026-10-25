@@ -86,30 +86,23 @@ Six hostnames serve the web app: `phytospectra.com`, `www.phytospectra.com`,
 
 Domain registration: Cloudflare (both zones, 2026-10-21, auto-renew).
 
-Cloud Run domain mappings (service `phyto-frontend`, region `us-central1`):
+Cloud Run domain mappings (service `phyto-frontend`, region `us-central1`;
+all six created — .org verification completed 2026-10-26):
 
-| Domain                    | Status                        | DNS records needed                |
-|---------------------------|-------------------------------|-----------------------------------|
-| app.phytospectra.com      | LIVE (cert issued)            | CNAME app → ghs.googlehosted.com. |
-| www.phytospectra.com      | awaiting DNS                  | CNAME www → ghs.googlehosted.com. |
-| phytospectra.com (apex)   | awaiting DNS                  | A @ → 216.239.32/34/36/38.21      |
-| phytospectra.org (apex)   | BLOCKED — domain verification | A @ → 216.239.32/34/36/38.21      |
-| www.phytospectra.org      | BLOCKED — domain verification | CNAME www → ghs.googlehosted.com. |
-| app.phytospectra.org      | BLOCKED — domain verification | CNAME app → ghs.googlehosted.com. |
+| Domain                    | Status                              | DNS records needed                |
+|---------------------------|-------------------------------------|-----------------------------------|
+| app.phytospectra.com      | LIVE (cert issued)                  | CNAME app → ghs.googlehosted.com. |
+| phytospectra.com (apex)   | LIVE (cert issued, DNS switched)    | A @ → 216.239.32/34/36/38.21      |
+| www.phytospectra.com      | DNS switched, cert auto-provisioning| CNAME www → ghs.googlehosted.com. |
+| phytospectra.org (apex)   | mapping created, **DNS still old**  | A @ → 216.239.32/34/36/38.21      |
+| www.phytospectra.org      | mapping created, **DNS still old**  | CNAME www → ghs.googlehosted.com. |
+| app.phytospectra.org      | mapping created, **no DNS record**  | CNAME app → ghs.googlehosted.com. |
 
-**The .org mappings cannot be created until Google verifies the domain.**
-`gcloud domains verify phytospectra.org` opens Search Console in a browser;
-complete the verification there while signed in as the project owner
-(the .com was already verified this way). Then:
-
-```bash
-gcloud beta run domain-mappings create --project phyto-companion-prod \
-  --region us-central1 --service phyto-frontend --domain phytospectra.org
-gcloud beta run domain-mappings create --project phyto-companion-prod \
-  --region us-central1 --service phyto-frontend --domain www.phytospectra.org
-gcloud beta run domain-mappings create --project phyto-companion-prod \
-  --region us-central1 --service phyto-frontend --domain app.phytospectra.org
-```
+Remaining .org step: run `infrastructure/cloudflare_dns_setup.sh` once more
+(the .com zone is already converged and will be skipped; the .org zone still
+carries the old redirect placeholders `192.0.2.1`, and `app` was never
+created). Cert issuance for the .com www host completes on its own
+(Google retries ~every 5 min).
 
 DNS records for BOTH zones (Cloudflare dashboard per zone, or run
 `infrastructure/cloudflare_dns_setup.sh` with `CLOUDFLARE_API_TOKEN`; it
