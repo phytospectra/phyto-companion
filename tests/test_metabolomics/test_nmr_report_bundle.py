@@ -251,3 +251,66 @@ class TestExportBundle:
             content = zf.read("tables/peak_assignments.csv").decode()
         assert "H-11a" in content
         assert "benzylic junction" in content
+
+
+class TestQnmrBundleOutputs:
+    """ADR-0073 additions: region fits and quantification land in the
+    bundle as a figure and CSV tables, checksummed like every payload."""
+
+    def _sample_with_fits(self) -> SampleReport:
+        import numpy as np
+
+        from nmr_preproc.deconvolution import DeconvolutionParams, fit_region
+        from nmr_preproc.quantify import (
+            AnalyteSpec,
+            InternalStandard,
+            qnmr_calculate,
+        )
+
+        ppm = np.linspace(7.4, 7.0, 4001)
+        gamma2 = (0.003 / 2.0) ** 2
+        spectrum = gamma2 / ((ppm - 7.2) ** 2 + gamma2)
+        sample = _sample()
+        sample.ppm = ppm
+        sample.spectrum = spectrum
+        sample.region_fits = [
+            fit_region(
+                ppm, spectrum, 7.15, 7.25,
+                DeconvolutionParams(model="lorentzian", sf_mhz=500.0),
+            )
+        ]
+        sample.quantification = qnmr_calculate(
+            InternalStandard(
+                name="maleate", n_protons=2, integral=100.0, moles_nmol=100.0
+            ),
+            [AnalyteSpec(name="flavone-A", n_protons=3, integral=150.0,
+                         molecular_weight=300.0)],
+            sample_mass_mg=100.0,
+        )
+        assert sample.quantification.analytes[0].moles_nmol == 100.0
+        return sample
+
+    def test_deconvolution_csv_and_quantification_csv_written(
+        self, tmp_path: Path
+    ) -> None:
+        path = _export(tmp_path, samples=[self._sample_with_fits()])
+        with zipfile.ZipFile(path) as zf:
+            names = zf.namelist()
+            assert "tables/deconvolution_S1.csv" in names
+            assert "tables/quantification.csv" in names
+            deconv = zf.read("tables/deconvolution_S1.csv").decode()
+            assert "component_center_ppm" in deconv
+            assert "7.2" in deconv
+            quant = zf.read("tables/quantification.csv").decode()
+            assert "flavone-A" in quant
+            assert "n(flavone-A)" in quant  # substituted equation travels
+            assert "figures/deconvolution_S1.png" in names
+            checksums = json.loads(zf.read("provenance/checksums.json"))
+            assert "tables/quantification.csv" in checksums
+
+    def test_bundle_without_fits_unchanged(self, tmp_path: Path) -> None:
+        path = _export(tmp_path)
+        with zipfile.ZipFile(path) as zf:
+            names = zf.namelist()
+        assert not any("deconvolution" in n for n in names)
+        assert "tables/quantification.csv" not in names

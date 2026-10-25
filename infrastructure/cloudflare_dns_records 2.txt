@@ -1,0 +1,36 @@
+# DNS records in the Cloudflare dashboard for phytospectra.com
+# (Domain registered 2026-10-21 at Cloudflare.)
+#
+# Dashboard path: Cloudflare dashboard -> phytospectra.com -> DNS -> Records -> Add record
+# Type "CNAME" targets below are fully-qualified; Cloudflare flattens CNAME at
+# the zone apex (root) automatically, so record 1 works as written.
+#
+# --- Web app (phytospectra.com, www.phytospectra.com, app.phytospectra.com) ---
+# All three hostnames point at the Cloud Run frontend (phyto-frontend,
+# us-central1). There is no separate download site anymore: the desktop app
+# was removed and the web app is the only Phytospectra client.
+#
+# 1. Root
+#    Type: CNAME   Name: @   Target: ghs.googlehosted.com.   Proxy: DNS only (grey cloud)
+#
+# 2. www
+#    Type: CNAME   Name: www   Target: ghs.googlehosted.com.   Proxy: DNS only
+#
+# 3. app
+#    Type: CNAME   Name: app   Target: ghs.googlehosted.com.   Proxy: DNS only
+#
+# Cloud Run domain mappings (one per hostname; SSL certs provision ~15-60 min):
+#   gcloud domains verify phytospectra.com
+#   gcloud beta run domain-mappings create --project phyto-companion-prod \
+#     --region us-central1 --service phyto-frontend --domain phytospectra.com
+#   gcloud beta run domain-mappings create --project phyto-companion-prod \
+#     --region us-central1 --service phyto-frontend --domain www.phytospectra.com
+#   (app.phytospectra.com mapping already exists)
+#
+# After records 1-3 exist, smoke-test:
+#   curl -I https://phytospectra.com/        (expect 200, web app)
+#   curl -I https://www.phytospectra.com/    (expect 200, web app)
+#   curl -I https://app.phytospectra.com/    (expect 200, web app)
+#
+# --- Email (optional, skippable) ----------------------------------------------
+# MX/SPF/DMARC records only if mailboxes are set up for the domain.

@@ -4,6 +4,10 @@
 #   export CLOUDFLARE_API_TOKEN=...   (create one at
 #   https://dash.cloudflare.com/profile/api-tokens)
 # Idempotent: re-running skips records that already exist.
+#
+# All hostnames serve the Cloud Run web app (phyto-frontend). The apex uses
+# the A records Google issued with the phytospectra.com domain mapping; www
+# and app use the CNAME.
 
 set -euo pipefail
 
@@ -33,10 +37,31 @@ add_record() { # type name content proxied
     | python3 -c 'import sys,json;r=json.load(sys.stdin);print("created" if r["success"] else r.get("errors"))'
 }
 
-# Download site (GCS website endpoint, bucket phytospectra-downloads)
-add_record CNAME '@' 'c.storage.googleapis.com.'
-add_record CNAME 'www' 'c.storage.googleapis.com.'
-# Web app (Cloud Run frontend)
+delete_record() { # type name — remove a stale record (e.g. old download site)
+  local type="$1" name="$2"
+  local fqdn="${name}.${ZONE_NAME}"
+  [[ "$name" == "@" ]] && fqdn="${ZONE_NAME}"
+  local ids
+  ids=$(api "${API}/zones/${zone_id}/dns_records?type=${type}&name=${fqdn}" \
+    | python3 -c 'import sys,json;print(" ".join(r["id"] for r in json.load(sys.stdin)["result"]))')
+  for id in $ids; do
+    api -X DELETE "${API}/zones/${zone_id}/dns_records/${id}" \
+      | python3 -c 'import sys,json;r=json.load(sys.stdin);print("deleted" if r["success"] else r.get("errors"))'
+  done
+}
+
+# Retire the old download-site records (GCS website endpoints), if present.
+delete_record CNAME '@'
+delete_record CNAME 'www'
+
+# Web app on all hostnames (Cloud Run frontend phyto-frontend).
+# Apex: A records issued by the phytospectra.com Cloud Run domain mapping.
+for ip in 216.239.32.21 216.239.34.21 216.239.36.21 216.239.38.21; do
+  add_record A '@' "${ip}."
+done
+# www + app: CNAME to Google's Cloud Run endpoint.
+add_record CNAME 'www' 'ghs.googlehosted.com.'
 add_record CNAME 'app' 'ghs.googlehosted.com.'
 
-echo "done. Next: gcloud domains verify app.phytospectra.com, then recreate the Cloud Run domain mapping."
+echo "done. SSL certs provision automatically (~15-60 min). Smoke-test:"
+echo "  curl -I https://phytospectra.com/   https://www.phytospectra.com/   https://app.phytospectra.com/"

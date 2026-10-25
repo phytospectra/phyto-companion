@@ -6,6 +6,24 @@ contour panels -- the 2D layer of the Q1 report bundle.  Orientation is
 self-checked: a COSY must be symmetric about its diagonal, and the
 loader uses that property to validate the (F1, F2) reshape on every
 load of a homonuclear spectrum.
+
+Storage formats handled (case-study finding: the M6-4 COSY/HMBC ``2rr``
+files carry XDIM block/submatrix storage, and reading them flat produced
+garbled matrices before the orientation check ran):
+
+* flat rows (XDIM == 0 in both dimension files, or XDIM == SI) -- the
+  classic layout every reader expects;
+* XDIM block/submatrix storage (XDIM divides SI but XDIM != SI) --
+  TopSpin writes the matrix as a sequence of XDIM-x-XDIM tiles that
+  must be re-tiled into place before anything else sees the data.
+  This is the same undo nmrglue's ``read_pdata`` performs via
+  ``reorder_submatrix``; implemented here because nmrglue is
+  deliberately not a dependency (ADR-0068).
+
+Data type follows the processed-data convention (nmrglue bruker
+``read_pdata``): ``DTYPP == 2`` reads float64, anything else int32; byte
+order from ``BYTORDP`` (0 little, 1 big).  The acquisition-time ``DTYPA``
+does NOT apply to processed files.
 """
 
 from __future__ import annotations
@@ -21,6 +39,7 @@ __all__ = [
     "pick_cross_peaks",
     "contour_figure",
     "noise_sigma",
+    "undo_submatrix_storage",
 ]
 
 
@@ -82,6 +101,84 @@ def _parse_params(path: Path) -> dict:
     return params
 
 
+def _parsed_number(params: dict, key: str, default: float) -> float:
+    value = params.get(key)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def undo_submatrix_storage(
+    data: np.ndarray, si1: int, si2: int, xdim1: int, xdim2: int
+) -> np.ndarray:
+    """Re-tile TopSpin XDIM block storage into a full (si1, si2) matrix.
+
+    Bruker writes processed 2D data as a sequence of ``xdim2``-wide rows
+    grouped into ``xdim1``-row submatrices, NOT in plain row-major
+    order: the first ``xdim1 * xdim2`` values are the top-left tile, the
+    next block the tile below it, and so on down the first tile column
+    before the second tile column starts.  ``xdim1``/``xdim2`` come from
+    ``XDIM`` in ``proc2s``/``procs`` respectively (the same values
+    nmrglue's ``guess_shape_and_submatrix_shape`` reads).
+
+    Flat storage (``xdim == si``, the common 1D case and every 2rr
+    written without submatrixing) is returned unchanged.
+    """
+    if xdim1 <= 0 or xdim2 <= 0 or (xdim1 == si1 and xdim2 == si2):
+        return data.reshape(si1, si2)
+    if si1 % xdim1 or si2 % xdim2:
+        # Inconsistent XDIM vs SI: trust SI, read flat (recorded upstream
+        # as a note via the returned storage string in load_2d).
+        return data.reshape(si1, si2)
+    blocks = data.reshape(si1 // xdim1, si2 // xdim2, xdim1, xdim2)
+    return blocks.transpose(0, 2, 1, 3).reshape(si1, si2)
+
+
+def _pdata_dtype(procs: dict) -> np.dtype:
+    # Processed-data convention (nmrglue read_pdata): DTYPP == 2 is
+    # double precision; everything else is int32.  BYTORDP gives the
+    # byte order (0 little-endian, 1 big-endian); DTYPA/BYTORDA are
+    # acquisition-time keys and do NOT describe processed data.
+    is_float = int(_parsed_number(procs, "DTYPP", 0.0)) == 2
+    big_endian = int(_parsed_number(procs, "BYTORDP", 0.0)) == 1
+    base = "f8" if is_float else "i4"
+    return np.dtype((">" if big_endian else "<") + base)
+
+
+def _partner_symmetry_score(
+    matrix: np.ndarray, f1_ppm: np.ndarray, f2_ppm: np.ndarray, top: int = 40
+) -> float:
+    """Fraction of the strongest peaks whose COSY partner exists.
+
+    For a homonuclear correlation spectrum every cross-peak at
+    (f2 = a, f1 = b) has a partner at (f2 = b, f1 = a); the fraction of
+    top peaks whose mirrored counterpart carries >= 20% of their
+    intensity is a physical orientation test that works for NON-SQUARE
+    matrices too (where a flat element-wise correlation of the matrix
+    with its transpose is meaningless).
+    """
+    m = np.asarray(matrix, dtype=np.float64)
+    if m.min() == m.max():
+        return 0.0
+    threshold = np.percentile(m, 99.99)
+    coords = np.argwhere(m >= threshold)
+    order = np.argsort(m[m >= threshold])[::-1][:top]
+    hits = 0
+    counted = 0
+    for k in order:
+        i, j = coords[k]
+        p2, p1 = f2_ppm[j], f1_ppm[i]
+        jp = int(np.argmin(np.abs(f2_ppm - p1)))
+        ip = int(np.argmin(np.abs(f1_ppm - p2)))
+        counted += 1
+        if m[ip, jp] >= 0.2 * m[i, j]:
+            hits += 1
+    return hits / max(counted, 1)
+
+
 def load_2d(pdata_dir: str | Path, kind: str, title: str | None = None) -> TwoDData:
     """Load one processed 2D experiment directory (pdata/N)."""
     p = Path(pdata_dir)
@@ -89,12 +186,17 @@ def load_2d(pdata_dir: str | Path, kind: str, title: str | None = None) -> TwoDD
     f1p = _parse_params(p / "proc2s")  # indirect dimension
     si2, si1 = int(f2p["SI"]), int(f1p["SI"])
 
-    raw = np.fromfile(p / "2rr", dtype=np.dtype("<i4"))
+    raw = np.fromfile(p / "2rr", dtype=_pdata_dtype(f2p))
     if raw.size < si1 * si2:
         raise ValueError(
             f"2rr too small: {raw.size} points < {si1}x{si2}"
         )
-    matrix = raw[: si1 * si2].astype(np.float64).reshape(si1, si2)
+    flat = raw[: si1 * si2].astype(np.float64)
+    matrix = undo_submatrix_storage(
+        flat, si1, si2,
+        int(_parsed_number(f1p, "XDIM", 0.0)),   # XDIM of the indirect dim
+        int(_parsed_number(f2p, "XDIM", 0.0)),   # XDIM of the direct dim
+    )
 
     def _axis(params: dict) -> np.ndarray:
         sf = float(params["SF"])
@@ -106,10 +208,12 @@ def load_2d(pdata_dir: str | Path, kind: str, title: str | None = None) -> TwoDD
     f2 = _axis(f2p)
     f1 = _axis(f1p)
     if kind.upper() == "COSY":
-        # homonuclear sanity: symmetric within the processed intensity
-        # scale -- catches F1/F2 transposition before anything renders
-        corr = np.corrcoef(matrix.ravel(), matrix.T.ravel())[0, 1]
-        if corr < 0.9:
+        # homonuclear sanity: cross-peaks must come in (a, b)/(b, a)
+        # partner pairs -- a PHYSICAL orientation test, valid for
+        # non-square matrices where the old flat matrix-vs-transpose
+        # correlation was meaningless and silently mis-transposed
+        # correctly-read spectra (case-study finding).
+        if _partner_symmetry_score(matrix, f1, f2) < 0.5:
             matrix = matrix.T
             f1, f2 = f2, f1
     return TwoDData(kind=kind, matrix=matrix, f2_ppm=f2, f1_ppm=f1,

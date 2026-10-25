@@ -46,8 +46,11 @@ def normalize(table: FeatureTable, method: str, params: dict | None = None) -> F
       * ``is``   -- internal standard: samples scaled by
                     ``params['internal_standard_feature_id']`` intensity.
       * ``qnmr`` -- qNMR external calibration: multiply by
-                    ``params['calibration_factor']`` (documented as a
-                    scale placeholder pending the real qNMR service).
+                    ``params['calibration_factor']``.  The factor is
+                    computed by the real qNMR service
+                    (``nmr_preproc/app/quantify.py``, ADR-0073):
+                    internal-standard integrals in, calibration factor
+                    out; this branch only applies it to the table.
     """
     params = params or {}
     if method not in NORMALIZATION_METHODS:

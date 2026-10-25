@@ -83,6 +83,8 @@ REPORT_VOICE_RULES = [
     "R4 discussion citations are resolvable published sources",
     "R5 limitations section is mandatory",
     "R6 constructive tone at the stated evidence level",
+    "R7 numbers in tables and text must match (automatic consistency "
+    "checks; a violating bundle is refused, ADR-0075)",
 ]
 
 
@@ -286,7 +288,11 @@ class SampleReport:
     an extra focused panel under the full sweep so crowded spectra (e.g.
     a 220 ppm 13C sweep) stay readable -- the manuscript expansion-panel
     convention.  ``predicted_smiles`` enables the predict-vs-experimental
-    mirror overlay figure.
+    mirror overlay figure.  ``region_fits`` (list of ``deconvolution.
+    RegionFit``, ADR-0073) each become a deconvolution overlay panel +
+    a per-component CSV; ``quantification`` (``quantify.
+    QuantificationResult``, ADR-0073) becomes the quantification table.
+    Both default empty so existing call sites are unchanged.
     """
 
     sample_id: str
@@ -302,6 +308,8 @@ class SampleReport:
     notes: list[str] = field(default_factory=list)
     regions: list[tuple[float, float, str]] = field(default_factory=list)
     predicted_smiles: str | None = None
+    region_fits: list = field(default_factory=list)  # list[RegionFit]
+    quantification: object | None = None  # QuantificationResult
 
 
 # ---------------------------------------------------------------------------
@@ -564,6 +572,59 @@ def _overlay_figure(
     return buf.getvalue()
 
 
+def _deconvolution_figure(sample: SampleReport) -> bytes | None:
+    """One panel per fitted region: experimental (black) over the total
+    model (dashed grey) with each component (coloured, filled); a reader
+    SEES what an overlapped region was resolved into (ADR-0073)."""
+    from .deconvolution import evaluate_region_fit
+
+    fits = [f for f in sample.region_fits if getattr(f, "status", "") == "fitted"]
+    if not fits:
+        return None
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(
+        len(fits), 1, figsize=(9, 2.0 * len(fits) + 0.6), squeeze=False
+    )
+    colors = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#8c564b", "#e7969c"]
+    for ax, fit in zip(axes[:, 0], fits):
+        pad = 0.15 * (fit.hi_ppm - fit.lo_ppm)
+        lo, hi = fit.lo_ppm - pad, fit.hi_ppm + pad
+        mask = (sample.ppm >= lo) & (sample.ppm <= hi)
+        xr = sample.ppm[mask]
+        yr = sample.spectrum[mask]
+        scale = max(float(np.percentile(np.abs(yr), 99.9)), 1e-12)
+        ax.plot(xr, yr / scale, lw=0.6, color="black", label="experimental")
+        grid = np.linspace(hi, lo, 1200)
+        total, components = evaluate_region_fit(fit, grid)
+        ax.plot(grid, total / scale, "--", lw=1.0, color="#7c828c",
+                label=f"fit (R²={fit.r_squared:.3f})" if fit.r_squared is not None
+                else "fit")
+        for i, comp in enumerate(components):
+            ax.fill_between(
+                grid, 0.0, comp / scale, alpha=0.30,
+                color=colors[i % len(colors)],
+                label=f"{fit.components[i].center_ppm:.3f} ppm",
+            )
+        ax.set_xlim(hi, lo)
+        ax.set_ylim(-0.12, 1.12)
+        ax.set_title(
+            f"[{fit.lo_ppm}, {fit.hi_ppm}] ppm -- {len(fit.components)} "
+            f"component(s), {fit.model_id}",
+            fontsize=8, loc="left",
+        )
+        ax.legend(fontsize=6, ncol=4, loc="upper right", framealpha=0.5)
+        ax.set_xlabel("δ (ppm)")
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    return buf.getvalue()
+
+
 def format_nmr_text_acs(
     sample: SampleReport, assignments: list[PeakAssignment]
 ) -> str:
@@ -629,6 +690,18 @@ def render_report_docx(
         raise ReportError("python-docx is not installed") from exc
 
     _check_q1_rules(samples, proposals, assignments, sources, limitations)
+    from .consistency import check_bundle_consistency
+
+    consistency = check_bundle_consistency(samples, assignments)
+    if not consistency.ok:
+        raise ReportError(
+            "consistency checks failed (R7: numbers in tables and text "
+            "must match): "
+            + "; ".join(
+                f.message for f in consistency.findings
+                if f.severity == "error"
+            )
+        )
 
     document = Document()
     document.add_heading(title, level=0)
@@ -785,6 +858,21 @@ def render_report_docx(
               d.verdict] for d in dereplications],
         )
 
+    # Cross-artefact consistency section (ADR-0075)
+    document.add_heading("Cross-artefact consistency", level=1)
+    document.add_paragraph(
+        f"{consistency.summary}.  Numbers in tables and text are checked "
+        "against each other automatically before this report is written; "
+        "any disagreement refuses the bundle rather than reaching a "
+        "reader."
+    )
+    for finding in consistency.findings:
+        document.add_paragraph(
+            f"[{finding.severity}] {finding.sample_id} "
+            f"({finding.check}): {finding.message}",
+            style="List Bullet",
+        ).runs[0].font.size = Pt(9)
+
     # Pharmacology section
     if pharmacology:
         document.add_heading("Pharmacology (predicted)", level=1)
@@ -851,11 +939,25 @@ def export_bundle(
 ) -> Path:
     """Write the complete zipped publication bundle; fail loud on gaps.
 
-    Enforces the Q1 report rules (R1-R6) before anything is written, so
-    a refused bundle leaves no partial file behind.  Every payload file
-    is checksummed in ``provenance/checksums.json``.
+    Enforces the Q1 report rules (R1-R6) and the cross-artefact
+    consistency checks (ADR-0075: numbers in tables and text must
+    match) before anything is written, so a refused bundle leaves no
+    partial file behind.  Every payload file is checksummed in
+    ``provenance/checksums.json``.
     """
     _check_q1_rules(samples, proposals, assignments, sources, limitations)
+    from .consistency import check_bundle_consistency
+
+    consistency = check_bundle_consistency(samples, assignments)
+    if not consistency.ok:
+        errors = [
+            f.message for f in consistency.findings
+            if f.severity == "error"
+        ]
+        raise ReportError(
+            "consistency checks failed (R7: numbers in tables and text "
+            "must match): " + "; ".join(errors)
+        )
     path = Path(path)
     if path.parent and not path.parent.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -936,6 +1038,36 @@ def export_bundle(
                          ))
                 except (ReportError, ValueError):
                     pass  # overlay recorded as absent, never fatal
+            if s.region_fits:
+                try:
+                    png = _deconvolution_figure(s)
+                    if png:
+                        _add(zf, f"figures/deconvolution_{s.sample_id}.png", png)
+                except (ReportError, ValueError):
+                    pass  # deconvolution figure recorded as absent, never fatal
+                dv = io.StringIO()
+                w = csv.writer(dv)
+                w.writerow(["sample_id", "lo_ppm", "hi_ppm", "status",
+                            "component_center_ppm", "fwhm_hz", "height",
+                            "area", "model", "eta", "r_squared"])
+                for fit in s.region_fits:
+                    for c in fit.components:
+                        w.writerow(
+                            [s.sample_id, f"{fit.lo_ppm:.3f}", f"{fit.hi_ppm:.3f}",
+                             fit.status, f"{c.center_ppm:.4f}", f"{c.fwhm_hz:.3f}",
+                             f"{c.height:.6g}", f"{c.area:.6g}", c.model,
+                             f"{c.eta:.3f}" if c.eta is not None else "",
+                             f"{fit.r_squared:.4f}"
+                             if fit.r_squared is not None else ""]
+                        )
+                    if not fit.components:
+                        w.writerow(
+                            [s.sample_id, f"{fit.lo_ppm:.3f}",
+                             f"{fit.hi_ppm:.3f}", fit.status, "", "", "", "",
+                             "", "", ""]
+                        )
+                _add(zf, f"tables/deconvolution_{s.sample_id}.csv",
+                     dv.getvalue().encode())
             _add(zf, f"tables/nmr_text_{s.sample_id}.txt",
                  (format_nmr_text_acs(s, assignments) + "\n").encode())
         for prop in proposals:
@@ -943,8 +1075,7 @@ def export_bundle(
             if png:
                 _add(zf, f"figures/structure_{prop.sample_id}.png", png)
 
-        _add(
-            zf, "report.docx",
+        _add(zf, "report.docx",
             render_report_docx(
                 title, samples, rankings, proposals, assignments,
                 sources, limitations, discussion,
@@ -952,6 +1083,18 @@ def export_bundle(
                 pharmacology=pharmacology,
             ),
         )
+
+        # Cross-artefact consistency record (ADR-0075)
+        from .consistency import check_bundle_consistency
+
+        consistency = check_bundle_consistency(samples, assignments)
+        lines = [consistency.summary]
+        lines.extend(
+            f"[{f.severity}] {f.sample_id} ({f.check}): {f.message}"
+            for f in consistency.findings
+        )
+        _add(zf, "tables/consistency_report.txt",
+             ("\n".join(lines) + "\n").encode())
 
         # 2D spectra, correlation tables, dereplication, pharmacology
         from .twod import contour_figure
@@ -982,6 +1125,27 @@ def export_bundle(
                             if d.mean_abs_deviation != float("inf") else "",
                             d.verdict])
             _add(zf, "tables/dereplication.csv", dp.getvalue().encode())
+        quant_rows = [
+            (s.sample_id, s.quantification)
+            for s in samples
+            if s.quantification is not None
+        ]
+        if quant_rows:
+            qt = io.StringIO()
+            w = csv.writer(qt)
+            w.writerow(["sample_id", "standard", "standard_nmol", "analyte",
+                        "analyte_nmol", "mass_mg", "wt_percent", "equation"])
+            for sample_id, q in quant_rows:
+                for a in q.analytes:
+                    w.writerow(
+                        [sample_id, q.standard_name,
+                         f"{q.standard_moles_nmol:.6g}", a.name,
+                         f"{a.moles_nmol:.6g}",
+                         f"{a.mass_mg:.6g}" if a.mass_mg is not None else "",
+                         f"{a.wt_percent:.4f}" if a.wt_percent is not None else "",
+                         a.equation]
+                    )
+            _add(zf, "tables/quantification.csv", qt.getvalue().encode())
         if pharmacology:
             ph = io.StringIO()
             w = csv.writer(ph)

@@ -84,7 +84,7 @@ class ShareClaims:
 
 
 def app_base_url() -> str:
-    return os.environ.get("PHYTO_APP_BASE_URL", "https://app.phytospectra.com")
+    return os.environ.get("PHYTO_APP_BASE_URL", "https://www.phytospectra.com")
 
 
 def share_url_for(token: str) -> str:

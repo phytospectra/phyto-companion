@@ -400,6 +400,73 @@ class ApplyMetabolomicsLayersOutput(_Contract):
     sample_ids: list[str] = Field(default_factory=list)
 
 
+class DeconvolveSpectrumInput(_Contract):
+    """Line-shape deconvolution of overlapped 1D regions (ADR-0073).
+
+    The spectrum arrives as inline arrays (the orchestrator serialises
+    what the preprocessing step produced); regions are ppm windows the
+    analyst nominates.  Unusable input becomes ``skipped=True`` with
+    the NAMED reason, never a guessed fit."""
+
+    ppm: list[float] = Field(..., min_length=8)
+    intensity: list[float] = Field(..., min_length=8)
+    sf_mhz: float = Field(default=500.0, gt=0)
+    regions: list[tuple[float, float]] = Field(..., min_length=1)
+    model: str = "pseudovoigt"
+    snr_threshold: float = Field(default=10.0, gt=0)
+    max_components: int = Field(default=12, ge=1, le=64)
+    baseline_degree: int = Field(default=1, ge=0, le=1)
+    extra_seeds_ppm: list[float] = Field(default_factory=list)
+
+
+class DeconvolveSpectrumOutput(_Contract):
+    fits: list[dict[str, Any]] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    model_id: str | None = None
+    skipped: bool = False
+    reason: str | None = None
+
+
+class QuantifySampleInput(_Contract):
+    """Internal-standard qNMR quantification (ADR-0073).
+
+    ``standard``: {name, n_protons, integral, moles_nmol | mass_mg +
+    molecular_weight + purity_fraction}; ``analytes``: list of
+    {name, n_protons, integral, molecular_weight?}.  Integrals come
+    from the deconvolve/integrate outputs -- ratio units cancel."""
+
+    standard: dict[str, Any]
+    analytes: list[dict[str, Any]] = Field(..., min_length=1)
+    sample_mass_mg: float | None = Field(default=None, gt=0)
+
+
+class QuantifySampleOutput(_Contract):
+    result: dict[str, Any] | None = None
+    skipped: bool = False
+    reason: str | None = None
+
+
+class EvaluateEquationInput(_Contract):
+    """Custom-equation evaluation under the AST whitelist (ADR-0074).
+
+    ``expression`` must be whitelisted arithmetic/comparison; ``specs``
+    are boolean pass/fail expressions with warning/severe levels."""
+
+    expression: str = Field(..., min_length=1)
+    values: dict[str, float] = Field(..., min_length=1)
+    name: str = "adhoc"
+    specs: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class EvaluateEquationOutput(_Contract):
+    value: float | bool | None = None
+    substituted: str = ""
+    notes: list[str] = Field(default_factory=list)
+    spec_results: list[dict[str, Any]] = Field(default_factory=list)
+    skipped: bool = False
+    reason: str | None = None
+
+
 # --- Tier 3 ---------------------------------------------------------------
 
 
@@ -540,6 +607,9 @@ TIER1_TOOL_NAMES = (
     "chromatography.apply_layers",
     "metabolomics.preprocess",
     "metabolomics.apply_layers",
+    "nmr_preproc.deconvolve",
+    "nmr_preproc.quantify",
+    "nmr_preproc.evaluate_equation",
 )
 TIER2_TOOL_NAMES = (
     "gnps.submit_job",
@@ -657,6 +727,31 @@ def build_default_registry() -> ToolRegistry:
             "(ADR-0068..ADR-0072)",
             1.0, True,
             ApplyMetabolomicsLayersInput, ApplyMetabolomicsLayersOutput,
+        ),
+        (
+            "nmr_preproc.deconvolve",
+            "Line-shape deconvolution of overlapped 1D NMR regions "
+            "(pseudo-Voigt/Lorentzian/Gaussian components on a local "
+            "baseline, per-region fitted/failed/skipped status) for "
+            "extract mixtures (ADR-0073)",
+            2.0, True,
+            DeconvolveSpectrumInput, DeconvolveSpectrumOutput,
+        ),
+        (
+            "nmr_preproc.quantify",
+            "Internal-standard qNMR quantification from region or "
+            "fit-based integrals, every result carrying its substituted "
+            "equation as audit text (ADR-0073)",
+            0.5, True,
+            QuantifySampleInput, QuantifySampleOutput,
+        ),
+        (
+            "nmr_preproc.evaluate_equation",
+            "Evaluate a user-defined derived quantity or pass/fail "
+            "specification under the whitelisted AST evaluator "
+            "(no eval/exec; ADR-0074)",
+            0.1, True,
+            EvaluateEquationInput, EvaluateEquationOutput,
         ),
     ]
     tier2: list[tuple[str, str, float, bool, type, type]] = [
@@ -1550,6 +1645,160 @@ def _mock_qa_verify(inp: QAVerifyInput) -> QAVerifyOutput:
     )
 
 
+def _mock_deconvolve(inp: DeconvolveSpectrumInput) -> DeconvolveSpectrumOutput:
+    """Run the REAL deconvolution (ADR-0073); skips carry named reasons."""
+    from dataclasses import asdict
+
+    import numpy as np
+
+    try:
+        from nmr_preproc.deconvolution import (
+            DeconvolutionParams,
+            SkipDeconvolution,
+            deconvolve,
+        )
+    except ImportError:
+        try:
+            from services.nmr_preproc.app.deconvolution import (  # type: ignore
+                DeconvolutionParams,
+                SkipDeconvolution,
+                deconvolve,
+            )
+        except ImportError:
+            return DeconvolveSpectrumOutput(
+                skipped=True,
+                reason="nmr_preproc service not staged in this plane",
+            )
+    params = DeconvolutionParams(
+        model=inp.model,
+        sf_mhz=inp.sf_mhz,
+        snr_threshold=inp.snr_threshold,
+        max_components=inp.max_components,
+        baseline_degree=inp.baseline_degree,
+    )
+    try:
+        result = deconvolve(
+            np.asarray(inp.ppm, dtype=float),
+            np.asarray(inp.intensity, dtype=float),
+            inp.regions,
+            params,
+            extra_seeds_ppm=inp.extra_seeds_ppm,
+        )
+    except SkipDeconvolution as skip:
+        return DeconvolveSpectrumOutput(skipped=True, reason=skip.reason)
+    return DeconvolveSpectrumOutput(
+        fits=[asdict(f) for f in result.fits],
+        notes=result.notes,
+        model_id=result.model_id,
+    )
+
+
+def _mock_quantify(inp: QuantifySampleInput) -> QuantifySampleOutput:
+    """Run the REAL qNMR calculation (ADR-0073); skips carry named reasons."""
+    from dataclasses import asdict
+
+    try:
+        from nmr_preproc.quantify import (
+            AnalyteSpec,
+            InternalStandard,
+            SkipQuantification,
+            qnmr_calculate,
+        )
+    except ImportError:
+        try:
+            from services.nmr_preproc.app.quantify import (  # type: ignore
+                AnalyteSpec,
+                InternalStandard,
+                SkipQuantification,
+                qnmr_calculate,
+            )
+        except ImportError:
+            return QuantifySampleOutput(
+                skipped=True,
+                reason="nmr_preproc service not staged in this plane",
+            )
+    standard = inp.standard
+    analytes = inp.analytes
+    try:
+        result = qnmr_calculate(
+            InternalStandard(
+                name=standard["name"],
+                n_protons=standard["n_protons"],
+                integral=standard["integral"],
+                moles_nmol=standard.get("moles_nmol"),
+                mass_mg=standard.get("mass_mg"),
+                molecular_weight=standard.get("molecular_weight"),
+                purity_fraction=standard.get("purity_fraction", 1.0),
+            ),
+            [
+                AnalyteSpec(
+                    name=a["name"],
+                    n_protons=a["n_protons"],
+                    integral=a["integral"],
+                    molecular_weight=a.get("molecular_weight"),
+                )
+                for a in analytes
+            ],
+            sample_mass_mg=inp.sample_mass_mg,
+        )
+    except (SkipQuantification, KeyError, TypeError, ValueError) as exc:
+        reason = exc.reason if isinstance(exc, SkipQuantification) else str(exc)
+        return QuantifySampleOutput(skipped=True, reason=reason)
+    return QuantifySampleOutput(result=asdict(result))
+
+
+def _mock_evaluate_equation(inp: EvaluateEquationInput) -> EvaluateEquationOutput:
+    """Run the REAL whitelist evaluator (ADR-0074); every rejection names
+    the offending construct."""
+    from dataclasses import asdict
+
+    try:
+        from nmr_preproc.equations import (
+            CustomEquation,
+            EquationError,
+            SpecCheck,
+            check_specs,
+            evaluate_equation,
+        )
+    except ImportError:
+        try:
+            from services.nmr_preproc.app.equations import (  # type: ignore
+                CustomEquation,
+                EquationError,
+                SpecCheck,
+                check_specs,
+                evaluate_equation,
+            )
+        except ImportError:
+            return EvaluateEquationOutput(
+                skipped=True,
+                reason="nmr_preproc service not staged in this plane",
+            )
+    try:
+        result = evaluate_equation(
+            CustomEquation(name=inp.name, expression=inp.expression),
+            dict(inp.values),
+        )
+        spec_results = [
+            asdict(s)
+            for s in check_specs(
+                [SpecCheck(**s) for s in inp.specs], dict(inp.values)
+            )
+        ]
+    except EquationError as exc:
+        return EvaluateEquationOutput(skipped=True, reason=exc.reason)
+    except (KeyError, TypeError, ValueError) as exc:
+        return EvaluateEquationOutput(
+            skipped=True, reason=f"malformed spec entry: {exc}"
+        )
+    return EvaluateEquationOutput(
+        value=result.value,
+        substituted=result.substituted,
+        notes=result.notes,
+        spec_results=spec_results,
+    )
+
+
 _MOCK_IMPLEMENTATIONS: dict[str, Callable[[Any], Any]] = {
     "rdkit.descriptors": _mock_rdkit_descriptors,
     "rdkit.formula": _mock_rdkit_formula,
@@ -1568,6 +1817,9 @@ _MOCK_IMPLEMENTATIONS: dict[str, Callable[[Any], Any]] = {
     "chromatography.apply_layers": _mock_apply_chromatography_layers,
     "metabolomics.preprocess": _mock_metabolomics_preprocess,
     "metabolomics.apply_layers": _mock_apply_metabolomics_layers,
+    "nmr_preproc.deconvolve": _mock_deconvolve,
+    "nmr_preproc.quantify": _mock_quantify,
+    "nmr_preproc.evaluate_equation": _mock_evaluate_equation,
     "gnps.submit_job": _mock_gnps_submit,
     "gnps.fetch_results": _mock_gnps_fetch,
     "sirius.predict_formula": _mock_sirius,

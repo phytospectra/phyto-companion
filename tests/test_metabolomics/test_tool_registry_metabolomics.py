@@ -1,20 +1,29 @@
-"""Tool-registry integration for the metabolomics tools (ADR-0068..ADR-0072):
+"""Tool-registry integration for the metabolomics tools (ADR-0068..ADR-0074):
 tier, dry-run availability, real execution through the mock executor, and
 the boundary behaviour when services are not staged."""
 
 from __future__ import annotations
 
 import csv
+import math
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from phyto_shared.metabolomics import MetabolomicsInput
 
 from orchestrator.tool_registry import (
     DEFAULT_REGISTRY,
+    DeconvolveSpectrumInput,
+    EvaluateEquationInput,
+    MockToolExecutor,
+    QuantifySampleInput,
     _mock_apply_metabolomics_layers,
+    _mock_deconvolve,
+    _mock_evaluate_equation,
     _mock_metabolomics_preprocess,
+    _mock_quantify,
     ApplyMetabolomicsLayersInput,
     MetabolomicsPreprocessInput,
 )
@@ -151,3 +160,105 @@ class TestApplyLayersExecution:
         ]
         assert out.evidence  # skips are evidence too
         assert out.pca is None and out.model is None
+
+
+def _singlet_arrays() -> tuple[list[float], list[float]]:
+    """Isolated Lorentzian at 7.20 ppm (analytic area pi*h*w/2)."""
+    ppm = np.linspace(7.4, 7.0, 4001)
+    gamma2 = (0.003 / 2.0) ** 2
+    intensity = gamma2 / ((ppm - 7.20) ** 2 + gamma2)
+    return ppm.tolist(), intensity.tolist()
+
+
+class TestQnmrRegistryEntries:
+    def test_three_tools_registered_tier1_dry_run(self) -> None:
+        for name in (
+            "nmr_preproc.deconvolve",
+            "nmr_preproc.quantify",
+            "nmr_preproc.evaluate_equation",
+        ):
+            spec = DEFAULT_REGISTRY.get_tool(name)
+            assert spec.tier.name == "TIER_1_DETERMINISTIC", name
+            assert spec.enabled_in_dry_run is True, name
+            assert not spec.requires_gpu, name
+
+
+class TestQnmrExecution:
+    def test_deconvolve_runs_real_fitter_through_contract(self) -> None:
+        ppm, intensity = _singlet_arrays()
+        out = _mock_deconvolve(
+            DeconvolveSpectrumInput(
+                ppm=ppm, intensity=intensity, regions=[(7.15, 7.25)],
+                model="lorentzian",
+            )
+        )
+        assert out.skipped is False
+        assert out.model_id == "deconv-0.1.0"
+        fit = out.fits[0]
+        assert fit["status"] == "fitted"
+        truth = math.pi * 0.003 / 2.0
+        assert abs(fit["components"][0]["area"] - truth) / truth < 0.03
+
+    def test_deconvolve_bad_axes_skip_with_reason(self) -> None:
+        out = _mock_deconvolve(
+            DeconvolveSpectrumInput(
+                ppm=[float(i) for i in range(10)],
+                intensity=[float(i) for i in range(11)],
+                regions=[(0.0, 9.0)],
+            )
+        )
+        assert out.skipped is True
+        assert "axes disagree" in (out.reason or "")
+
+    def test_quantify_runs_real_math(self) -> None:
+        out = _mock_quantify(
+            QuantifySampleInput(
+                standard={"name": "maleate", "n_protons": 2, "integral": 100.0,
+                          "moles_nmol": 100.0},
+                analytes=[{"name": "x", "n_protons": 3, "integral": 150.0}],
+            )
+        )
+        assert out.skipped is False
+        analyte = out.result["analytes"][0]
+        assert abs(analyte["moles_nmol"] - 100.0) < 1e-6
+        assert "n(x)" in analyte["equation"]
+
+    def test_quantify_non_physical_input_skips(self) -> None:
+        out = _mock_quantify(
+            QuantifySampleInput(
+                standard={"name": "s", "n_protons": 2, "integral": 100.0},
+                analytes=[{"name": "x", "n_protons": 2, "integral": 1.0}],
+            )
+        )
+        assert out.skipped is True
+        assert "no usable amount" in (out.reason or "")
+
+    def test_evaluate_equation_real_evaluator(self) -> None:
+        out = _mock_evaluate_equation(
+            EvaluateEquationInput(
+                expression="(I_a / N_a) / (I_s / N_s) * n_s",
+                values={"I_a": 150.0, "N_a": 3.0, "I_s": 100.0, "N_s": 2.0,
+                        "n_s": 100.0},
+                specs=[{"name": "check", "expression": "100 >= 95", "level": "severe"}],
+            )
+        )
+        assert out.skipped is False
+        assert abs(float(out.value) - 100.0) < 1e-9
+        assert out.spec_results[0]["passed"] is True
+
+    def test_evaluate_equation_forbidden_construct_skips(self) -> None:
+        out = _mock_evaluate_equation(
+            EvaluateEquationInput(expression="x.__class__", values={"x": 1.0})
+        )
+        assert out.skipped is True
+        assert "Attribute" in (out.reason or "")
+
+    def test_executor_round_trip_all_three(self) -> None:
+        executor = MockToolExecutor(DEFAULT_REGISTRY)
+        ppm, intensity = _singlet_arrays()
+        out = executor.execute(
+            "nmr_preproc.deconvolve",
+            {"ppm": ppm, "intensity": intensity, "regions": [[7.15, 7.25]],
+             "model": "lorentzian"},
+        )
+        assert out.fits[0]["status"] == "fitted"

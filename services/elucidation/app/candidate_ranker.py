@@ -24,6 +24,10 @@ from phyto_shared.constants import (
     single_family_gap,
 )
 from phyto_shared.exceptions import InvalidInputError
+from phyto_shared.lipid_regions import (
+    DEFAULT_LIPID_REGIONS_13C,
+    curate_13c_assignment,
+)
 from phyto_shared.models import (
     Candidate,
     CandidateEvidenceProfile,
@@ -57,6 +61,7 @@ __all__ = [
     "score_molecule",
     "supplied_modalities",
     "evidence_profile",
+    "lipid_curation_13c",
 ]
 
 _ELEMENT_PATTERN = re.compile(r"([A-Z][a-z]?)(\d*)")
@@ -107,6 +112,14 @@ class RankingConfig(BaseModel):
     # cosine (higher is better) converts to a distance via 1 - cosine.
     ms2_distance: Literal["one_minus_cosine"] = "one_minus_cosine"
     fragment_tolerance_da: float = 0.02
+    # 13C lipid-region exclusion (ADR-0076): observed 13C peaks inside
+    # the lipid/acyl contaminant envelopes (glycerol backbone, acyl
+    # chains) are dropped from c_1d/hsqc evidence BEFORE matching, so a
+    # lipid-contaminated extract cannot manufacture false assignments in
+    # the 60-80 ppm glycerol window.  Empty tuple disables the filter.
+    exclude_lipid_regions_13c: tuple[tuple[float, float], ...] = (
+        DEFAULT_LIPID_REGIONS_13C
+    )
 
 
 def ms2_cosine(
@@ -495,6 +508,64 @@ def _evidence_items_for(
     return items
 
 
+def lipid_curation_13c(
+    observed: ObservedEvidence, config: RankingConfig | None = None
+) -> tuple[ObservedEvidence, list[EvidenceItem]]:
+    """Apply the 13C lipid-region exclusion to observed evidence.
+
+    Returns the filtered evidence (new object; the input is never
+    mutated) plus one EvidenceItem documenting the exclusion so the
+    ranking's audit chain shows what was removed and why.  The curation
+    runs on BOTH c_1d shifts and HSQC carbon coordinates -- a lipid
+    cross-peak must not survive through the 2D path either.
+    """
+    config = config or RankingConfig()
+    if not config.exclude_lipid_regions_13c:
+        return observed, []
+    notes: list[EvidenceItem] = []
+    updates: dict = {}
+    if observed.c_1d:
+        curation = curate_13c_assignment(
+            [(c, 1.0) for c in observed.c_1d],
+            regions=config.exclude_lipid_regions_13c,
+        )
+        if curation.excluded:
+            updates["c_1d"] = [c for c, _p in curation.kept]
+            notes.append(EvidenceItem(
+                source_spectrum="observed:c_1d",
+                spectral_feature=(
+                    f"{len(curation.excluded)} 13C peak(s) excluded as "
+                    "lipid-region signals (ADR-0076): "
+                    + ", ".join(f"{c:.2f}" for c, _p, _r in curation.excluded)
+                ),
+                relation="lipid_region_excluded",
+                strength=0.0,
+            ))
+    if observed.hsqc:
+        kept_hsqc = [
+            (h, c, m)
+            for h, c, m in observed.hsqc
+            if not any(
+                lo <= c <= hi for lo, hi in config.exclude_lipid_regions_13c
+            )
+        ]
+        excluded = len(observed.hsqc) - len(kept_hsqc)
+        if excluded:
+            updates["hsqc"] = kept_hsqc
+            notes.append(EvidenceItem(
+                source_spectrum="observed:hsqc",
+                spectral_feature=(
+                    f"{excluded} HSQC cross-peak(s) excluded as "
+                    "lipid-region signals (ADR-0076)"
+                ),
+                relation="lipid_region_excluded",
+                strength=0.0,
+            ))
+    if not updates:
+        return observed, []
+    return observed.model_copy(update=updates), notes
+
+
 def rank_candidates(
     observed: ObservedEvidence,
     candidates: list[Candidate],
@@ -513,6 +584,10 @@ def rank_candidates(
     config = config or RankingConfig()
     predictor = predictor or get_shift_predictor()
     reference_ms2 = reference_ms2 or {}
+
+    # 13C lipid-region exclusion (ADR-0076) BEFORE any matching; the
+    # exclusion is recorded as evidence and re-attached to every rank.
+    observed, lipid_notes = lipid_curation_13c(observed, config)
 
     observed_counts = (
         parse_formula_string(observed.formula) if observed.formula else None

@@ -121,7 +121,7 @@ class RealStripeClient:
                 status_code=503,
                 detail="Stripe is not configured; set STRIPE_SECRET_KEY",
             )
-        base_url = os.environ.get("PHYTO_APP_BASE_URL", "https://app.phytospectra.com")
+        base_url = os.environ.get("PHYTO_APP_BASE_URL", "https://www.phytospectra.com")
         form = {
             "mode": "subscription",
             "line_items[0][price]": self._price_for(plan),

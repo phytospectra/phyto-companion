@@ -60,6 +60,7 @@ __all__ = [
     "load_experiment",
     "preprocess_experiments",
     "fid_decay_ratio",
+    "fid_data_type",
 ]
 
 
@@ -121,9 +122,22 @@ def parse_jcamp(path: Path) -> dict:
     return params
 
 
-def _fid_dtype(byte_order: int) -> np.dtype:
-    # BYTORDA: 0 little-endian, 1 big-endian (int32 re/im interleaved)
-    return np.dtype("<i4") if int(byte_order or 0) == 0 else np.dtype(">i4")
+def _fid_data_type(acqus: dict) -> np.dtype:
+    """Data type of the interleaved re/im FID pairs from ``acqus``.
+
+    DTYPA is honoured per the Bruker/nmrglue convention: 2 means the FID
+    was stored as float64 re/im pairs (DTYPA=2 is written e.g. by
+    IconNMR for digitizer data; case-study finding: every 1H FID in the
+    'NMR file for prediction' export carries DTYPA=2 and reading it as
+    int32 produced garbage and a false 'no decay' verdict), anything
+    else means int32.  Unknown/absent keys fall back to int32 -- the
+    historical behaviour -- and the chosen type is recorded in the
+    provenance metadata.
+    """
+    byte_order = int(acqus.get("BYTORDA", 0) or 0)
+    endian = ">" if byte_order == 1 else "<"
+    is_float = int(acqus.get("DTYPA", 0) or 0) == 2
+    return np.dtype(endian + ("f8" if is_float else "i4"))
 
 
 def fid_decay_ratio(fid: np.ndarray, quarters: int = 4) -> float:
@@ -143,7 +157,10 @@ def fid_decay_ratio(fid: np.ndarray, quarters: int = 4) -> float:
 
 def _load_fid(exp_dir: Path) -> tuple[np.ndarray, dict]:
     acqus = parse_jcamp(exp_dir / "acqus")
-    raw = np.fromfile(exp_dir / "fid", dtype=_fid_dtype(acqus.get("BYTORDA", 0)))
+    dtype = _fid_data_type(acqus)
+    raw = np.fromfile(exp_dir / "fid", dtype=dtype)
+    # TD counts COMPLEX points; the file holds 2*TD interleaved re/im
+    # values of the DTYPA-selected width.
     td = int(acqus.get("TD", raw.size // 2))
     fid = raw[: 2 * td].astype(np.float64)
     complex_fid = fid[0::2] + 1j * fid[1::2]
@@ -157,6 +174,7 @@ def _load_fid(exp_dir: Path) -> tuple[np.ndarray, dict]:
                             / sf_mhz)
         + float(acqus["SW_h"]) / sf_mhz / 2.0,
         "source": "raw fid",
+        "fid_data_type": dtype.str,  # DTYPA honoured: recorded, auditable
         "pulse_program": str(acqus.get("PULPROG", "")) or None,
         "solvent": str(acqus.get("SOLVENT", "")) or None,
         "decay_ratio": round(fid_decay_ratio(complex_fid), 3),
@@ -168,7 +186,15 @@ def _load_processed(exp_dir: Path) -> tuple[np.ndarray, dict]:
     procs = parse_jcamp(exp_dir / "pdata" / "1" / "procs")
     si = int(procs["SI"])
     nc = int(procs["NC_proc"])
-    raw = np.fromfile(exp_dir / "pdata" / "1" / "1r", dtype=_fid_dtype(procs.get("BYTORDA", 0)))
+    # Processed data follows the DTYPP/BYTORDP convention (nmrglue
+    # read_pdata); fall back to the old BYTORDA-int32 behaviour when the
+    # processed keys are absent.
+    big = int(procs.get("BYTORDP", procs.get("BYTORDA", 0)) or 0) == 1
+    is_float = int(procs.get("DTYPP", 0) or 0) == 2
+    raw = np.fromfile(
+        exp_dir / "pdata" / "1" / "1r",
+        dtype=np.dtype((">" if big else "<") + ("f8" if is_float else "i4")),
+    )
     spectrum = raw.astype(np.float64) * (2.0**nc)
     sf = float(procs["SF"])
     sw_ppm = float(procs["SW_p"]) / sf

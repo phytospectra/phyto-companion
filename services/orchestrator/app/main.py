@@ -391,7 +391,7 @@ def _redact(value: Any) -> Any:
 
 _EVIDENCE_OUTPUT_KEYS = frozenset(
     {"grounding_score", "explanation", "hypothesis", "evidence", "confidence",
-     # Ranking/proposal outputs feed the desktop report bundle (the
+     # Ranking/proposal outputs feed the web app report view (the
      # read-only share view is the documented evidence surface).
      "ranks", "candidate_ranks", "proposals", "assignments", "peaks",
      "ranking", "claim"}
@@ -466,7 +466,7 @@ def _share_view(run_id: str, runtime: _Runtime) -> dict[str, Any]:
         "cta": {
             "label": "Open in Phytospectra",
             "url": (
-                f"{os.environ.get('PHYTO_APP_BASE_URL', 'https://app.phytospectra.com')}"
+                f"{os.environ.get('PHYTO_APP_BASE_URL', 'https://www.phytospectra.com')}"
                 "/analysis/new"
             ),
             "prefill": {

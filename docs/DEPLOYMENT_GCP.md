@@ -25,7 +25,7 @@ gcloud run deploy phyto-orchestrator --project=phyto-companion-prod \
   --region=us-central1 \
   --image=us-central1-docker.pkg.dev/phyto-companion-prod/phyto/orchestrator-fullplane:latest \
   --allow-unauthenticated --memory=2Gi --cpu=2 --timeout=900 --max-instances=10 \
-  --set-env-vars=PHYTO_ENV=cloud,PHYTO_DRY_RUN=1,PHYTO_APP_BASE_URL=https://app.phytospectra.com,PHYTO_FREE_TOKENS=50
+  --set-env-vars=PHYTO_ENV=cloud,PHYTO_DRY_RUN=1,PHYTO_APP_BASE_URL=https://www.phytospectra.com,PHYTO_FREE_TOKENS=50
 ```
 
 (`infrastructure/cloudbuild-fullplane.yaml` wraps the Dockerfile build.)
@@ -75,53 +75,59 @@ curl -s -X POST $BASE/runs/<run_id>/approve \
 
 ## Public domains (phytospectra.com)
 
-Both domains are registered at Cloudflare (2026-10-21, auto-renew). The GCP
-side is ready; only the DNS records in the Cloudflare dashboard are missing.
+The web app is the only Phytospectra client — the desktop app (and with it
+the download site) was removed on 2026-10-26. `phytospectra.com`,
+`www.phytospectra.com` and `app.phytospectra.com` all serve the web app;
+`www.phytospectra.com` is the canonical host (citations, share links and
+Stripe return URLs default to it via `PHYTO_APP_BASE_URL`).
 
-Already done on the GCP side:
+Domain registration: Cloudflare (2026-10-21, auto-renew).
 
-- Download site: bucket `gs://phytospectra-downloads` with website config
-  (`index.html` / `404.html`), public via `allUsers:objectViewer`. Installers
-  live under `downloads/` (macOS zip, Windows exe, SHA256SUMS.txt).
-- Web app: Cloud Run service `phyto-frontend`
-  (https://phyto-frontend-819429615655.us-central1.run.app).
-- Orchestrator: `phyto-orchestrator` (real Firebase auth, dry_run off).
+Cloud Run domain mappings (all created, service `phyto-frontend`,
+region `us-central1`):
 
-Records to add (Cloudflare dashboard → phytospectra.com → DNS, or run
-`infrastructure/cloudflare_dns_setup.sh` with `CLOUDFLARE_API_TOKEN`):
+| Domain                 | Status              | DNS records needed                |
+|------------------------|---------------------|-----------------------------------|
+| app.phytospectra.com   | LIVE (cert issued)  | CNAME app → ghs.googlehosted.com. |
+| www.phytospectra.com   | awaiting DNS        | CNAME www → ghs.googlehosted.com. |
+| phytospectra.com (apex)| awaiting DNS        | A @ → 216.239.32/34/36/38.21      |
 
-| Type  | Name | Target                     | Purpose            |
-|-------|------|----------------------------|--------------------|
-| CNAME | @    | c.storage.googleapis.com   | download site      |
-| CNAME | www  | c.storage.googleapis.com   | download site      |
-| CNAME | app  | ghs.googlehosted.com       | web app (Cloud Run)|
+DNS records (Cloudflare dashboard → phytospectra.com → DNS, or run
+`infrastructure/cloudflare_dns_setup.sh` with `CLOUDFLARE_API_TOKEN`; it
+also deletes the stale download-site records pointing at
+`c.storage.googleapis.com`):
 
-Then:
+- Root: four A records `216.239.32.21`, `216.239.34.21`, `216.239.36.21`,
+  `216.239.38.21` (Google-issued for the apex mapping; a CNAME at the apex
+  is not usable here), Proxy: DNS only.
+- www: CNAME → `ghs.googlehosted.com.`, Proxy: DNS only.
+- app: CNAME → `ghs.googlehosted.com.`, Proxy: DNS only (exists).
+
+SSL certificates provision automatically once DNS resolves; allow ~15-60
+min, then confirm with
+`gcloud beta run domain-mappings describe --domain <domain> --project
+phyto-companion-prod --region us-central1` (all conditions `True`).
+
+Smoke test once certs are provisioned:
 
 ```bash
-gcloud domains verify app.phytospectra.com
-gcloud beta run domain-mappings create --project phyto-companion-prod \
-  --region us-central1 --service phyto-frontend --domain app.phytospectra.com
-# follow its instructions to verify; SSL cert provisioning takes ~15-60 min
+curl -I https://phytospectra.com/        # 200, web app
+curl -I https://www.phytospectra.com/    # 200, web app
+curl -I https://app.phytospectra.com/    # 200, web app
 ```
 
-Smoke test once DNS propagates:
+## Retired download site
+
+The desktop-app download page lived in GCS buckets whose names matched the
+request Host header: `phytospectra.com`, `www.phytospectra.com` and
+`phytospectra-downloads`. With the desktop app removed, these buckets (and
+the `downloads/` installer objects) are obsolete and can be deleted:
 
 ```bash
-curl -I https://phytospectra.com/          # 200, download page
-curl -I https://phytospectra.com/downloads/Phytospectra-macos.zip
-curl -I https://app.phytospectra.com/      # 200, web app
+gcloud storage buckets delete gs://phytospectra.com \
+  gs://www.phytospectra.com gs://phytospectra-downloads \
+  --project=phyto-companion-prod
 ```
-
-## Domain-named bucket (required for GCS CNAME hosting)
-
-GCS resolves the bucket from the request's Host header, so the bucket serving
-`https://phytospectra.com` **must be named `phytospectra.com`** (created in the
-US multi-region, website config `index.html`/`404.html`, public via
-`allUsers:objectViewer`). Creating it requires one-time ownership verification:
-`gcloud domains verify phytospectra.com` (Cloudflare one-click works because
-DNS lives there). `gs://phytospectra-downloads` remains as a mirror for legacy
-`storage.googleapis.com` links; the CI publish job writes to both.
 
 ## phytospectra.org
 

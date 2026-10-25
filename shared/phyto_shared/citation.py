@@ -48,7 +48,7 @@ __all__ = [
 
 logger = logging.getLogger("phyto.citation")
 
-_APP_BASE_URL = os.environ.get("PHYTO_APP_BASE_URL", "https://app.phytospectra.com")
+_APP_BASE_URL = os.environ.get("PHYTO_APP_BASE_URL", "https://www.phytospectra.com")
 
 _SHA256_PATTERN = r"^[0-9a-f]{64}$"
 
