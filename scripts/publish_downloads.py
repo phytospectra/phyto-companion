@@ -10,7 +10,10 @@ import os
 
 from google.cloud import storage
 
-BUCKET = "phytospectra-downloads"
+# Primary bucket is named after the domain (GCS CNAME hosting requires the
+# bucket name to match the Host header); the -downloads bucket is kept as a
+# mirror so legacy storage.googleapis.com links stay valid.
+BUCKETS = ["phytospectra.com", "phytospectra-downloads"]
 FILES = [
     ("Phytospectra-macos.zip", "application/zip"),
     ("Phytospectra-windows.exe", "application/octet-stream"),
@@ -22,11 +25,12 @@ def main() -> None:
     raw = os.environ["GCP_SA_JSON"]
     info = json.loads(base64.b64decode(raw)) if not raw.lstrip().startswith("{") else json.loads(raw)
     client = storage.Client.from_service_account_info(info)
-    bucket = client.bucket(BUCKET)
-    for name, content_type in FILES:
-        blob = bucket.blob(f"downloads/{name}")
-        blob.upload_from_filename(name, content_type=content_type)
-        print(f"uploaded downloads/{name}")
+    for bucket_name in BUCKETS:
+        bucket = client.bucket(bucket_name)
+        for name, content_type in FILES:
+            blob = bucket.blob(f"downloads/{name}")
+            blob.upload_from_filename(name, content_type=content_type)
+            print(f"uploaded gs://{bucket_name}/downloads/{name}")
 
 
 if __name__ == "__main__":

@@ -112,3 +112,26 @@ curl -I https://phytospectra.com/          # 200, download page
 curl -I https://phytospectra.com/downloads/Phytospectra-macos.zip
 curl -I https://app.phytospectra.com/      # 200, web app
 ```
+
+## Domain-named bucket (required for GCS CNAME hosting)
+
+GCS resolves the bucket from the request's Host header, so the bucket serving
+`https://phytospectra.com` **must be named `phytospectra.com`** (created in the
+US multi-region, website config `index.html`/`404.html`, public via
+`allUsers:objectViewer`). Creating it requires one-time ownership verification:
+`gcloud domains verify phytospectra.com` (Cloudflare one-click works because
+DNS lives there). `gs://phytospectra-downloads` remains as a mirror for legacy
+`storage.googleapis.com` links; the CI publish job writes to both.
+
+## phytospectra.org
+
+The .org zone is on the same Cloudflare account. Serve it as a 301 redirect
+to the .com (keeps one canonical host for SSL, SEO and cert management):
+
+1. Cloudflare → phytospectra.org → DNS: add proxied (orange) record
+   `A @ 192.0.2.1` and `CNAME www 192.0.2.1` (placeholder targets; the
+   redirect rule intercepts all traffic).
+2. Rules → Redirect Rules → Create rule:
+   - If: Hostname equals `phytospectra.org` **or** `www.phytospectra.org`
+   - Then: Static redirect, 301, `https://phytospectra.com`,
+     preserve query and path.
