@@ -87,22 +87,17 @@ Six hostnames serve the web app: `phytospectra.com`, `www.phytospectra.com`,
 Domain registration: Cloudflare (both zones, 2026-10-21, auto-renew).
 
 Cloud Run domain mappings (service `phyto-frontend`, region `us-central1`;
-all six created — .org verification completed 2026-10-26):
+all six created and LIVE with issued certificates as of 2026-10-26 —
+verified end-to-end, HTTP 200 on every hostname):
 
-| Domain                    | Status                              | DNS records needed                |
-|---------------------------|-------------------------------------|-----------------------------------|
-| app.phytospectra.com      | LIVE (cert issued)                  | CNAME app → ghs.googlehosted.com. |
-| phytospectra.com (apex)   | LIVE (cert issued, DNS switched)    | A @ → 216.239.32/34/36/38.21      |
-| www.phytospectra.com      | DNS switched, cert auto-provisioning| CNAME www → ghs.googlehosted.com. |
-| phytospectra.org (apex)   | mapping created, **DNS still old**  | A @ → 216.239.32/34/36/38.21      |
-| www.phytospectra.org      | mapping created, **DNS still old**  | CNAME www → ghs.googlehosted.com. |
-| app.phytospectra.org      | mapping created, **no DNS record**  | CNAME app → ghs.googlehosted.com. |
-
-Remaining .org step: run `infrastructure/cloudflare_dns_setup.sh` once more
-(the .com zone is already converged and will be skipped; the .org zone still
-carries the old redirect placeholders `192.0.2.1`, and `app` was never
-created). Cert issuance for the .com www host completes on its own
-(Google retries ~every 5 min).
+| Domain                    | Status     | DNS records                       |
+|---------------------------|------------|-----------------------------------|
+| app.phytospectra.com      | LIVE       | CNAME app → ghs.googlehosted.com. |
+| phytospectra.com (apex)   | LIVE       | A @ → 216.239.32/34/36/38.21      |
+| www.phytospectra.com      | LIVE       | CNAME www → ghs.googlehosted.com. |
+| phytospectra.org (apex)   | LIVE       | A @ → 216.239.32/34/36/38.21      |
+| www.phytospectra.org      | LIVE       | CNAME www → ghs.googlehosted.com. |
+| app.phytospectra.org      | LIVE       | CNAME app → ghs.googlehosted.com. |
 
 DNS records for BOTH zones (Cloudflare dashboard per zone, or run
 `infrastructure/cloudflare_dns_setup.sh` with `CLOUDFLARE_API_TOKEN`; it
