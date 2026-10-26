@@ -84,7 +84,6 @@ class LipidCuration:
     def summary(self) -> str:
         if not self.excluded:
             return "lipid curation: 0 peaks excluded"
-        windows = sorted({(lo, hi) for lo, hi, _ in self.excluded_regions()})
         reasons = "; ".join(
             f"[{lo:g}, {hi:g}] ppm ({reason})"
             for (lo, hi), reason in self._reason_by_window().items()

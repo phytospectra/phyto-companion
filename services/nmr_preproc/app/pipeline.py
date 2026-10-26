@@ -122,7 +122,7 @@ def parse_jcamp(path: Path) -> dict:
     return params
 
 
-def _fid_data_type(acqus: dict) -> np.dtype:
+def fid_data_type(acqus: dict) -> np.dtype:
     """Data type of the interleaved re/im FID pairs from ``acqus``.
 
     DTYPA is honoured per the Bruker/nmrglue convention: 2 means the FID
@@ -157,7 +157,7 @@ def fid_decay_ratio(fid: np.ndarray, quarters: int = 4) -> float:
 
 def _load_fid(exp_dir: Path) -> tuple[np.ndarray, dict]:
     acqus = parse_jcamp(exp_dir / "acqus")
-    dtype = _fid_data_type(acqus)
+    dtype = fid_data_type(acqus)
     raw = np.fromfile(exp_dir / "fid", dtype=dtype)
     # TD counts COMPLEX points; the file holds 2*TD interleaved re/im
     # values of the DTYPA-selected width.
