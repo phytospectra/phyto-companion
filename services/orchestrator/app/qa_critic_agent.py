@@ -22,10 +22,15 @@ from pydantic import BaseModel
 
 from phyto_shared.grounding import GROUNDING_MIN_SCORE, GroundingReport, compute_grounding
 from phyto_shared.literature_models import PaperHit
+from phyto_shared.rubrics import load_rubric
 
 from .llm_client import LLMClient
 
 __all__ = ["CheckResult", "VerificationResult", "QACriticAgent"]
+
+#: Tools whose outputs are judged against the packaged NMR
+#: structure-elucidation rubric (PROMPT_nmr_structure_elucidation.md).
+_RUBRIC_TOOL_PREFIXES = ("elucidation.", "nmr_preproc.")
 
 
 @dataclass(frozen=True)
@@ -279,13 +284,25 @@ class QACriticAgent:
         self, tool_name: str, output: BaseModel
     ) -> CheckResult:
         """LLM-as-judge narrative review; supplements, never replaces rules."""
+        system_prompt = (
+            "You are a QA critic for scientific AI outputs. Judge "
+            "whether the output is coherent, evidence-grounded, and "
+            "honest about uncertainty. Reply PASS or FAIL with a reason."
+        )
+        if tool_name.startswith(_RUBRIC_TOOL_PREFIXES):
+            try:
+                rubric = load_rubric("elucidation")
+            except (FileNotFoundError, OSError):
+                rubric = ""
+            if rubric:
+                system_prompt = (
+                    f"{system_prompt}\n\nJudge against this structure-"
+                    f"elucidation rubric (report every numbered rule the "
+                    f"output violates):\n{rubric}"
+                )
         try:
             response = self.llm.complete(
-                system_prompt=(
-                    "You are a QA critic for scientific AI outputs. Judge "
-                    "whether the output is coherent, evidence-grounded, and "
-                    "honest about uncertainty. Reply PASS or FAIL with a reason."
-                ),
+                system_prompt=system_prompt,
                 user_prompt=(
                     f"Tool: {tool_name}\nOutput: {output.model_dump_json()}"
                 ),
