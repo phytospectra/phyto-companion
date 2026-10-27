@@ -86,7 +86,7 @@ authoritative full text of every numbered decision remains in
 | ADR-0072 | Analytical reporting checklist as evidence, with visible gaps | accepted | `shared/phyto_shared/metabolomics.py` |
 | ADR-0073 | In-house spectral deconvolution and qNMR region integration as Tier-1 tools | accepted | `services/nmr_preproc/app/deconvolution.py` |
 | ADR-0074 | Custom equations via a whitelisted AST evaluator — no eval, ever | accepted | `services/nmr_preproc/app/equations.py` |
-| ADR-0075 | (reserved — cited by `services/nmr_preproc/app/consistency.py`; ADR text pending) | reserved (gap) | `docs/DECISIONS.md` |
-| ADR-0076 | (reserved — cited by `shared/phyto_shared/lipid_regions.py` lipid-region exclusion; ADR text pending) | reserved (gap) | `docs/DECISIONS.md` |
+| ADR-0075 | Bruker readers honour DTYPA/XDIM, cross-artefact consistency is enforced (R7), MSI levels follow Sumner 2007 | accepted | `services/nmr_preproc/app/consistency.py` |
+| ADR-0076 | Lipid-region exclusion as a recorded curation step in the 13C assignment path | accepted | `shared/phyto_shared/lipid_regions.py` |
 | ADR-0077 | Web app only — desktop app removed; all six hostnames on .com and .org serve the web app (www.phytospectra.com canonical) | accepted | `docs/DEPLOYMENT_GCP.md` |
 | ADR-0077 | Web app only — desktop app removed; all six hostnames on .com and .org serve the web app (www.phytospectra.com canonical) | accepted | `docs/DEPLOYMENT_GCP.md` |

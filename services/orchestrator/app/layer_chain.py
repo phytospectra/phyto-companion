@@ -85,7 +85,9 @@ def _level1_evidence_chain(
             (name for name, s_ik in standard_iks.items() if s_ik == ik), None
         )
         if matched:
-            update = {"level_1_match": matched}
+            # MSI Level 1 per the standard (authentic standard, ADR-0061):
+            # the level is attributed where the provenance is.
+            update = {"level_1_match": matched, "msi_level": 1}
             if offset is not None:
                 update["rt_offset_applied"] = offset
             rank = rank.model_copy(update=update)

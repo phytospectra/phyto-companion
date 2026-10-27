@@ -251,8 +251,33 @@ ELEMENT_VALENCES: Mapping[str, int] = MappingProxyType(
 class MSIConfidenceLevel(IntEnum):
     """Metabolite Standards Initiative confidence levels.
 
-    Level 1 is the only level at which PhytoCompanion may report a compound
-    as *confirmed* -- and only with recorded human-in-the-loop approval.
+    Defined EXACTLY as the standard defines them (Sumner et al.,
+    Metabolomics 3:161, 2007 -- "Proposed minimum reporting standards
+    for chemical analysis", Table 2 / chemical analysis working group):
+
+    * Level 1 -- **identified compounds**: two independent orthogonal
+      data types (e.g. MS/MS *and* retention time, or NMR *and* MS)
+      compared against an authentic chemical reference standard
+      analysed under identical experimental conditions.
+    * Level 2 -- **putatively annotated compounds**: no authentic
+      standard, but physicochemical properties and/or spectral
+      similarity to authentic compounds in commercial or public
+      libraries (GNPS library hit, NMRShiftDB2/COCONUT/SUMMIT match,
+      curated literature shift tables).
+    * Level 3 -- **putatively characterized compound classes**: a
+      compound CLASS is assigned from characteristic
+      physicochemical/spectral properties of the class, without
+      justification for a specific structure.
+    * Level 4 -- **unknown compounds**: not identified nor putatively
+      annotated; features reported only by their spectral
+      characteristics.
+
+    Platform policy ON TOP of the standard: a Level-1 match is stamped
+    only by the home-library calibration path (an in-house authentic
+    standard, ADR-0061) and "confirmed" additionally requires recorded
+    human-in-the-loop approval.  A literature-table match is Level 2,
+    never Level 1 -- the standard reserves Level 1 for authentic
+    standards under identical conditions (ADR-0075).
     """
 
     LEVEL_1 = 1
@@ -261,30 +286,47 @@ class MSIConfidenceLevel(IntEnum):
     LEVEL_4 = 4
 
 
+#: The standard's own names for each level, for report wording.
+MSI_LEVEL_NAMES: Mapping[MSIConfidenceLevel, str] = MappingProxyType(
+    {
+        MSIConfidenceLevel.LEVEL_1: "identified compound",
+        MSIConfidenceLevel.LEVEL_2: "putatively annotated compound",
+        MSIConfidenceLevel.LEVEL_3: "putatively characterized compound class",
+        MSIConfidenceLevel.LEVEL_4: "unknown compound",
+    }
+)
+
+
 MSI_LEVEL_REQUIREMENTS: Mapping[MSIConfidenceLevel, str] = MappingProxyType(
     {
         MSIConfidenceLevel.LEVEL_1: (
-            "Identified compound: agreement with an authentic reference "
-            "standard analysed under identical conditions in >= 2 orthogonal "
-            "properties (e.g. retention time + MS/MS, or NMR consistency). "
-            "Requires recorded human sign-off before the platform reports "
-            "'confirmed'."
+            "Identified compound (standard Level 1): agreement of >= 2 "
+            "independent orthogonal data types (e.g. retention time + "
+            "MS/MS, or NMR + MS) with an AUTHENTIC REFERENCE STANDARD "
+            "analysed under identical experimental conditions.  On this "
+            "platform the stamp comes from the home-library calibration "
+            "path (ADR-0061) and 'confirmed' additionally requires "
+            "recorded human sign-off."
         ),
         MSIConfidenceLevel.LEVEL_2: (
-            "Putatively annotated compound: probable identity from spectral "
+            "Putatively annotated compound (standard Level 2): probable "
+            "identity from physicochemical properties and/or spectral "
             "similarity to library/literature data (GNPS library hit, "
-            "NMRShiftDB2/COCONUT match, SUMMIT cross-modal match) without an "
-            "in-house authentic standard."
+            "NMRShiftDB2/COCONUT match, SUMMIT cross-modal match, "
+            "curated published shift tables) WITHOUT an authentic "
+            "standard analysed in-house."
         ),
         MSIConfidenceLevel.LEVEL_3: (
-            "Putatively characterized compound class: class/subclass "
-            "assignment from physicochemical properties and spectral evidence "
-            "(building-block fragments, HSQC network neighbourhood), without "
-            "justification for a specific structure."
+            "Putatively characterized compound class (standard Level 3): "
+            "class/subclass assignment from characteristic "
+            "physicochemical properties and spectral evidence "
+            "(building-block fragments, HSQC network neighbourhood), "
+            "without justification for a specific structure."
         ),
         MSIConfidenceLevel.LEVEL_4: (
-            "Unknown compound: evidence insufficient even for a class-level "
-            "assignment."
+            "Unknown compound (standard Level 4): evidence insufficient "
+            "even for a class-level assignment; report the feature, not "
+            "a name."
         ),
     }
 )

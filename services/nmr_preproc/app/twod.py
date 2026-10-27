@@ -7,7 +7,7 @@ self-checked: a COSY must be symmetric about its diagonal, and the
 loader uses that property to validate the (F1, F2) reshape on every
 load of a homonuclear spectrum.
 
-Storage formats handled (case-study finding: the M6-4 COSY/HMBC ``2rr``
+Storage formats handled (ADR-0075; case-study finding: the M6-4 COSY/HMBC ``2rr``
 files carry XDIM block/submatrix storage, and reading them flat produced
 garbled matrices before the orientation check ran):
 
@@ -163,18 +163,26 @@ def _partner_symmetry_score(
     m = np.asarray(matrix, dtype=np.float64)
     if m.min() == m.max():
         return 0.0
-    threshold = np.percentile(m, 99.99)
-    coords = np.argwhere(m >= threshold)
-    order = np.argsort(m[m >= threshold])[::-1][:top]
+    # strongest points only; works for dense real spectra and sparse
+    # synthetic ones alike (a percentile cut alone would admit a sea of
+    # zeros when the matrix is mostly empty)
+    flat_order = np.argsort(m, axis=None)[::-1]
+    top_points = [k for k in flat_order[: 5 * top] if m.flat[k] > 0][:top]
     hits = 0
     counted = 0
-    for k in order:
-        i, j = coords[k]
+    for k in top_points:
+        i, j = divmod(int(k), m.shape[1])
         p2, p1 = f2_ppm[j], f1_ppm[i]
         jp = int(np.argmin(np.abs(f2_ppm - p1)))
         ip = int(np.argmin(np.abs(f1_ppm - p2)))
         counted += 1
-        if m[ip, jp] >= 0.2 * m[i, j]:
+        # the two axes can have different ppm spacings, so the mirrored
+        # ppm coordinates land up to a pixel away from the mapped index;
+        # search a +/-1 point neighbourhood around the mapped partner
+        window = m[
+            max(ip - 1, 0): ip + 2, max(jp - 1, 0): jp + 2
+        ]
+        if window.size and window.max() >= 0.2 * m[i, j]:
             hits += 1
     return hits / max(counted, 1)
 

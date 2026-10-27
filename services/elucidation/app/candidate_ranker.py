@@ -651,6 +651,7 @@ def rank_candidates(
             candidate, per_candidate_results[index], config.cap
         )
         evidence.extend(per_candidate_gaps[index])
+        evidence.extend(lipid_notes)
         if formula_failed[index]:
             evidence.append(
                 EvidenceItem(
@@ -690,6 +691,13 @@ def rank_candidates(
                 ranking_interval=(best, worst),
                 tied_candidates=tied_ids,
                 verdict=assessment.verdict,
+                # MSI Level 2 baseline ("putatively annotated"): the ranker
+                # matches observed spectra against library/predicted
+                # reference data, which is spectral similarity WITHOUT an
+                # authentic standard -- the standard's Level 2 definition
+                # (Sumner 2007).  Level 1 is stamped only by the
+                # calibration layer together with level_1_match (ADR-0075).
+                msi_level=int(MSIConfidenceLevel.LEVEL_2),
                 evidence_graph=graph,
                 evidence_profile=profile,
             )

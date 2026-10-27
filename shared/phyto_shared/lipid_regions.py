@@ -42,20 +42,25 @@ __all__ = [
 ]
 
 #: (low_ppm, high_ppm, reason) triples covering the common lipid/acyl
-#: contaminant envelopes of plant 13C spectra.
+#: contaminant envelopes of plant 13C spectra.  Catalog of ALL known
+#: windows; the DEFAULT mask below is the safe subset.
 LIPID_REGIONS_13C: tuple[tuple[float, float, str], ...] = (
-    (0.0, 40.0, "fatty-acyl chain methylenes/terminal methyls"),
-    (55.0, 90.0, "glycerol backbone (C1/C3 ~63, C2 ~72) and glycolipid sugars"),
+    (10.0, 40.0, "fatty-acyl chain methylenes/terminal methyls"),
+    (55.0, 75.0, "glycerol backbone C1/C3 (~63) and glycolipid sugars"),
     (125.0, 135.0, "fatty-acyl olefinic carbons"),
-    (172.0, 180.0, "acyl ester/carboxyl carbons"),
+    (172.0, 174.5, "triacylglycerol ester carbonyls"),
 )
 
-#: Regions used by default: everything LIPID_REGIONS_13C defines.  A
-#: caller MAY pass a subset (e.g. only the glycerol window) when its
-#: sample is known lipid-free; the default errs toward exclusion.
-DEFAULT_LIPID_REGIONS_13C: tuple[tuple[float, float], ...] = tuple(
-    (lo, hi) for lo, hi, _reason in LIPID_REGIONS_13C
-)
+#: Default exclusion mask: the aliphatic fatty-acyl envelope ONLY.  This
+#: mirrors the case-study curation ([10, 40] ppm) and is the one window
+#: that cannot overlap natural-product carbons of the platform's target
+#: classes (pterocarpans, flavonoids, isoflavones): their oxygenated
+#: aliphatic carbons sit at 60-90 ppm, aromatics at 93-160 ppm, and
+#: carbonyls at 165-185 ppm.  The other catalog windows (glycerol,
+#: olefinic, ester C=O) DO overlap those analyte carbons, so they are
+#: opt-in: pass them explicitly when the sample's chemistry justifies
+#: it, and the report records what was excluded and why.
+DEFAULT_LIPID_REGIONS_13C: tuple[tuple[float, float], ...] = ((10.0, 40.0),)
 
 
 def is_in_regions(
@@ -93,17 +98,14 @@ class LipidCuration:
             f"{reasons}; {self.n_kept} kept"
         )
 
-    def excluded_regions(self) -> list[tuple[float, float]]:
-        return [
-            (ppm, ppm)
-            for ppm, _prom, _reason in self.excluded
-        ]
+    def excluded_ppm(self) -> list[float]:
+        return [ppm for ppm, _prom, _reason in self.excluded]
 
     def _reason_by_window(self) -> dict[tuple[float, float], str]:
         by_window: dict[tuple[float, float], str] = {}
         for ppm, _prom, reason in self.excluded:
             for lo, hi, r in LIPID_REGIONS_13C:
-                if lo <= ppm <= hi:
+                if lo <= ppm <= hi and r == reason:
                     by_window[(lo, hi)] = r
                     break
         return by_window

@@ -42,7 +42,8 @@ def _full_bundle(tmp_path: Path):
     derep = DereplicationResult(
         sample_id="S1", best_match="maackiain", citation="Teixeira 2018",
         coverage=1.0, mean_abs_deviation=0.005,
-        verdict="MSI Level 1 pending human sign-off",
+        verdict="MSI Level 2 (putatively annotated; curated reference-table "
+            "match)",
     )
     pharm = PharmacologyRow(
         compound="maackiain", target="MAO-B", method="similarity",
@@ -88,7 +89,7 @@ class TestFullBundleCapabilities:
 
 
 class TestHomeLibrary:
-    def test_maackiain_stamps_level1_pending(self) -> None:
+    def test_maackiain_is_level2_putatively_annotated(self) -> None:
         lib = load_library("data/curated_home_library.csv")
         assert len(lib) >= 3
         maack_obs = [7.35, 6.55, 6.42, 3.49, 3.64, 4.22, 6.72, 6.43, 5.47, 5.92]
@@ -96,4 +97,11 @@ class TestHomeLibrary:
         assert res is not None
         assert res.entry.name == "maackiain"
         assert res.coverage >= 0.90
-        assert "MSI Level 1 pending" in verdict
+        # MSI levels as the standard defines them (Sumner 2007, ADR-0075):
+        # a curated literature table is NOT an authentic standard, so the
+        # verdict is Level 2 at best and never claims Level 1.
+        assert "MSI Level 2" in verdict
+        assert "putatively annotated" in verdict
+        assert "Level 1" not in verdict.replace(
+            "Level 1 requires an authentic standard", ""
+        )

@@ -479,6 +479,18 @@ class CandidateRank(StrictModel):
         "this peak at Level 1 (ADR-0061).  MSI Level 1 requires an authentic "
         "standard; this field is that claim's provenance.",
     )
+    msi_level: int | None = Field(
+        default=None,
+        ge=1,
+        le=4,
+        description="MSI confidence level this rank's evidence supports, "
+        "as the standard defines the levels (Sumner et al. 2007; ADR-0075): "
+        "1 = identified compound (authentic standard, >= 2 orthogonal data "
+        "types; set together with level_1_match), 2 = putatively annotated "
+        "compound (library/literature spectral match without a standard -- "
+        "the ranker baseline), 3 = putatively characterized compound class, "
+        "4 = unknown.  None when the level was never attributed.",
+    )
     rt_offset_applied: float | None = Field(
         default=None,
         description="RT offset (min) applied to predicted RTs after "

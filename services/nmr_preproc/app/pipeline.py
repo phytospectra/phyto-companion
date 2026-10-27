@@ -125,7 +125,7 @@ def parse_jcamp(path: Path) -> dict:
 def fid_data_type(acqus: dict) -> np.dtype:
     """Data type of the interleaved re/im FID pairs from ``acqus``.
 
-    DTYPA is honoured per the Bruker/nmrglue convention: 2 means the FID
+    DTYPA is honoured (ADR-0075) per the Bruker/nmrglue convention: 2 means the FID
     was stored as float64 re/im pairs (DTYPA=2 is written e.g. by
     IconNMR for digitizer data; case-study finding: every 1H FID in the
     'NMR file for prediction' export carries DTYPA=2 and reading it as
