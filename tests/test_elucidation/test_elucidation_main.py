@@ -173,3 +173,99 @@ class TestEvidence:
         assert "claim_nodes" in graph
         assert "match_support" in graph["claim_nodes"]
         assert len(response.json()["provenance_manifest_id"]) == 64
+
+
+class TestPhase2Vertical:
+    """One end-to-end run through the API on a REAL (file-backed) library.
+
+    Phase 2's production vertical: a curated CSV library is wired via
+    PHYTO_STRUCTURE_DB_PATH, and a single request traverses
+    candidates -> provenance manifest -> health, with the fixture library
+    labeled (provenance/source recorded per candidate) and excluded from
+    any scientific claim. Run on the local plane (mock predictor), per
+    the split-plane rules.
+    """
+
+    @pytest.fixture()
+    def vertical_library(self, tmp_path):
+        csv = tmp_path / "vertical_library.csv"
+        csv.write_text(
+            "name,smiles,provenance,source\n"
+            "phenol,Oc1ccccc1,experimental,curated-vertical-test\n"
+            "catechol,Oc1ccccc1O,experimental,curated-vertical-test\n",
+            encoding="utf-8",
+        )
+        return csv
+
+    @pytest.fixture()
+    def vertical_client(self, vertical_library, monkeypatch):
+        from elucidation import main
+
+        monkeypatch.setenv("PHYTO_STRUCTURE_DB_PATH", str(vertical_library))
+        main.get_runtime.cache_clear()
+        with TestClient(main.app) as test_client:
+            yield test_client
+        main.get_runtime.cache_clear()
+
+    def test_end_to_end_with_real_library(self, vertical_client):
+        # health first: the deployment's mode is observable
+        health = vertical_client.get("/health").json()
+        assert health["status"] == "ok"
+        assert health["structure_db_available"] is True
+        assert health["db_size"] == 2
+        assert health["predictor"] == "MockShiftPredictor"
+
+        # one full candidates request against the real library
+        response = vertical_client.post(
+            "/elucidate/candidates",
+            json={
+                "observed": PHENOL_OBSERVED.model_dump(),
+                "formula": "C6H6O",
+            },
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["provenance_manifest_id"], "no provenance manifest"
+        ranks = body["ranks"]
+        assert ranks, "no candidates returned from the real library"
+        top = ranks[0]
+        # the curated library's provenance travels with the candidate
+        assert top["candidate"]["provenance"] == "experimental"
+        assert top["candidate"]["source"] == "curated-vertical-test"
+        assert top["candidate"]["name"] == "phenol"  # exact 1H+13C match wins
+        assert top["ranking_convention"] == "lower_is_better"
+
+        # the novel endpoint traverses the same runtime on the same library:
+        # catechol (in the library) + one OH -> C6H6O3, which the curated
+        # library does NOT contain, so the edit survives the known filter
+        catechol_ik = Chem.MolToInchiKey(Chem.MolFromSmiles("Oc1ccccc1O"))
+        novel = vertical_client.post(
+            "/elucidate/novel",
+            json={
+                "target_formula": "C6H6O3",
+                "parent_ik": catechol_ik,
+                "observed": {"h_1d": [6.5, 6.7, 6.9]},
+            },
+        )
+        assert novel.status_code == 200
+        novel_body = novel.json()
+        assert novel_body["provenance_manifest_id"]
+        assert novel_body["novel_candidates"], "hydroxyquinol should be reachable"
+        novel_top = novel_body["novel_candidates"][0]
+        assert novel_top["candidate"]["provenance"] == "predicted"
+
+    def test_vertical_rejects_missing_library_at_startup(self):
+        from elucidation import main
+        from elucidation.runtime_config import ElucidationConfig
+
+        from phyto_shared.exceptions import CloudServiceError
+
+        with pytest.raises(CloudServiceError, match="not found"):
+            main._Runtime(
+                ElucidationConfig(
+                    env="local", dry_run=True,
+                    vertex_endpoint_id=None, gcp_project=None,
+                    vertex_location="us-central1",
+                    structure_db_path="/nonexistent/vertical.csv",
+                )
+            )
