@@ -87,7 +87,24 @@ Reporting template per the enterprise handoff brief. One row per milestone.
 - **Remaining blockers**: Phase 3 (verify deployed auth is real — finding 6; Stripe webhook contract; frontend evidence-field contract — finding 7); Phase 4.
 - **Next bounded task**: Phase 3 — auth/ops evidence collection and contract tests.
 
+## Milestone: Phase 3 — auth contract tests (finding 6) + FE evidence-field contract (finding 7)
+
+- **Milestone/status**: Phase 3 first slice — **complete** (finding 6 finding-7 addressed; deployed-mode live verification still pending user/environment).
+- **Base SHA → result SHA**: `4c7786c` → `672874e` (backend, branch `agent/phase0a-phase1a-failclosed-runtime`); frontend `45b73de` → `d7d7a49` (frontend repo, `main`).
+- **Implemented behavior**:
+  - **Finding 6 (401 contract)**: every authed service route must return 401 for unauthenticated callers. `tests/test_auth/test_service_health.py` extended (+85/−14) with contract tests for the 7 services that lacked them, plus a structural fail-closed guard: a test that introspects registered routers and fails if any future authed router ships without the guard. Frontend contract mirror (finding 7): backend `models.py:482` carries `msi_level` (MSI confidence level) on `CandidateRank`; mirrored into `src/lib/phyto/types.ts`, `src/lib/phyto/fixtures.ts`, `src/__fixtures__/rich_identify_response.json`, and pinned in `tests/unit/contract-type-fixes.test.tsx` so the FE cannot silently drop the evidence field.
+- **Evidence**:
+  - `tests/test_auth/test_service_health.py` → **33 passed**.
+  - Full backend suite: **1556 passed**, 14 warnings (pre-existing class-scoped-fixture deprecations), 72.1s; `ruff check .` → All checks passed.
+  - Frontend: `tsc --noEmit` clean; `scripts/check_fe_contract.py` → OK (allowlisted pass-2 gaps excluded, pinned shapes intact).
+- **Environment limitation (frontend vitest suite)**: `npx vitest run` (vitest 4, Node v26.11.1) fails at worker startup in this environment — pool errors `[vitest-pool-runner]: Timeout waiting for worker to respond` / `Failed to start forks worker for test files ...` (10 errors, 0 tests executed, 120s). Recorded in `HANDOFF_repo_health.md` as an environment limitation, not a code defect: the worker-spawn path times out under this sandbox (forks pool, Node 26.11.1). Verification for this slice therefore relied on `tsc --noEmit` + the FE contract checker + backend tests; the vitest unit suite (incl. the new `msi_level` pin in `contract-type-fixes.test.tsx`) should be run on a machine with a working worker-spawn path before merge to `main`.
+- **Scientific validation**: none required — auth contract tests and type mirroring only; no scientific expectations touched.
+- **Security/deployment impact**: positive — closes the 401 coverage gap (finding 6) for 7 services with a structural guard against regressions; `msi_level` now travels to the FE so MSI confidence is not silently dropped at the contract boundary.
+- **Remaining blockers**: deployed-mode auth verification (needs live environment access); Stripe webhook contract test; frontend vitest run (environment limitation above); Phases 4–5.
+- **Next bounded task**: Phase 3 remainder — Stripe webhook signature contract test, then deployed-mode verification setup.
+
 ## Test/lint addendum
 
-- Full suite: `pytest -q` → **1541 passed**, 14 warnings, 71.6s (2026-10-31, Python 3.12, Phase 2 vertical included). Warnings are pre-existing class-scoped-fixture deprecations, not failures.
+- Full suite: `pytest -q` → **1556 passed**, 14 warnings, 72.1s (2026-10-31, Python 3.12, Phase 3 auth contracts included). Warnings are pre-existing class-scoped-fixture deprecations, not failures.
 - Lint: `ruff check .` → **All checks passed!**
+- Frontend: `tsc --noEmit` clean; `scripts/check_fe_contract.py` OK; vitest suite not runnable in this environment (see Phase 3 milestone, environment limitation).

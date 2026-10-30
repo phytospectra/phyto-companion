@@ -290,3 +290,30 @@ Beyond the audit script and the two handoff files,
 **no other existing files were modified** — the 15 remaining unstaged
 modifications predate this pass (they are the prior sessions'
 marker-miss, threshold-basis, auth-flake and governance work).
+
+## 8. Environment limitation addendum (2026-10-31): frontend vitest worker-spawn timeout
+
+As of the Phase 3 auth-contract pass (backend `672874e`, frontend
+`d7d7a49`), the frontend unit suite **cannot run in this environment**.
+`npx vitest run` (vitest 4 under Node v26.11.1, macOS/arm64 sandbox)
+fails at worker startup before any test executes:
+
+```
+Error: [vitest-pool]: Failed to start forks worker for test files
+  .../frontend/tests/unit/client.test.ts
+Caused by: [vitest-pool-runner]: Timeout waiting for worker to respond
+ (10 errors, "Test Files no tests / Tests no tests", Duration 120s)
+```
+
+This is an **environment limitation, not a code defect**: the same tree
+ran the vitest suite cleanly in the earlier audit (§5: 7 files / 21
+tests passing). Phase 3 verification therefore relied on
+`tsc --noEmit` (clean), `scripts/check_fe_contract.py` (OK), and the
+backend suite (1556 passed), plus a fresh attempt with an explicit
+`--reporter` flag ruling out reporter-loading errors
+(`--reporter=basic` fails separately with `Failed to load custom
+Reporter from basic` — that flag is not a valid built-in in vitest 4;
+the default-reporter run reproduces the worker timeout). **Action for
+a later session:** run `npm run test:unit` on a machine with a working
+worker-spawn path before merging the frontend contract commit
+(`d7d7a49`, msi_level mirror) to `main`.
