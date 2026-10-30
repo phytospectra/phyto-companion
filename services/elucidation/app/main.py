@@ -12,10 +12,11 @@ from functools import lru_cache
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from rdkit import Chem
 
-from phyto_shared.exceptions import InvalidInputError
+from phyto_shared.exceptions import CloudServiceError, InvalidInputError
 from phyto_shared.models import CandidateRank
 from phyto_shared.provenance import ProvenanceBuilder, sha256_dict
 
@@ -31,17 +32,59 @@ from .candidate_ranker import (
 )
 from .evidence_graph import RichEvidenceGraph, build_evidence_graph
 from .novel_structure_generator import generate_novel_candidates
-from .shift_predictor import get_shift_predictor
+from .runtime_config import ElucidationConfig
+from .shift_predictor import MockShiftPredictor, VertexAIShiftPredictor
 from .site_localization import SiteLocalization, localize_site
-from .structure_db import MockStructureDB
+from .structure_db import MockStructureDB, StructureDatabase
 
 router = APIRouter()
 
 
 class _Runtime:
-    def __init__(self) -> None:
-        self.predictor = get_shift_predictor()
-        self.db = MockStructureDB()
+    """Resolved scientific collaborators, explicit about their mode.
+
+    Built from :class:`ElucidationConfig` so the predictor can never
+    silently fall back to a mock on the cloud plane: a real deployment
+    with missing Vertex configuration fails at startup (ADR-0078).  The
+    structure database is honest about its limits instead: only the mock
+    fixture library exists today, so in real cloud mode the slot stays
+    empty and access raises :class:`CloudServiceError` (503) rather than
+    serving the fixture library as if it were a database.
+    """
+
+    def __init__(self, config: ElucidationConfig | None = None) -> None:
+        self.config = (config or ElucidationConfig.from_env()).validate()
+        self._db: StructureDatabase | None = (
+            MockStructureDB() if self.config.dry_run else None
+        )
+        if self.config.real_prediction:
+            # Constructed from the VALIDATED config, not the env-reading
+            # factory: the factory re-derives dry-run from os.environ, which
+            # would silently disagree with an explicitly-passed config.
+            # Missing configuration already raised in validate(); the SDK
+            # absence raises CloudServiceError at first predict().
+            self.predictor = VertexAIShiftPredictor(
+                endpoint_id=self.config.vertex_endpoint_id,
+                project=self.config.gcp_project,
+                location=self.config.vertex_location,
+            )
+        else:
+            self.predictor = MockShiftPredictor()
+
+    @property
+    def db(self) -> StructureDatabase:
+        if self._db is None:
+            raise CloudServiceError(
+                "no structure database is configured on this deployment; "
+                "candidate retrieval is explicitly unavailable -- configure "
+                "a real provider (the structure_db provider interface, "
+                "Step 6+ wiring) or run the local plane (PHYTO_DRY_RUN=1)",
+                context={
+                    "env": self.config.env,
+                    "capability": "structure_db",
+                },
+            )
+        return self._db
 
 
 @lru_cache(maxsize=1)
@@ -268,15 +311,28 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
     cfg = install_auth(application, config)
     application.include_router(router)
 
+    @application.exception_handler(CloudServiceError)
+    async def cloud_service_unavailable(
+        _request: Any, exc: CloudServiceError
+    ) -> JSONResponse:
+        """An unconfigured/failed cloud capability is a 503, never mock data."""
+        return JSONResponse(
+            status_code=503,
+            content={"detail": exc.message, "context": exc.context},
+        )
+
     @application.get("/health")
     def health() -> dict[str, Any]:
         runtime = get_runtime()
+        db_available = runtime._db is not None
         return {
             "status": "ok",
             "service": "elucidation",
             "version": __version__,
             "predictor": type(runtime.predictor).__name__,
-            "db_size": len(runtime.db._candidates),
+            "predictor_mode": runtime.config.mode,
+            "structure_db_available": db_available,
+            "db_size": len(runtime.db._candidates) if db_available else 0,
             "dry_run": cfg.dry_run,
         }
 

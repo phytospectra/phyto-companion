@@ -290,14 +290,39 @@ class MockShiftPredictor:
 
 
 def get_shift_predictor(**kwargs) -> ShiftPredictor:
-    """Mock when PHYTO_DRY_RUN=1 or the Vertex AI SDK is unavailable."""
-    if os.environ.get("PHYTO_DRY_RUN") == "1":
+    """Resolve the predictor for the current plane (ADR-0078).
+
+    Dry-run (the local plane's default) returns the deterministic mock.
+    Real mode -- ``PHYTO_ENV=cloud`` with ``PHYTO_DRY_RUN`` unset or ``0`` --
+    NEVER falls back to the mock: a missing Vertex configuration or the
+    absence of the Google SDK raises, so a misconfigured deployment cannot
+    answer with mock science.  Explicitly setting ``PHYTO_DRY_RUN=1`` on the
+    cloud plane is the documented bring-up mode and is reported by
+    ``/health`` as ``local-mock``.
+    """
+    env = os.environ.get("PHYTO_ENV", "local")
+    explicit = os.environ.get("PHYTO_DRY_RUN")
+    dry_run = (env != "cloud") if explicit is None else explicit == "1"
+    if dry_run:
         return MockShiftPredictor()
+
+    required = ("endpoint_id", "project")
+    missing = [key for key in required if not kwargs.get(key)]
+    if missing:
+        raise CloudServiceError(
+            "shift prediction is in real mode but is missing required "
+            f"configuration: {', '.join(missing)}. Refusing to fall back to "
+            "the mock predictor; set VERTEX_ENDPOINT_ID and "
+            "GOOGLE_CLOUD_PROJECT, or run the local plane with "
+            "PHYTO_DRY_RUN=1.",
+            context={"env": env, "missing": missing},
+        )
     try:
         import google.cloud.aiplatform  # noqa: F401
-    except ImportError:
-        return MockShiftPredictor()
-    required = ("endpoint_id", "project")
-    if any(not kwargs.get(key) for key in required):
-        return MockShiftPredictor()
+    except ImportError as exc:
+        raise CloudServiceError(
+            "shift prediction is in real mode but google-cloud-aiplatform "
+            "is not installed; refusing to fall back to the mock predictor",
+            context={"env": env},
+        ) from exc
     return VertexAIShiftPredictor(**kwargs)

@@ -100,12 +100,41 @@ class TestVertexClient:
 
 
 class TestFactory:
+    """Plane resolution is explicit and fail-closed (ADR-0078).
+
+    The local plane (default) gets the mock. Real cloud mode never
+    degrades to the mock: missing configuration or a missing SDK raises.
+    """
+
     def test_dry_run_forces_mock(self, monkeypatch):
         monkeypatch.setenv("PHYTO_DRY_RUN", "1")
         assert isinstance(get_shift_predictor(), MockShiftPredictor)
 
-    def test_no_sdk_defaults_to_mock(self, monkeypatch):
+    def test_local_plane_defaults_to_mock(self, monkeypatch):
         monkeypatch.delenv("PHYTO_DRY_RUN", raising=False)
+        monkeypatch.delenv("PHYTO_ENV", raising=False)
+        assert isinstance(get_shift_predictor(), MockShiftPredictor)
+
+    def test_cloud_real_mode_without_config_raises(self, monkeypatch):
+        monkeypatch.setenv("PHYTO_ENV", "cloud")
+        monkeypatch.delenv("PHYTO_DRY_RUN", raising=False)
+        with pytest.raises(CloudServiceError) as excinfo:
+            get_shift_predictor()
+        assert "missing required configuration" in str(excinfo.value)
+        assert "endpoint_id" in str(excinfo.value)
+
+    def test_cloud_real_mode_without_sdk_raises(self, monkeypatch):
+        monkeypatch.setenv("PHYTO_ENV", "cloud")
+        monkeypatch.setenv("PHYTO_DRY_RUN", "0")
+        with pytest.raises(CloudServiceError) as excinfo:
+            get_shift_predictor(endpoint_id="1", project="p")
+        # The venv has no google-cloud-aiplatform: this must be a refusal,
+        # never a silent MockShiftPredictor.
+        assert "not installed" in str(excinfo.value)
+
+    def test_cloud_bringup_dry_run_is_explicit(self, monkeypatch):
+        monkeypatch.setenv("PHYTO_ENV", "cloud")
+        monkeypatch.setenv("PHYTO_DRY_RUN", "1")
         assert isinstance(get_shift_predictor(), MockShiftPredictor)
 
 

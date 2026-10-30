@@ -90,3 +90,4 @@ authoritative full text of every numbered decision remains in
 | ADR-0076 | Lipid-region exclusion as a recorded curation step in the 13C assignment path | accepted | `shared/phyto_shared/lipid_regions.py` |
 | ADR-0077 | Web app only — desktop app removed; all six hostnames on .com and .org serve the web app (www.phytospectra.com canonical) | accepted | `docs/DEPLOYMENT_GCP.md` |
 | ADR-0077 | Web app only — desktop app removed; all six hostnames on .com and .org serve the web app (www.phytospectra.com canonical) | accepted | `docs/DEPLOYMENT_GCP.md` |
+| ADR-0078 | Runtime mode selection is explicit and fail-closed — no silent mock in real mode (`ElucidationConfig`, 503 on unconfigured capabilities) | accepted | `services/elucidation/app/runtime_config.py` |
