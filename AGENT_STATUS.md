@@ -65,6 +65,17 @@ Reporting template per the enterprise handoff brief. One row per milestone.
 - **Remaining blockers**: Phase 2 (structure-DB provider wiring), Phase 3 (deployed-mode verification), Phase 4 (agent modes).
 - **Next bounded task**: Phase 2 — wire a real structure-DB provider behind `_Runtime.db` (currently 503 in real mode) with a contract test.
 
+## Milestone: Phase 2 — FileStructureDB provider wired (ADR-0081)
+
+- **Milestone/status**: Phase 2 Step 6+ — **complete, 1539 passed, ruff clean**.
+- **Base SHA → result SHA**: `e7d1d9d` → `ae96706` (branch `agent/phase0a-phase1a-failclosed-runtime`).
+- **Implemented behavior**: `FileStructureDB` — a real curated structure library loaded from CSV (`name`, `smiles`, optional `provenance`/`source`), wired via `PHYTO_STRUCTURE_DB_PATH` on either plane. Loading is fail-closed: missing file, missing columns, invalid SMILES, duplicate InChIKey, or empty file is a startup `CloudServiceError` — never a partially-loaded library, which would quietly miss candidates and read as a negative result. When set, the real library serves candidate retrieval in both planes; when unset, behavior is unchanged (mock in dry-run, 503 in real mode per ADR-0078). `.env.example` documents the variable. ADR-0081 appended; numbering check OK.
+- **Evidence**: 12 new tests in `tests/test_elucidation/test_structure_db_provider.py` (loading, formula/InChIKey indexing, provenance/source defaults, every failure mode, runtime wiring in both planes); elucidation suite 168 passed; full suite 1539 passed; ruff clean. One real behavior caught during authoring: the test's first maackiain SMILES string was invalid — the fail-closed loader caught it at startup, which is exactly the designed behavior.
+- **Scientific validation**: none required (infrastructure); the mock library stays labeled and excluded from scientific claims; the FileStructureDB library's provenance column is recorded per candidate.
+- **Security/deployment impact**: positive — candidate retrieval is now a real, configurable capability without credentials or network; a bad library file refuses startup with an actionable message.
+- **Remaining blockers**: Phase 2 production vertical demo (one end-to-end elucidation run with recorded provenance); Phase 3 enterprise security/ops.
+- **Next bounded task**: Phase 2 vertical — one end-to-end elucidation request (candidates → novel) with provenance recorded and labeled output.
+
 ## Test/lint addendum
 
 - Full suite: `pytest -q` → **1524 passed**, 14 warnings, 346.93s (2026-10-31, Python 3.12, includes the new runtime-mode tests). Warnings are pre-existing class-scoped-fixture deprecations, not failures.
