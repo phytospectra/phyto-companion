@@ -24,6 +24,22 @@ Reporting template per the enterprise handoff brief. One row per milestone.
 - **Remaining blockers**: NMRArena license unverifiable without authenticated access; NMRGym gated (email request pending user authorization — contacting authors requires authorization per brief); deployed-mode verification (finding 6) needs live environment access; findings 2–4, 7, 8 not yet addressed (backlog items 1–3).
 - **Next bounded task**: backlog **[P1B]** — audit HMBC regression labels vs coordinates (finding 4) and the Word-report COSY/HMBC disagreement (finding 3), documentation only, no expectation changes.
 
+## Milestone: Phase 1B — §13 HMBC coordinate reconciliation (ADR-0079) + findings 2/3 verified
+
+- **Milestone/status**: P1B — **complete, 18/18 regression tests pass**.
+- **Base SHA → result SHA**: `efeccde` → (this commit, branch `agent/phase0a-phase1a-failclosed-runtime`).
+- **Implemented behavior**:
+  - Measured every HMBC label's cross-peak against the real fixture under the §4 reference S/N implementation. Brief finding 4 confirmed: `H-11a→C-4a` was pinned at (5.47, 66.5) duplicating `H-11a→C-6`'s peak; 66.5 is C-6, the only 13C signal there. The real C-4a cross-peaks sit at 157.2: H-11a→C-4a S/N 13.9 (2.3× control), H-6eq→C-4a S/N 32.2 (6.8× control) — reconciling §13's "verified ≈27" that the old pin mis-filed as a divergence at 3.7.
+  - Corrected the two rows in `test_case_study_regression.py` with measured baselines (ADR-0079; not expectation-gaming: every new number is a measurement, and §13's own claimed S/N values reconcile within its ±30% tolerance). Suite: 18/18 pass. ADR-0079 appended, index updated, numbering check OK.
+  - Finding 3 verified: the two Word reports' COSY/HMBC contradiction is a timeline artefact — the 2026-10-24 `FullCapabilities` report read the COSY flat (pre-XDIM-fix, "artifact-dominated reconstruction"); the 2026-10-25/26 report re-verified all six COSY + 15 HMBC correlations after the reader fix. Older report needs a superseded banner (P1D).
+  - Finding 2 verified: `phytospectra-paper/PHYTOSPECTRA-MANUSCRIPT-DRAFT1.md` (~line 94) still says the FIDs show "corrupted quadrature … no FID decay"; ADR-0075 proved the FIDs healthy (decay ratios 101.9/580.7/23.1/162.9) and the workspace README already carries the strikethrough correction. Manuscript rewrite tracked as P1D.
+  - Full reconciliation note: `docs/CASE_STUDY_COORDINATE_RECONCILIATION.md`.
+- **Evidence**: full F1-column scans (H-11a, H-6eq, H-1, H-7, OCH2O, H-4) with S/N at every §13 coordinate; `test_case_study_regression.py` 18 passed; `scripts/check_adr_numbers.py` OK; Word reports extracted and compared (431 vs 647 lines; docx mtimes 10-24 vs 10-25/26).
+- **Scientific validation**: no §13 expectation was changed to make a test pass — the two corrected pins are measurements at the physically correct carbon, and §13's own claimed S/N values reconcile within its stated tolerance. The remaining divergence set is unchanged.
+- **Security/deployment impact**: none (test- and docs-only).
+- **Remaining blockers**: P1C (LLM endpoint provenance tagging), P1D (stale metadata sweep: Word-report banner, manuscript FID paragraph, README/release metadata); NMRArena license and NMRGym contact still gated on user authorization.
+- **Next bounded task**: **P1C** — test asserting every provider-backed LLM endpoint records model id + version in response provenance.
+
 ## Test/lint addendum
 
 - Full suite: `pytest -q` → **1524 passed**, 14 warnings, 346.93s (2026-10-31, Python 3.12, includes the new runtime-mode tests). Warnings are pre-existing class-scoped-fixture deprecations, not failures.

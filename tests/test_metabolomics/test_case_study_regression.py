@@ -20,7 +20,7 @@ were frozen from this implementation on 2026-10-26.
 KNOWN §13 DIVERGENCES (documented, not silently encoded):
 
 * Several §13 "verified" HMBC correlations -- H-7→C-10a (§13 ≈38), H-7→C-9
-  (≈32), H-6eq→C-4a (≈27), H-1→C-3/4a (≈23), OCH2O→C-8 (≈16.5), OCH2O→C-9
+  (≈32), H-1→C-3/4a (≈23), OCH2O→C-8 (≈16.5), OCH2O→C-9
   (≈14), H-1→C-11a (≈14) -- measure S/N ≈ 3–5 under the §4 protocol as
   written (noise is homogeneous, so no local-noise variant reconciles
   them).  The cross-peaks exist but sit near the "absent" threshold.  The
@@ -31,6 +31,12 @@ KNOWN §13 DIVERGENCES (documented, not silently encoded):
   reader regression (a broken deblock drops them to ~1).
 * §13 labels H-11a→C-1 "weak (~8, <2× control)"; the reference
   implementation measures 14.7 at 2.8× control, i.e. verified.
+* ADR-0079 (2026-10-31): the earlier pinning of H-11a→C-4a at 66.5 ppm was a
+  labelling error — 66.5 is C-6, the only 13C signal there. The measured
+  H-11a→C-4a cross-peak sits at 157.2 (S/N 13.9, 2.3× control, verified), and
+  H-6eq→C-4a measures 32.2 at 157.2 (6.8× control) — reconciling §13's
+  "verified ≈27" which was pinned at 66.5 where it measures 3.7. The
+  H-11a→C-4a entry is now pinned at 157.2 with its own frozen baseline.
 * The 13C lipid catalog (ADR-0076) historically defaulted to a mask that
   included the 55–90 ppm glycerol window, which also covers maackiain
   C-6 (66.5) and C-11a (78.5) that §13 expects in the analyte list.  The
@@ -292,8 +298,15 @@ _HMBC_STRONG = [
     ("H-6eq→C-11a", 4.22, 78.5, 33.3, 4.5),
     ("H-11a→C-6", 5.47, 66.5, 18.3, 6.6),
     ("H-6ax→C-11a", 3.64, 78.5, 20.4, 4.3),
-    ("H-11a→C-4a", 5.47, 66.5, 18.3, 6.6),
+    # ADR-0079: C-4a is the oxygenated quaternary at 157.2, not 66.5 (C-6,
+    # the only signal there).  The measured H-11a→C-4a cross-peak sits at
+    # 157.2 with its own baseline; the old 66.5 row duplicated C-6's.
+    ("H-11a→C-4a", 5.47, 157.2, 13.9, 6.0),
     ("H-11a→C-1", 5.47, 132.1, 14.7, 5.2),
+    # ADR-0079: H-6eq→C-4a at 157.2 measures 32.2 (6.8x control) --
+    # reconciling §13's "verified ≈27", which the old pin at 66.5 measured
+    # as 3.7 and mis-filed as a divergence.
+    ("H-6eq→C-4a", 4.22, 157.2, 32.2, 4.8),
 ]
 
 
@@ -311,10 +324,11 @@ def test_hmbc_strong_correlations_verified(case_study: Path) -> None:
 #: §13 claims these verified (S/N 9–38); under the §4 reference
 #: implementation they measure 3–5 (see module docstring).  Pinned in a
 #: presence band that still fails if the reader regresses.
+#: ADR-0079: the two C-4a-pinned rows moved to _HMBC_STRONG at 157.2; the
+#: rows below keep their original (measured) coordinates.
 _HMBC_DISCREPANT = [
     ("H-7→C-10a", 6.72, 157.2, 4.2),
     ("H-7→C-9", 6.72, 104.7, 5.1),
-    ("H-6eq→C-4a", 4.22, 66.5, 3.7),
     ("H-1→C-3/4a", 6.55, 66.5, 3.9),
     ("OCH2O→C-8", 5.90, 101.3, 4.4),
     ("OCH2O→C-9", 5.90, 104.7, 4.9),
