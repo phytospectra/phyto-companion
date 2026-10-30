@@ -93,3 +93,4 @@ authoritative full text of every numbered decision remains in
 | ADR-0078 | Runtime mode selection is explicit and fail-closed — no silent mock in real mode (`ElucidationConfig`, 503 on unconfigured capabilities) | accepted | `services/elucidation/app/runtime_config.py` |
 | ADR-0079 | §13 HMBC C-4a correlations reconciled at 157.2 ppm (were mis-pinned at 66.5 = C-6); measured baselines | accepted | `tests/test_metabolomics/test_case_study_regression.py` |
 | ADR-0080 | LLM judge verdicts carry the judge's model identity (`CheckResult.model_identity`, `LLMClient.model_identity`) | accepted | `services/orchestrator/app/qa_critic_agent.py` |
+| ADR-0081 | Candidate retrieval is a configurable capability — FileStructureDB CSV library, fail-closed loading | accepted | `services/elucidation/app/structure_db.py` |

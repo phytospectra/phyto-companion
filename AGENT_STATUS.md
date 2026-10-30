@@ -51,6 +51,20 @@ Reporting template per the enterprise handoff brief. One row per milestone.
 - **Remaining blockers**: P1D (stale metadata sweep: Word-report superseded banner, manuscript FID paragraph, README/release metadata); Phase 2 provider wiring (structure DB).
 - **Next bounded task**: **P1D** — stale metadata sweep (finding 8): dated superseded banner on the October 24 Word report, manuscript FID paragraph rewrite tracked, README/release metadata vs. repo state.
 
+## Milestone: Phase 1D — stale metadata sweep (findings 2, 3, 8)
+
+- **Milestone/status**: P1D — **complete** (manuscript + README + banner; see below for what was deliberately NOT changed).
+- **Base SHA → result SHA**: `0fa15b4` → `e7d1d9d` (README, branch `agent/phase0a-phase1a-failclosed-runtime`).
+- **Implemented behavior**:
+  - **Finding 2 (manuscript FID wording)**: rewrote `phytospectra-paper/PHYTOSPECTRA-MANUSCRIPT-DRAFT1.md` data-basis paragraph — the "corrupted quadrature" diagnosis is now presented as what it was (a named skip that turned out to be an int32 misread of DTYPA=2 float64 FIDs), with the ADR-0075 audit date, the healthy decay ratios (101.9/580.7/23.1/162.9), and an explicit statement that the corrected reading supersedes any earlier text calling the FIDs corrupt. Also fixed the "Data-quality guards" table row to state the decay check is read under the declared dtype.
+  - **Finding 3 (Word-report disagreement)**: added `CaseStudy_Photospectra/READ_ME_FIRST_superseded_report.txt` — a dated banner marking the 2026-10-24 `Phytospectra_NMR_Report_FullCapabilities.docx` (and its copies) as superseded, naming the stale 2D verdicts (pre-XDIM-fix flat read) and the stale FID claim, and pointing to the post-fix 2026-10-25/26 report and `docs/CASE_STUDY_COORDINATE_RECONCILIATION.md` §2. The docx itself was not edited (binary, owner decision).
+  - **Finding 8 (stale metadata)**: README's Vertex env row now states the ADR-0078 fail-closed requirement (missing config refuses startup). Checked the rest: README architecture, layout, provider table, and the frontend-repo pointer all verified current (frontend repo exists and was updated 2026-10-26); manuscript's "Archived version: [TO ADD — Zenodo DOI upon release]" stays as-is because no release exists — creating one requires owner authorization (Phase 5).
+- **Evidence**: manuscript line 94 rewrite (grep shows no remaining uncorrected "corrupt" claims); banner file in `CaseStudy_Photospectra/`; README commit `e7d1d9d`; `gh repo view phytospectra/phyto-companion-frontend` → updated 2026-10-26.
+- **Scientific validation**: none required (metadata/documentation only; no numbers changed).
+- **Security/deployment impact**: none (docs); the banner prevents sharing a stale report that understates the platform's 2D capability.
+- **Remaining blockers**: Phase 2 (structure-DB provider wiring), Phase 3 (deployed-mode verification), Phase 4 (agent modes).
+- **Next bounded task**: Phase 2 — wire a real structure-DB provider behind `_Runtime.db` (currently 503 in real mode) with a contract test.
+
 ## Test/lint addendum
 
 - Full suite: `pytest -q` → **1524 passed**, 14 warnings, 346.93s (2026-10-31, Python 3.12, includes the new runtime-mode tests). Warnings are pre-existing class-scoped-fixture deprecations, not failures.

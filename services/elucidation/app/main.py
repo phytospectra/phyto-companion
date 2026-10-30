@@ -35,7 +35,7 @@ from .novel_structure_generator import generate_novel_candidates
 from .runtime_config import ElucidationConfig
 from .shift_predictor import MockShiftPredictor, VertexAIShiftPredictor
 from .site_localization import SiteLocalization, localize_site
-from .structure_db import MockStructureDB, StructureDatabase
+from .structure_db import FileStructureDB, MockStructureDB, StructureDatabase
 
 router = APIRouter()
 
@@ -46,17 +46,25 @@ class _Runtime:
     Built from :class:`ElucidationConfig` so the predictor can never
     silently fall back to a mock on the cloud plane: a real deployment
     with missing Vertex configuration fails at startup (ADR-0078).  The
-    structure database is honest about its limits instead: only the mock
-    fixture library exists today, so in real cloud mode the slot stays
-    empty and access raises :class:`CloudServiceError` (503) rather than
-    serving the fixture library as if it were a database.
+    structure database is honest about its limits: when
+    ``PHYTO_STRUCTURE_DB_PATH`` is configured, a real
+    :class:`FileStructureDB` is loaded at startup (a missing or invalid
+    file is a startup error, ADR-0081); otherwise the local plane serves
+    the mock fixture library and real mode leaves candidate retrieval
+    explicitly unavailable (503) rather than serving the fixture library
+    as if it were a database.
     """
 
     def __init__(self, config: ElucidationConfig | None = None) -> None:
         self.config = (config or ElucidationConfig.from_env()).validate()
-        self._db: StructureDatabase | None = (
-            MockStructureDB() if self.config.dry_run else None
-        )
+        if self.config.structure_db_path:
+            # Real curated library, either plane -- startup error if the
+            # file is missing or malformed (ADR-0081).
+            self._db: StructureDatabase | None = FileStructureDB(
+                self.config.structure_db_path
+            )
+        else:
+            self._db = MockStructureDB() if self.config.dry_run else None
         if self.config.real_prediction:
             # Constructed from the VALIDATED config, not the env-reading
             # factory: the factory re-derives dry-run from os.environ, which

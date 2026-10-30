@@ -12,6 +12,11 @@ Plane semantics (matching ``auth.config.AuthConfig``):
   explicitly (bring-up only, reported as such).
 - Real mode requires ``VERTEX_ENDPOINT_ID`` and ``GOOGLE_CLOUD_PROJECT``;
   a missing value refuses startup rather than degrading to the mock.
+- ``PHYTO_STRUCTURE_DB_PATH`` (either plane): a curated CSV structure
+  library. When set, the runtime loads a real ``FileStructureDB`` at
+  startup (a missing/invalid file is a startup error, ADR-0081); when
+  unset, the local plane serves the mock fixture library and real mode
+  leaves candidate retrieval explicitly unavailable (503).
 """
 
 from __future__ import annotations
@@ -33,6 +38,7 @@ class ElucidationConfig:
     vertex_endpoint_id: str | None
     gcp_project: str | None
     vertex_location: str
+    structure_db_path: str | None = None
 
     @property
     def real_prediction(self) -> bool:
@@ -55,6 +61,7 @@ class ElucidationConfig:
             vertex_endpoint_id=os.getenv("VERTEX_ENDPOINT_ID") or None,
             gcp_project=os.getenv("GOOGLE_CLOUD_PROJECT") or None,
             vertex_location=os.getenv("VERTEX_LOCATION", "us-central1"),
+            structure_db_path=os.getenv("PHYTO_STRUCTURE_DB_PATH") or None,
         )
 
     def validate(self) -> "ElucidationConfig":
