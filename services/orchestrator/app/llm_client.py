@@ -15,17 +15,30 @@ __all__ = ["LLMClient", "MockLLMClient", "VertexAILLMClient", "get_llm_client"]
 
 
 class LLMClient(Protocol):
-    """Minimal chat interface used by Tier 3 tools and the QA critic."""
+    """Minimal chat interface used by Tier 3 tools and the QA critic.
+
+    ``model_identity`` is a short, non-secret description of the judge
+    (e.g. endpoint id or model slug) so any judge-written verdict can be
+    attributed to a specific model -- the QA critic records it whenever
+    ``verified_by == "llm_judge"`` (ADR-0080).
+    """
 
     def complete(self, system_prompt: str, user_prompt: str) -> str: ...
+
+    @property
+    def model_identity(self) -> str: ...
 
 
 class MockLLMClient:
     """Deterministic, offline stand-in for the fine-tuned endpoint.
 
     Its output is always marked as mock and always reminds the caller it
-    is Tier 3 material requiring verification.
+    is Tier 3 material requiring QA/Critic verification.
     """
+
+    @property
+    def model_identity(self) -> str:
+        return "mock-llm-client:deterministic"
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
         excerpt = " ".join(user_prompt.split())[:200]
@@ -53,6 +66,10 @@ class VertexAILLMClient:
         self.endpoint_id = endpoint_id
         self.project = project
         self.location = location
+
+    @property
+    def model_identity(self) -> str:
+        return f"vertex-endpoint:{self.endpoint_id}"
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
         try:

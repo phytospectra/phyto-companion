@@ -23,9 +23,11 @@ and evidence in `AGENT_STATUS.md`.
    (finding 3); verify the manuscript's "FIDs corrupt" wording (finding 2).
    **Do not change expected numbers to make tests pass** — discrepancies are
    documented, then corrected with a dated ADR if the *source* was wrong.
-2. **[P1C] LLM provider inventory** — extend finding 5 verification into a
-   test asserting every provider-backed endpoint tags model id + version in its
-   response provenance.
+2. ~~**[P1C] LLM provider inventory**~~ DONE (ADR-0080): every `llm_judge`
+   verdict now carries the judge's model identity (`CheckResult.model_identity`,
+   `LLMClient.model_identity`); the `services/llm` paths were already compliant.
+   Standing rule: assert the same tagging on new provider-backed endpoints as
+   they are added.
 3. **[P1D] Stale metadata sweep** (finding 8) — README, paper metadata, release
    metadata vs. current repo state.
 

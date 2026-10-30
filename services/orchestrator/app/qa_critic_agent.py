@@ -40,9 +40,15 @@ class CheckResult:
     name: str
     passed: bool
     detail: str
+    #: Which model produced an ``llm_judge`` verdict (ADR-0080). ``None``
+    #: for rule-based checks. Never a key or credential.
+    model_identity: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "passed": self.passed, "detail": self.detail}
+        out = {"name": self.name, "passed": self.passed, "detail": self.detail}
+        if self.model_identity is not None:
+            out["model_identity"] = self.model_identity
+        return out
 
 
 @dataclass
@@ -314,8 +320,15 @@ class QACriticAgent:
                 detail=f"judge call failed (fail closed): {exc}",
             )
         passed = "FAIL" not in response.upper()[:200]
+        # Record WHICH model judged the output (ADR-0080): every
+        # llm_judge verdict must carry the judge's model identity so a
+        # verdict can be attributed and re-verified against the same
+        # model later. The identity is an endpoint id or model slug --
+        # never a key or credential.
+        identity = getattr(self.llm, "model_identity", "unknown-judge")
         return CheckResult(
             name="llm_judge",
             passed=passed,
             detail=response[:200],
+            model_identity=identity,
         )

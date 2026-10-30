@@ -40,6 +40,17 @@ Reporting template per the enterprise handoff brief. One row per milestone.
 - **Remaining blockers**: P1C (LLM endpoint provenance tagging), P1D (stale metadata sweep: Word-report banner, manuscript FID paragraph, README/release metadata); NMRArena license and NMRGym contact still gated on user authorization.
 - **Next bounded task**: **P1C** — test asserting every provider-backed LLM endpoint records model id + version in response provenance.
 
+## Milestone: Phase 1C — LLM judge model-identity provenance (ADR-0080)
+
+- **Milestone/status**: P1C — **complete, 1527 passed, ruff clean**.
+- **Base SHA → result SHA**: `758b5e5` → (this commit, branch `agent/phase0a-phase1a-failclosed-runtime`).
+- **Implemented behavior**: The QA critic's `llm_judge` verdicts now carry the judge's model identity. `LLMClient` protocol gains a non-secret `model_identity` property (`mock-llm-client:deterministic` / `vertex-endpoint:<id>`); `CheckResult` gains an optional `model_identity` field (`None` for rule-based checks; serialized only when set); `_llm_judge_check` stamps it from the client, with an honest `"unknown-judge"` `getattr` fallback. This closes the gap in brief finding 5 for the one path that wasn't already tagging: `services/llm` `/complete` already records `model_id`+`model_version` into the provenance manifest (verified in `clients.py`/`openrouter_client.py`, incl. the served-model id from the response body). ADR-0080 documents it; index updated, numbering check OK.
+- **Evidence**: `tests/test_orchestrator.py` 68 passed (4 new: judge verdict carries model identity; rule-based checks carry none; to_dict() serialization; mock identity is not a credential). Full suite: **1527 passed** (1524 + 3 net new), ruff clean. `scripts/check_adr_numbers.py` OK.
+- **Scientific validation**: no scientific expectations touched; judge text/verdict logic unchanged.
+- **Security/deployment impact**: positive — every judge verdict is now attributable to a model (endpoint id or model slug, never a key), enabling Phase 4C comparison and fine-tune replacement audits.
+- **Remaining blockers**: P1D (stale metadata sweep: Word-report superseded banner, manuscript FID paragraph, README/release metadata); Phase 2 provider wiring (structure DB).
+- **Next bounded task**: **P1D** — stale metadata sweep (finding 8): dated superseded banner on the October 24 Word report, manuscript FID paragraph rewrite tracked, README/release metadata vs. repo state.
+
 ## Test/lint addendum
 
 - Full suite: `pytest -q` → **1524 passed**, 14 warnings, 346.93s (2026-10-31, Python 3.12, includes the new runtime-mode tests). Warnings are pre-existing class-scoped-fixture deprecations, not failures.

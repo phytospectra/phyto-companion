@@ -722,6 +722,37 @@ class TestQACritic:
         assert result.verified_by == "llm_judge"
         assert any(check.name == "llm_judge" for check in result.checks)
 
+    def test_llm_judge_verdict_carries_model_identity(self):
+        # ADR-0080: every llm_judge verdict must attribute itself to a
+        # specific model so it can be re-verified against the same model.
+        class RecordingClient:
+            model_identity = "test-judge-model:v7"
+
+            def complete(self, system_prompt: str, user_prompt: str) -> str:
+                return "PASS"
+
+        result = QACriticAgent(llm=RecordingClient()).verify(
+            "llm.explain", LLMExplainOutput(explanation="The evidence supports X")
+        )
+        judge = next(c for c in result.checks if c.name == "llm_judge")
+        assert judge.model_identity == "test-judge-model:v7"
+        assert judge.to_dict()["model_identity"] == "test-judge-model:v7"
+
+    def test_rule_based_checks_have_no_model_identity(self):
+        critic = QACriticAgent()
+        result = critic.verify(
+            "llm.explain", LLMExplainOutput(explanation="The evidence supports X")
+        )
+        assert all(c.model_identity is None for c in result.checks)
+
+    def test_mock_judge_identity_is_not_a_credential(self):
+        critic = QACriticAgent(llm=MockLLMClient())
+        result = critic.verify(
+            "llm.explain", LLMExplainOutput(explanation="The evidence supports X")
+        )
+        judge = next(c for c in result.checks if c.name == "llm_judge")
+        assert judge.model_identity == "mock-llm-client:deterministic"
+
 
 # ---------------------------------------------------------------------------
 # FastAPI surface
