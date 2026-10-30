@@ -73,10 +73,21 @@ Reporting template per the enterprise handoff brief. One row per milestone.
 - **Evidence**: 12 new tests in `tests/test_elucidation/test_structure_db_provider.py` (loading, formula/InChIKey indexing, provenance/source defaults, every failure mode, runtime wiring in both planes); elucidation suite 168 passed; full suite 1539 passed; ruff clean. One real behavior caught during authoring: the test's first maackiain SMILES string was invalid — the fail-closed loader caught it at startup, which is exactly the designed behavior.
 - **Scientific validation**: none required (infrastructure); the mock library stays labeled and excluded from scientific claims; the FileStructureDB library's provenance column is recorded per candidate.
 - **Security/deployment impact**: positive — candidate retrieval is now a real, configurable capability without credentials or network; a bad library file refuses startup with an actionable message.
-- **Remaining blockers**: Phase 2 production vertical demo (one end-to-end elucidation run with recorded provenance); Phase 3 enterprise security/ops.
-- **Next bounded task**: Phase 2 vertical — one end-to-end elucidation request (candidates → novel) with provenance recorded and labeled output.
+- **Remaining blockers**: Phase 3 enterprise security/ops.
+- **Next bounded task**: ~~Phase 2 vertical~~ → complete; see next milestone.
+
+## Milestone: Phase 2 vertical — one end-to-end API run on a real library
+
+- **Milestone/status**: Phase 2 production vertical — **complete, 1541 passed, ruff clean, ADR numbering OK**.
+- **Base SHA → result SHA**: `ae96706` → `b0edccb` (branch `agent/phase0a-phase1a-failclosed-runtime`).
+- **Implemented behavior**: `TestPhase2Vertical` in `tests/test_elucidation/test_elucidation_main.py` — a 2-molecule curated CSV library (phenol + catechol, provenance `experimental`, source `curated-vertical-test`) is wired via `PHYTO_STRUCTURE_DB_PATH` and traversed through three touchpoints in one run: `/health` reports `structure_db_available` and `db_size=2`; `/elucidate/candidates` returns phenol at rank 1 with the curated provenance/source traveling on the candidate; `/elucidate/novel` (catechol + one OH → C6H6O3 hydroxyquinol, not in the library) returns a `predicted`-provenance candidate that survived the known-InChIKey filter. The missing-library startup path asserts `CloudServiceError` specifically.
+- **Evidence**: full suite **1541 passed**, ruff clean, `check_adr_numbers.py` OK.
+- **Scientific validation**: none — this is the wiring vertical, run on the local plane with a labeled fixture library, excluded from scientific claims per the brief.
+- **Security/deployment impact**: proves the Phase 2 capability end to end with no credentials and no silent mock fallback; the only remaining local-plane mock is the shift predictor, which is the documented dry-run behavior.
+- **Remaining blockers**: Phase 3 (verify deployed auth is real — finding 6; Stripe webhook contract; frontend evidence-field contract — finding 7); Phase 4.
+- **Next bounded task**: Phase 3 — auth/ops evidence collection and contract tests.
 
 ## Test/lint addendum
 
-- Full suite: `pytest -q` → **1524 passed**, 14 warnings, 346.93s (2026-10-31, Python 3.12, includes the new runtime-mode tests). Warnings are pre-existing class-scoped-fixture deprecations, not failures.
-- Lint: `ruff check shared services scripts tests` → **All checks passed!**
+- Full suite: `pytest -q` → **1541 passed**, 14 warnings, 71.6s (2026-10-31, Python 3.12, Phase 2 vertical included). Warnings are pre-existing class-scoped-fixture deprecations, not failures.
+- Lint: `ruff check .` → **All checks passed!**
