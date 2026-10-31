@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -121,10 +120,22 @@ def matrix_to_table(
 
 
 class MZmineDetector:
-    """MZmine 3 batch mode via subprocess (cloud plane).
+    """MZmine batch mode via subprocess (real plane).
 
-    Requires the MZmine home directory (MZMINE_HOME) and a licensed
-    local installation; fails closed otherwise.
+    .. warning:: **UNVERIFIED INTEGRATION (ADR-0084).** The batch file
+       this detector once wrote was a one-column CSV, but MZmine's
+       official batch files are XML documents with explicit module
+       steps, invoked as ``-batch <batch.xml> -input "<mzML glob>"``.
+       The CSV "batch" cannot have worked against a real MZmine 3 and
+       no test has ever run one; the expected output schema is equally
+       an assumption. Raw LC-MS processing is therefore a BLOCKED
+       capability: it fails closed at startup (ADR-0083) and must not
+       be claimed as working in any report until a live integration
+       test has validated the XML batch format, the executable version
+       and the actual CSV-export schema against a real installation.
+
+    Requires the MZmine home directory (MZMINE_HOME); fails closed
+    otherwise.
     """
 
     def __init__(self, mzmine_home: str | None = None) -> None:
@@ -134,73 +145,29 @@ class MZmineDetector:
         )
 
     def detect(self, mzml_paths: list[Path], params: DetectParams) -> FeatureTable:
+        if not mzml_paths:
+            raise InvalidInputError("no mzML files given", context={})
+        missing = [str(p) for p in mzml_paths if not p.is_file()]
+        if missing:
+            raise InvalidInputError(
+                "mzML input files do not exist",
+                context={"missing": missing},
+            )
         if not self.executable:
             raise CloudServiceError(
                 "MZmine executable not found; the local plane must use "
                 "MockDetector (split-plane rule)",
                 context={"mzmine_home": self.mzmine_home},
             )
-        batch = self._build_batch(mzml_paths, params)
-        result = subprocess.run(  # noqa: S603 - fixed executable
-            [self.executable, "-batch", str(batch)],
-            capture_output=True,
-            text=True,
-            timeout=600,
-            check=False,
-        )
-        if result.returncode != 0:
-            raise CloudServiceError(
-                "MZmine batch failed",
-                context={"stderr": result.stderr[-500:]},
-            )
-        csv_path = batch.with_suffix(".feature_table.csv")
-        if not csv_path.exists():
-            raise CloudServiceError(
-                "MZmine did not produce a feature table", context={}
-            )
-        return self._parse_mzmine_csv(csv_path, mzml_paths)
-
-    def _build_batch(self, mzml_paths: list[Path], params: DetectParams) -> Path:
-        import csv as _csv
-        import tempfile
-
-        rows = [{"mzml": str(path)} for path in mzml_paths]
-        handle = tempfile.NamedTemporaryFile(
-            "w", suffix=".csv", delete=False
-        )
-        writer = _csv.DictWriter(handle, fieldnames=["mzml"])
-        writer.writeheader()
-        writer.writerows(rows)
-        handle.close()
-        return Path(handle.name)
-
-    def _parse_mzmine_csv(self, csv_path: Path, mzml_paths: list[Path]) -> FeatureTable:
-        import csv as _csv
-
-        with csv_path.open() as handle:
-            rows = list(_csv.DictReader(handle))
-        samples = [
-            SampleMetadata(sample_id=path.stem, group=None) for path in mzml_paths
-        ]
-        features: list[Feature] = []
-        for row in rows:
-            intensities = {
-                key: float(value)
-                for key, value in row.items()
-                if key not in {"feature_id", "mz", "rt"} and value
-            }
-            features.append(
-                Feature(
-                    feature_id=row.get("feature_id", f"FT{len(features) + 1}"),
-                    mz=float(row["mz"]),
-                    rt=float(row["rt"]),
-                    intensities=intensities,
-                )
-            )
-        return FeatureTable(
-            features=features,
-            samples=samples,
-            provenance_notes=[f"mzmine batch from {csv_path.name}"],
+        raise CloudServiceError(
+            "MZmine integration is unverified (ADR-0084): the batch "
+            "contract (XML batch format, export schema, executable "
+            "version) has never been validated against a real "
+            "installation. Refusing to run rather than return "
+            "mis-shaped results. See the capability register: raw "
+            "LC-MS processing is a blocked capability.",
+            context={"mzmine_home": self.mzmine_home,
+                     "executable": str(self.executable)},
         )
 
 
@@ -281,7 +248,30 @@ class MockDetector:
 
 
 def get_detector(**kwargs) -> FeatureDetector:
-    """Mock when PHYTO_DRY_RUN=1 or no MZmine installation is configured."""
-    if os.environ.get("PHYTO_DRY_RUN") == "1" or not os.environ.get("MZMINE_HOME"):
+    """Mock on the dry-run plane; real mode requires an explicit detector.
+
+    Fail-closed (ADR-0078 rule): a caller that knows it is in real mode
+    (``dry_run=False``) gets ``MZmineDetector`` or nothing -- a missing
+    MZmine installation raises, it never silently degrades to the mock.
+    Callers that don't pass a config (legacy/tests) resolve the plane
+    from the environment, which still returns the mock when MZMINE_HOME
+    is unset -- that path must never be reachable from a validated cloud
+    runtime (``main._Runtime`` validates first).
+    """
+    config = kwargs.pop("config", None)
+    if config is None:
+        from .runtime_config import MetabolomicsConfig
+
+        config = MetabolomicsConfig.from_env()
+    if config.dry_run:
         return MockDetector()
-    return MZmineDetector(**kwargs)
+    if not config.mzmine_home:
+        from phyto_shared.exceptions import CloudServiceError
+
+        raise CloudServiceError(
+            "real mode requires MZMINE_HOME (a licensed local MZmine "
+            "installation); refusing to fall back to mock feature "
+            "detection",
+            context={"env": config.env, "capability": "feature_detection"},
+        )
+    return MZmineDetector(mzmine_home=config.mzmine_home, **kwargs)

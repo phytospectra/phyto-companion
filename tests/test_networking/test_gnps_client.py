@@ -199,13 +199,22 @@ class TestFactory:
         assert isinstance(get_gnps_client(), MockGNPSClient)
 
     def test_api_key_gives_real_client(self, monkeypatch):
-        monkeypatch.delenv("PHYTO_DRY_RUN", raising=False)
-        monkeypatch.delenv("PHYTO_ALLOW_PUBLIC_GNPS", raising=False)
-        monkeypatch.setenv("GNPS_API_KEY", "secret")
-        assert isinstance(get_gnps_client(), GNPSClient)
+        # Real mode is an explicit choice: a key alone on the dry-run
+        # local plane still gets the mock (ADR-0078 rule). Passing a
+        # validated real-mode config selects the real client.
+        from networking.runtime_config import NetworkingConfig
 
-    def test_explicit_public_allows_real_client(self, monkeypatch):
-        monkeypatch.delenv("PHYTO_DRY_RUN", raising=False)
-        monkeypatch.delenv("GNPS_API_KEY", raising=False)
-        monkeypatch.setenv("PHYTO_ALLOW_PUBLIC_GNPS", "1")
-        assert isinstance(get_gnps_client(), GNPSClient)
+        config = NetworkingConfig(
+            env="local", dry_run=False, gnps_api_key="secret",
+            allow_public_gnps=False,
+        )
+        assert isinstance(get_gnps_client(config=config), GNPSClient)
+
+    def test_explicit_public_allows_real_client(self):
+        from networking.runtime_config import NetworkingConfig
+
+        config = NetworkingConfig(
+            env="local", dry_run=False, gnps_api_key=None,
+            allow_public_gnps=True,
+        )
+        assert isinstance(get_gnps_client(config=config), GNPSClient)

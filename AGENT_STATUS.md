@@ -108,3 +108,77 @@ Reporting template per the enterprise handoff brief. One row per milestone.
 - Full suite: `pytest -q` → **1556 passed**, 14 warnings, 72.1s (2026-10-31, Python 3.12, Phase 3 auth contracts included). Warnings are pre-existing class-scoped-fixture deprecations, not failures.
 - Lint: `ruff check .` → **All checks passed!**
 - Frontend: `tsc --noEmit` clean; `scripts/check_fe_contract.py` OK; vitest suite not runnable in this environment (see Phase 3 milestone, environment limitation).
+
+## Milestone: Reconciliation + M0 honest coverage (ADR-0082/0083/0084)
+
+- **Milestone/status**: Enterprise-brief reconciliation + M0 of the
+  multi-vendor LC–MS prompt — **complete on the agent branch, 1593 passed,
+  ruff clean, ADR numbering OK**. NOT a validated LC–MS processing slice: see
+  the honest-boundary note below.
+- **Base SHA → result SHA**: backend `c2558a8` → (this commit, branch
+  `agent/phase0a-phase1a-failclosed-runtime`); frontend unchanged at `d7d7a49`
+  (verified HEAD, clean).
+- **Claim verification against code (requested)**: ADR-0079's corrected pins
+  confirmed present in `test_case_study_regression.py` (157.2 rows, duplicate
+  66.5 row gone); manuscript FID paragraph (line 94) + superseded-report
+  banner + DOI-placeholder decision verified on disk; the 1556-test claim
+  reproduced before this work began (1556 passed).
+- **Implemented behavior**:
+  - **ADR-0082 (honest provenance defaults)**: mock-library candidates now
+    `synthetic` (were `experimental`); undeclared `FileStructureDB` rows
+    default `structure_only` (were `experimental`); declared values preserved.
+    Score-neutral (no ranker reads provenance).
+  - **ADR-0083 (fail-closed startup validation extended)**: new
+    `runtime_config.py` in metabolomics/networking/pharmacology mirroring
+    `ElucidationConfig`; `_Runtime` built from validated config; `create_app`
+    validates eagerly (container entrypoint fails at import, not first
+    request). Real-mode requirements: `MZMINE_HOME`; GNPS route
+    (`GNPS_API_KEY` or explicit `PHYTO_ALLOW_PUBLIC_GNPS=1`); `NEO4J_URI`
+    (pharmacology real mode additionally explicitly unavailable until the
+    Step-8 Neo4j backend — honest unavailability, not a mock). `/health`
+    reports `detector_mode`/`gnps_mode`/`kg_mode`.
+  - **ADR-0084 (MZmine contract unverified)**: `MZmineDetector.detect()` now
+    refuses to run with a named error ("integration is unverified") after
+    validating inputs exist; the dead CSV "batch" code path is removed; the
+    block persists until a live test validates the XML batch format, version
+    and export schema against a real installation.
+  - **M0 deliverables**: `ANALYTICAL_CAPABILITY_MATRIX.md` (25 feature rows vs
+    reference families), `FORMAT_SUPPORT_MATRIX.md` (LC–MS + NMR), 
+    `DATABASE_CONNECTOR_REGISTRY.md` + machine-readable
+    `data/connector_registry.json` (36 connectors, rights-status honesty),
+    `docs/M0_RUNTIME_TRACE_AND_SCHEMAS.md` (runtime trace + 5 canonical schema
+    proposals), rewritten `CAPABILITY_REGISTER.md` v2 (evidence-tier columns),
+    rewritten `IMPLEMENTATION_BACKLOG.md` v2 (M0/M1 priorities).
+- **Evidence**: new tests —
+  `test_metabolomics/test_detector_runtime_modes.py` (8),
+  `test_networking/test_gnps_runtime_modes.py` (13),
+  `test_pharmacology/test_kg_runtime_modes.py` (11), factory/runtime updates in
+  `test_feature_detection.py` (+3), `test_structure_db_provider.py` (reworked
+  provenance tests), updated GNPS factory tests to the explicit-config
+  contract. Full suite **1593 passed**, 14 warnings (pre-existing), ruff
+  `All checks passed!`, `check_adr_numbers.py` OK.
+- **Local tests vs live integration vs scientific validation vs deployment**:
+  - Local tests: done (above).
+  - Live integration: none performed — no MZmine binary, no real mzML fixture,
+    no live GNPS/Vertex/Neo4j call; every real-mode path remains unexercised.
+  - Scientific validation: unchanged; §13 suite passes; the blocked MZmine
+    path claims nothing; fixture outputs stay excluded from scientific claims.
+  - Deployment: none; no push/PR/deploy was performed. Publication of the
+    branch requires explicit authorization per the brief.
+- **Scientific validation**: no expected scientific number changed anywhere in
+  this milestone; all new numbers are startup-failure contracts, not
+  measurements. §13 case-study regressions untouched.
+- **Security/deployment impact**: positive — closes the silent-mock hole in
+  three more services (a cloud deployment without MZmine/GNPS/Neo4j config now
+  refuses startup with an actionable name instead of serving fabricated
+  science); eager validation means the failure is at import time. No secrets
+  touched; registry lists rights-status honestly (`unknown` ⇒ no bulk
+  ingestion/training).
+- **Remaining blockers**: M1-a needs a real MZmine installation + rights-verified
+  open mzML fixture (M0-b shortlist) — both external to this environment;
+  deployed-mode auth verification needs live environment access; frontend
+  vitest run needs a working worker-spawn machine; Phase 4 agent work.
+- **Next bounded task**: **[M0-b]** verify rights and pick the first open
+  reference mzML dataset (accession + hash recorded, nothing unpublished);
+  then **[M1-a]** the MZmine live-integration contract when a binary is
+  available.

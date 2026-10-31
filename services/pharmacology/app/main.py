@@ -27,6 +27,7 @@ from . import __version__
 from .admet_prediction import ADMETResult, predict_admet
 from .knowledge_graph import get_knowledge_graph
 from .literature_mining import PubMedHit, query_compound_literature, search_pubmed
+from .runtime_config import PharmacologyConfig
 from .network_pharmacology import (
     MechanismHypothesis,
     build_network,
@@ -52,8 +53,19 @@ router = APIRouter()
 
 
 class _Runtime:
-    def __init__(self) -> None:
-        self.kg = get_knowledge_graph()
+    """Built from the validated config: real mode never reaches networkx.
+
+    Constructing the runtime validates the configuration eagerly
+    (``PharmacologyConfig.validate``), so a cloud deployment without
+    ``NEO4J_URI`` fails at startup instead of serving the in-memory
+    graph (with its mock traditional-use records) on first request
+    (ADR-0078 rule). Note the Neo4j backend itself is Step 8 wiring:
+    real mode currently fails closed there too.
+    """
+
+    def __init__(self, config: PharmacologyConfig | None = None) -> None:
+        self.config = (config or PharmacologyConfig.from_env()).validate()
+        self.kg = get_knowledge_graph(config=self.config)
 
 
 @lru_cache(maxsize=1)
@@ -362,12 +374,21 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
     cfg = install_auth(application, config)
     application.include_router(router)
 
+    # Fail fast: a real-mode deployment without NEO4J_URI must refuse to
+    # start (this runs at module import for the container entrypoint),
+    # not serve the networkx mock on the first request. Dry-run (local
+    # plane) skips validation by design.
+    get_runtime()
+
     @application.get("/health")
     def health() -> dict[str, Any]:
+        runtime = get_runtime()
         return {
             "status": "ok",
             "service": "pharmacology",
             "version": __version__,
+            "knowledge_graph": type(runtime.kg).__name__,
+            "kg_mode": runtime.config.mode,
             "dry_run": cfg.dry_run,
         }
 

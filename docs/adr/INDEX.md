@@ -94,3 +94,6 @@ authoritative full text of every numbered decision remains in
 | ADR-0079 | §13 HMBC C-4a correlations reconciled at 157.2 ppm (were mis-pinned at 66.5 = C-6); measured baselines | accepted | `tests/test_metabolomics/test_case_study_regression.py` |
 | ADR-0080 | LLM judge verdicts carry the judge's model identity (`CheckResult.model_identity`, `LLMClient.model_identity`) | accepted | `services/orchestrator/app/qa_critic_agent.py` |
 | ADR-0081 | Candidate retrieval is a configurable capability — FileStructureDB CSV library, fail-closed loading | accepted | `services/elucidation/app/structure_db.py` |
+| ADR-0082 | Provenance defaults are honest — synthetic fixtures are `synthetic`, undeclared curated rows are `structure_only` (never silently `experimental`) | accepted | `services/elucidation/app/structure_db.py` |
+| ADR-0083 | Fail-closed startup validation extends to metabolomics (`MZMINE_HOME`), networking (authorized GNPS route), pharmacology (`NEO4J_URI`; real mode explicitly unavailable until Step 8) | accepted | `services/metabolomics/app/runtime_config.py` |
+| ADR-0084 | MZmineDetector batch contract is unverified — raw LC–MS processing is a blocked capability, not a claimed one | accepted | `services/metabolomics/app/feature_detection.py` |

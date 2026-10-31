@@ -76,11 +76,40 @@ class TestMockDetector:
 
 
 class TestMZmineDetector:
-    def test_fails_closed_without_installation(self):
+    def test_fails_closed_without_installation(self, tmp_path):
+        real_file = tmp_path / "sample.mzML"
+        real_file.write_bytes(b"<indexedmzML/>")
         detector = MZmineDetector(mzmine_home="")
         with pytest.raises(CloudServiceError) as excinfo:
-            detector.detect(_paths(), DetectParams())
+            detector.detect([real_file], DetectParams())
         assert "MockDetector" in str(excinfo.value)
+
+    def test_rejects_nonexistent_input_files(self, monkeypatch):
+        # The detector must validate inputs before any subprocess work.
+        monkeypatch.setenv("MZMINE_HOME", "/opt/mzmine")
+        detector = MZmineDetector(mzmine_home="/opt/mzmine")
+        with pytest.raises(InvalidInputError, match="do not exist"):
+            detector.detect(
+                [Path("/nonexistent/sample.mzML")], DetectParams()
+            )
+
+    def test_detect_is_blocked_until_contract_validated(self, monkeypatch, tmp_path):
+        # ADR-0084: even with an "installed" MZmine the batch contract was
+        # never validated against a real installation, so detect() refuses
+        # rather than return mis-shaped results. This pin stays until the
+        # live integration test (real binary, XML batch, verified export
+        # schema) replaces it.
+        fake_bin = tmp_path / "mzmine"
+        fake_bin.write_text("#!/bin/sh\n")
+        fake_bin.chmod(0o755)
+        monkeypatch.setattr(
+            "metabolomics.feature_detection.shutil.which", lambda _: str(fake_bin)
+        )
+        real_file = tmp_path / "sample.mzML"
+        real_file.write_bytes(b"<indexedmzML/>")
+        detector = MZmineDetector(mzmine_home=str(tmp_path))
+        with pytest.raises(CloudServiceError, match="unverified"):
+            detector.detect([real_file], DetectParams())
 
 
 class TestFactory:
@@ -88,10 +117,37 @@ class TestFactory:
         monkeypatch.setenv("PHYTO_DRY_RUN", "1")
         assert isinstance(get_detector(), MockDetector)
 
-    def test_no_mzmine_returns_mock(self, monkeypatch):
+    def test_local_plane_defaults_mock(self, monkeypatch):
+        # Local plane (PHYTO_ENV unset => local => dry-run): the split-plane
+        # default is the mock, no MZMINE_HOME needed.
         monkeypatch.delenv("PHYTO_DRY_RUN", raising=False)
         monkeypatch.delenv("MZMINE_HOME", raising=False)
+        monkeypatch.delenv("PHYTO_ENV", raising=False)
         assert isinstance(get_detector(), MockDetector)
+
+    def test_real_mode_without_mzmine_raises_never_mock(self, monkeypatch):
+        # Fail-closed (ADR-0078 rule): a caller that asserts real mode gets
+        # an error naming the missing variable, never a silent mock.
+        from metabolomics.runtime_config import MetabolomicsConfig
+
+        monkeypatch.setenv("PHYTO_ENV", "cloud")
+        monkeypatch.delenv("PHYTO_DRY_RUN", raising=False)
+        monkeypatch.delenv("MZMINE_HOME", raising=False)
+        config = MetabolomicsConfig.from_env()
+        assert not config.dry_run
+        with pytest.raises(CloudServiceError, match="MZMINE_HOME"):
+            get_detector(config=config)
+
+    def test_real_mode_with_mzmine_returns_real_detector(self, monkeypatch):
+        from metabolomics.runtime_config import MetabolomicsConfig
+
+        monkeypatch.setenv("PHYTO_ENV", "cloud")
+        monkeypatch.delenv("PHYTO_DRY_RUN", raising=False)
+        monkeypatch.setenv("MZMINE_HOME", "/opt/mzmine")
+        config = MetabolomicsConfig.from_env()
+        detector = get_detector(config=config)
+        assert isinstance(detector, MZmineDetector)
+        assert detector.mzmine_home == "/opt/mzmine"
 
 
 class TestMatrixHelpers:

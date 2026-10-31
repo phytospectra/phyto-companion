@@ -61,7 +61,8 @@ def _candidate_from(name: str, smiles: str) -> Candidate:
         smiles=smiles,
         formula=MolecularFormula(counts=counts),
         exact_mass=MolecularFormula(counts=counts).exact_mass(),
-        provenance="experimental",
+        # Labeled fixture: these molecules are not measured reference data.
+        provenance="synthetic",
         source="mock structure library",
     )
 
@@ -106,11 +107,12 @@ class FileStructureDB(StructureDatabase):
     """Real curated structure library loaded from a CSV file.
 
     Columns: ``name``, ``smiles`` and optionally ``provenance``
-    (default ``experimental``) and ``source`` (default the file path's
-    name). Every row's formula is computed from the SMILES with RDKit;
-    an invalid SMILES is a startup error, never a skipped row (ADR-0081:
-    a partially-loaded library would quietly miss candidates and look
-    like a negative result).
+    (default ``structure_only``: a row that does not declare a
+    provenance must not be silently claimed as experimental) and
+    ``source`` (default the file path's name). Every row's formula is
+    computed from the SMILES with RDKit; an invalid SMILES is a startup
+    error, never a skipped row (ADR-0081: a partially-loaded library
+    would quietly miss candidates and look like a negative result).
     """
 
     def __init__(self, path: str | Path) -> None:
@@ -159,7 +161,7 @@ class FileStructureDB(StructureDatabase):
                     smiles=smiles,
                     formula=MolecularFormula(counts=counts),
                     exact_mass=MolecularFormula(counts=counts).exact_mass(),
-                    provenance=(row.get("provenance") or "experimental").strip(),
+                    provenance=(row.get("provenance") or "structure_only").strip(),
                     source=(row.get("source") or self.path.name).strip(),
                 )
                 self._candidates.append(candidate)

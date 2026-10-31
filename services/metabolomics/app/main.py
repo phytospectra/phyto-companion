@@ -23,6 +23,7 @@ from auth.install import install_auth
 from . import __version__
 from .differential_analysis import compare_groups, volcano_plot_data
 from .feature_detection import DetectParams, FeatureTable, get_detector
+from .runtime_config import MetabolomicsConfig
 from .multi_block_fusion import mfa, consensus_pca, permutation_test_fusion, pls_da_concat
 from .normalization import flag_low_quality, normalize, qc_correction
 from .pathway_enrichment import enrich_kegg, map_to_compounds
@@ -40,8 +41,18 @@ router = APIRouter()
 
 
 class _Runtime:
-    def __init__(self) -> None:
-        self.detector = get_detector()
+    """Built from the validated config: real mode never reaches a mock.
+
+    Constructing the runtime validates the configuration eagerly
+    (``MetabolomicsConfig.validate``), so a cloud deployment missing
+    ``MZMINE_HOME`` fails at startup instead of serving mock feature
+    detection on first request (ADR-0078 rule; mirrors the elucidation
+    service).
+    """
+
+    def __init__(self, config: MetabolomicsConfig | None = None) -> None:
+        self.config = (config or MetabolomicsConfig.from_env()).validate()
+        self.detector = get_detector(config=self.config)
 
 
 @lru_cache(maxsize=1)
@@ -312,13 +323,21 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
     cfg = install_auth(application, config)
     application.include_router(router)
 
+    # Fail fast: a real-mode deployment missing MZMINE_HOME must refuse to
+    # start (this runs at module import for the container entrypoint), not
+    # serve mock detection on the first request. Dry-run (local plane)
+    # skips validation by design.
+    get_runtime()
+
     @application.get("/health")
     def health() -> dict[str, Any]:
+        runtime = get_runtime()
         return {
             "status": "ok",
             "service": "metabolomics",
             "version": __version__,
-            "detector": type(get_runtime().detector).__name__,
+            "detector": type(runtime.detector).__name__,
+            "detector_mode": runtime.config.mode,
             "dry_run": cfg.dry_run,
         }
 

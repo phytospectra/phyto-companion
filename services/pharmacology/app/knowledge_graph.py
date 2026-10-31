@@ -305,14 +305,36 @@ class NetworkxKnowledgeGraph(KnowledgeGraph):
         return 1
 
 
-def get_knowledge_graph() -> KnowledgeGraph:
-    """networkx locally; Neo4j wiring lands with deployment (Step 8)."""
-    import os
+def get_knowledge_graph(config: "object | None" = None) -> KnowledgeGraph:
+    """Dry-run plane gets networkx; real mode requires an explicit backend.
 
-    if os.environ.get("PHYTO_ENV") == "cloud" and os.environ.get("NEO4J_URI"):
+    Fail-closed (ADR-0078 rule): a caller that knows it is in real mode
+    (``dry_run=False``) gets the real graph backend or an error naming
+    the missing configuration -- it never silently serves the in-memory
+    networkx graph, whose traditional-use records are mock strings.
+    (The Neo4j backend is Step 8 wiring; until it exists, real mode
+    fails closed at startup rather than pretending.)  Callers that
+    don't pass a config (legacy/tests) resolve the plane from the
+    environment; the networkx graph remains the dry-run default.
+    """
+    if config is None:
+        from .runtime_config import PharmacologyConfig
+
+        config = PharmacologyConfig.from_env()
+    if config.dry_run:
+        return NetworkxKnowledgeGraph()
+    if not config.neo4j_uri:
         raise CloudServiceError(
-            "Neo4j backend is wired at deployment time (Step 8); the "
-            "local plane uses NetworkxKnowledgeGraph",
-            context={},
+            "real mode requires NEO4J_URI (a real knowledge-graph "
+            "backend); the in-memory networkx graph with mock "
+            "traditional-use records is dry-run only -- refusing to "
+            "fall back to it",
+            context={"env": config.env, "capability": "knowledge_graph"},
         )
-    return NetworkxKnowledgeGraph()
+    # Neo4j wiring lands with deployment (Step 8). Failing closed here
+    # is deliberate: an unavailable capability is better than a mock.
+    raise CloudServiceError(
+        "the Neo4j knowledge-graph backend is not wired yet (Step 8); "
+        "real-mode pharmacology is explicitly unavailable",
+        context={"env": config.env, "capability": "knowledge_graph"},
+    )

@@ -30,13 +30,23 @@ from .gnps_client import get_gnps_client
 from .gnps_job_manager import GNPSJobManager
 from .network_visualization import network_summary, to_cytoscape_json, to_graphml
 from .nmr_networking import HSQCNetwork, HSQCSpectrum, build_hsqc_network
+from .runtime_config import NetworkingConfig
 
 router = APIRouter()
 
 
 class _Runtime:
-    def __init__(self) -> None:
-        self.client = get_gnps_client()
+    """Built from the validated config: real mode never reaches the mock.
+
+    Constructing the runtime validates the configuration eagerly
+    (``NetworkingConfig.validate``), so a cloud deployment without an
+    authorized GNPS access route fails at startup instead of serving
+    fabricated job handles on first request (ADR-0078 rule).
+    """
+
+    def __init__(self, config: NetworkingConfig | None = None) -> None:
+        self.config = (config or NetworkingConfig.from_env()).validate()
+        self.client = get_gnps_client(config=self.config)
         self.jobs = GNPSJobManager(client=self.client)
 
 
@@ -384,6 +394,12 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
     cfg = install_auth(application, config)
     application.include_router(router)
 
+    # Fail fast: a real-mode deployment without an authorized GNPS access
+    # route must refuse to start (this runs at module import for the
+    # container entrypoint), not serve fabricated job handles on the
+    # first request. Dry-run (local plane) skips validation by design.
+    get_runtime()
+
     @application.get("/health")
     def health() -> dict[str, Any]:
         runtime = get_runtime()
@@ -392,6 +408,7 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
             "service": "networking",
             "version": __version__,
             "gnps_client": type(runtime.client).__name__,
+            "gnps_mode": runtime.config.mode,
             "dry_run": cfg.dry_run,
         }
 

@@ -38,13 +38,23 @@ class TestFileStructureDB:
             "Cn1c(=O)c2c(ncn2C)n(C)c1=O"))
         assert db.candidate_by_inchikey(ik).name == "caffeine"
 
-    def test_default_provenance_and_source(self, tmp_path):
+    def test_undeclared_provenance_defaults_to_structure_only(self, tmp_path):
         csv = tmp_path / "lib.csv"
         _write_csv(csv, ["phenol,Oc1ccccc1"])
         db = FileStructureDB(csv)
         cand = db.candidates_for_formula({"C": 6, "H": 6, "O": 1})[0]
-        assert cand.provenance == "experimental"
+        # a row that does not declare provenance must not be claimed as
+        # experimental (ADR-0081 honest provenance)
+        assert cand.provenance == "structure_only"
         assert cand.source == "lib.csv"
+
+    def test_declared_provenance_is_preserved(self, tmp_path):
+        csv = tmp_path / "lib.csv"
+        _write_csv(csv, ["phenol,Oc1ccccc1,experimental,standard-lab"])
+        db = FileStructureDB(csv)
+        cand = db.candidates_for_formula({"C": 6, "H": 6, "O": 1})[0]
+        assert cand.provenance == "experimental"
+        assert cand.source == "standard-lab"
 
     def test_missing_file_is_startup_error(self, tmp_path):
         with pytest.raises(CloudServiceError, match="not found"):

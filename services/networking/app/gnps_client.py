@@ -27,6 +27,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from phyto_shared.exceptions import CloudServiceError, InvalidInputError
 
+from .runtime_config import NetworkingConfig
+
 __all__ = [
     "Annotation",
     "Cluster",
@@ -540,18 +542,31 @@ class MockGNPSClient:
 # ---------------------------------------------------------------------------
 
 
-def get_gnps_client(**kwargs: Any) -> GNPSClient | MockGNPSClient:
-    """Mock when PHYTO_DRY_RUN=1, or when no API key is set and public GNPS
-    is not explicitly allowed (PHYTO_ALLOW_PUBLIC_GNPS != 1).
+def get_gnps_client(config: NetworkingConfig | None = None,
+                    **kwargs: Any) -> GNPSClient | MockGNPSClient:
+    """Dry-run plane gets the mock; real mode requires an authorized route.
 
-    Note: a developer who exports a real GNPS_API_KEY (and clears
-    PHYTO_DRY_RUN) gets the real client even locally -- that is their
-    explicit choice; the split-plane default is the mock, since local
-    development never carries credentials.
+    Fail-closed (ADR-0078 rule): a caller that knows it is in real mode
+    (``dry_run=False``) gets ``GNPSClient`` or an error naming the
+    missing access route -- it never silently degrades to the mock,
+    whose fabricated job handles would look like real submissions.
+    Callers that don't pass a config (legacy/tests) resolve the plane
+    from the environment.  A developer who exports a real GNPS_API_KEY
+    (and clears PHYTO_DRY_RUN) gets the real client even locally --
+    that is their explicit choice; the split-plane default is the mock,
+    since local development never carries credentials.
     """
-    dry_run = os.environ.get("PHYTO_DRY_RUN") == "1"
-    has_key = bool(os.environ.get("GNPS_API_KEY"))
-    public_allowed = os.environ.get("PHYTO_ALLOW_PUBLIC_GNPS") == "1"
-    if dry_run or (not has_key and not public_allowed):
+    if config is None:
+        config = NetworkingConfig.from_env()
+    if config.dry_run:
         return MockGNPSClient()
+    if not config.gnps_api_key and not config.allow_public_gnps:
+        raise CloudServiceError(
+            "real mode has no authorized GNPS access route: set "
+            "GNPS_API_KEY, or explicitly opt in to the public GNPS "
+            "instance with PHYTO_ALLOW_PUBLIC_GNPS=1 (public "
+            "submissions carry data outside the tenancy boundary); "
+            "refusing to fall back to the mock client",
+            context={"env": config.env, "capability": "gnps_submission"},
+        )
     return GNPSClient(**kwargs)
