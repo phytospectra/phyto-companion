@@ -9,22 +9,26 @@
   "conversion": {
     "parser": "ThermoRawFileParser",
     "parser_version": "2.0.0.0",
-    "parser_path": "/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/tools/mzmine-4.11.0/mzmine.app/Contents/external_tools/thermo_raw_file_parser/ThermoRawFileParser",
-    "mzml_path": "/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/data/validated_runs/M1b/converted/20220426_UMETAB266_POS_Thiostreptone.mzML",
+    "parser_path": "tools/mzmine-4.11.0/mzmine.app/Contents/external_tools/thermo_raw_file_parser/ThermoRawFileParser",
+    "mzml_path": "data/validated_runs/M1b/converted/20220426_UMETAB266_POS_Thiostreptone.mzML",
     "mzml_size_bytes": 34638312,
-    "mzml_sha256": "f1e7409e717790a7456f31216b343ce35239930c3fd869ebca9df0704449ae15"
+    "mzml_sha256_as_executed": "f1e7409e717790a7456f31216b343ce35239930c3fd869ebca9df0704449ae15",
+    "mzml_sha256_as_committed": "45b67fd57332c9bf6080233679e8d743cbaa704dddd91380638a6e2019d5b283",
+    "note": "as_committed differs from as_executed only by redaction of the absolute local path in the sourceFile location attribute; spectral content unchanged"
   },
   "engine": {
     "name": "MZmine",
     "version": "4.11.0",
-    "user_file": "subhadip.ban@mfu.ac.th.mzuser4"
+    "user_file": "<redacted username>.mzuser4 (machine-locked; created interactively by the user via 'mzmine -login')"
   },
   "batch": {
-    "path": "/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/data/validated_runs/M1b/batch.mzbatch",
-    "sha256": "0c101f428511ecb9c2c81705b0e283a123b58a870697fa0dee0913bb5c8e3d07",
-    "steps": 11
+    "path": "data/validated_runs/M1b/batch.mzbatch",
+    "steps": 11,
+    "sha256_as_executed": "0c101f428511ecb9c2c81705b0e283a123b58a870697fa0dee0913bb5c8e3d07",
+    "sha256_as_committed": "973fea5d7db9649d707efa56373ce9db5aff53db7a0a866cd5858f40add6e69d",
+    "note": "as_committed differs from as_executed only by redaction of absolute local paths (home dir, username) from the import step; parameter content is unchanged"
   },
-  "cli_command": "/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/tools/mzmine-4.11.0/mzmine.app/Contents/MacOS/mzmine -user /Users/subhadipbanerjee/.mzmine/users/subhadip.ban@mfu.ac.th.mzuser4 -batch /Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/data/validated_runs/M1b/batch.mzbatch",
+  "cli_command": "tools/mzmine-4.11.0/mzmine.app/Contents/MacOS/mzmine -user <redacted-user>.mzuser4 -batch data/validated_runs/M1b/batch.mzbatch",
   "feature_count_total": 1926,
   "precursor_query_mz": 832.753,
   "precursor_matches_10ppm": [

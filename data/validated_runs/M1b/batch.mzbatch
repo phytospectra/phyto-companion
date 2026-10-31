@@ -2,7 +2,7 @@
 <batch mzmine_version="4.11.0">
     <batchstep method="io.github.mzmine.modules.io.import_rawdata_all.AllSpectralDataImportModule" module_name="Import MS data" parameter_version="1">
         <parameter name="File names">
-            <file>/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/data/validated_runs/M1b/converted/20220426_UMETAB266_POS_Thiostreptone.mzML</file>
+            <file>data/validated_runs/M1b/converted/20220426_UMETAB266_POS_Thiostreptone.mzML</file>
         </parameter>        <parameter name="Vendor data options" selected="false"/>        <parameter name="Advanced import" selected="false"/>        <parameter name="Extract sample metadata">false</parameter>        <parameter name="Sort and color">true</parameter>
     </batchstep>
     <batchstep method="io.github.mzmine.modules.dataprocessing.featdet_massdetection.MassDetectionModule" module_name="Mass detection" parameter_version="1">
@@ -133,8 +133,8 @@
         <parameter name="Feature lists" type="BATCH_LAST_FEATURELISTS"/>
         <parameter name="Row selection">ALL</parameter>
         <parameter name="Filename">
-            <current_file>/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/data/validated_runs/M1b/features.csv</current_file>
-            <last_file>/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/data/validated_runs/M1b/features.csv</last_file>
+            <current_file>data/validated_runs/M1b/features.csv</current_file>
+            <last_file>data/validated_runs/M1b/features.csv</last_file>
         </parameter>
         <parameter name="Field separator">,</parameter>
         <parameter name="Identification separator">;</parameter>

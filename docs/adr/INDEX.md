@@ -100,3 +100,4 @@ authoritative full text of every numbered decision remains in
 | ADR-0085 | MZmine 4.11 batch contract pinned and validated to the CLI login gate; feature run pending a user profile | accepted | `services/metabolomics/app/batch_xml.py`, `services/metabolomics/app/feature_detection.py` |
 | ADR-0086 | M1-a accepted: measured MZmine feature run through the platform entry point; M1-b (vendor-native) explicitly still open | accepted | `data/validated_runs/M1a/`, `services/metabolomics/app/feature_detection.py` |
 | ADR-0087 | Vendor-native conversion as a pinned, license-documented pre-step — ThermoRawFileParser from MZMINE_HOME, fail-closed on absence | accepted | `services/metabolomics/app/vendor_conversion.py` |
+| ADR-0088 | OSF project as the citable acceptance-evidence archive (embargoed until owner flip); third-party data referenced, not re-uploaded | accepted | `scripts/osf_register_evidence.sh`, `data/validated_runs/` |
