@@ -2450,3 +2450,38 @@ own enforcement surface.
   conversion (.raw/.d) remains M1-b, a separate acceptance test. The
   `.mzuser4` profile is machine-locked and user-owned; no credentials
   are recorded anywhere in the repository.
+
+### ADR-0087: Vendor-native conversion is a pinned, license-documented pre-step — ThermoRawFileParser from MZMINE_HOME, fail-closed on absence
+
+- **Status:** accepted
+- **Date:** 2026-10-31
+- **Context:** M1-b (ADR-0086) requires feature detection on vendor-native
+  Thermo `.raw` files. MZmine itself cannot import `.raw`; the platform
+  must convert first. Reaching for the newest parser version or a
+  system-wide binary would make the pipeline non-reproducible and
+  license-ambiguous.
+- **Decision:** Thermo vendor files are converted exclusively by
+  ThermoRawFileParser (Apache-2.0; Thermo's RawFileReader is its
+  source-included component), resolved from the pinned MZMINE_HOME
+  (`tools/mzmine-<version>/external_tools/thermo_raw_file_parser/`), so
+  the converter version is pinned by the same mechanism as the MZmine
+  binary. The conversion step is fail-closed (ADR-0082 semantics): with
+  no parser binary configured or locatable, conversion raises
+  `CloudServiceError` naming the exact gap — never a synthetic file.
+  Implementation: `services/metabolomics/app/vendor_conversion.py`
+  (`ThermoRawFileParserConverter`), tested by
+  `tests/test_metabolomics/test_vendor_conversion.py`.
+- **Consequences:** Only Thermo is covered at this stage; other vendors
+  (Waters, Bruker, Agilent, Sciex) each need their own pinned converter
+  and will be added under follow-up ADRs. M1-b is measured and accepted:
+  a 68,362,907-byte `20220426_UMETAB266_POS_Thiostreptone.raw`
+  (MSV000090047, SHA-256
+  `0f039d2578c2b244f57cc212362e438e20fab242c483f3f5defc650596ebe6d8`,
+  recorded in `data/validated_runs/M1b/run_summary.json`) converted by
+  ThermoRawFileParser 2.0.0.0 to a 34,638,312-byte indexed mzML (1,926
+  features detected by the MZmine 4.11.0 batch); the thiostrepton
+  [M+2H]2+ anchor is observed at
+  m/z 832.75345 (0.54 ppm), RT 505.2 s, base-peak feature 1423, area
+  6.9e5. Note: this dataset has NO MS2 scans (full-scan only), matching
+  the file's acquisition; MS/MS confirmation remains pending for both
+  M1-a and M1-b.

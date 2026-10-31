@@ -55,11 +55,15 @@ must end with its acceptance test and evidence in `AGENT_STATUS.md`.
    actual CSV-export schema, and pin a live integration test skipped when
    `MZMINE_HOME` is absent. Acceptance: the live test passes once, recorded
    with version + config + output contract; CI stays green without the binary.
-4. **[M1-b] Vendor-conversion path survey** — pick the first validated
-   vendor-conversion route (ProteoWizard/msconvert worker vs vendor export)
-   for one vendor family; qualification per §4 of the prompt (fixtures,
-   negative cases, conversion-loss report). Worker isolation rules per the
-   enterprise brief.
+4. **[M1-b] Vendor-conversion path survey — Thermo route DONE (ADR-0087)**:
+   the first validated route is ThermoRawFileParser 2.0.0.0 (bundled with the
+   pinned MZmine 4.11.0) driving a `.raw` → mzML conversion, then the same
+   `MZmineDetector` batch: 5,023 scans converted, 1,926 features, thiostrepton
+   [M+2H]²⁺ anchor measured (0.54 ppm, RT 8.42 min) pending MS/MS
+   confirmation. Fail-closed on a missing parser (`test_vendor_conversion.py`).
+   Remaining survey work: ProteoWizard/msconvert worker for Waters/Bruker/
+   Agilent/Sciex, conversion-loss report, worker isolation per the enterprise
+   brief.
 5. **[P2-remainder] Real-mode vertical on a real exported feature table** —
    run lcms_preproc → statistics on a licensed real table, recorded with
    provenance; fixture outputs stay excluded from scientific claims.

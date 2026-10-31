@@ -1,0 +1,66 @@
+{
+  "recorded_at_utc": "2026-10-31T11:21:54.706292+00:00",
+  "dataset": {
+    "accession": "MSV000090047",
+    "file": "20220426_UMETAB266_POS_Thiostreptone.raw",
+    "size_bytes": 68362907,
+    "sha256": "0f039d2578c2b244f57cc212362e438e20fab242c483f3f5defc650596ebe6d8"
+  },
+  "conversion": {
+    "parser": "ThermoRawFileParser",
+    "parser_version": "2.0.0.0",
+    "parser_path": "/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/tools/mzmine-4.11.0/mzmine.app/Contents/external_tools/thermo_raw_file_parser/ThermoRawFileParser",
+    "mzml_path": "/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/data/validated_runs/M1b/converted/20220426_UMETAB266_POS_Thiostreptone.mzML",
+    "mzml_size_bytes": 34638312,
+    "mzml_sha256": "f1e7409e717790a7456f31216b343ce35239930c3fd869ebca9df0704449ae15"
+  },
+  "engine": {
+    "name": "MZmine",
+    "version": "4.11.0",
+    "user_file": "subhadip.ban@mfu.ac.th.mzuser4"
+  },
+  "batch": {
+    "path": "/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/data/validated_runs/M1b/batch.mzbatch",
+    "sha256": "0c101f428511ecb9c2c81705b0e283a123b58a870697fa0dee0913bb5c8e3d07",
+    "steps": 11
+  },
+  "cli_command": "/Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/tools/mzmine-4.11.0/mzmine.app/Contents/MacOS/mzmine -user /Users/subhadipbanerjee/.mzmine/users/subhadip.ban@mfu.ac.th.mzuser4 -batch /Users/subhadipbanerjee/Documents/NMR-MS-data analysis/phyto-companion/data/validated_runs/M1b/batch.mzbatch",
+  "feature_count_total": 1926,
+  "precursor_query_mz": 832.753,
+  "precursor_matches_10ppm": [
+    {
+      "feature_id": "1423",
+      "observed_mz": 832.75345,
+      "charge_assumption": "2+",
+      "mass_error_ppm": 0.54,
+      "rt_seconds": 505.22,
+      "rt_minutes": 8.4204,
+      "area": "6.905E5",
+      "mz_range_min": "832.75317"
+    },
+    {
+      "feature_id": "1187",
+      "observed_mz": 832.75359,
+      "charge_assumption": "2+",
+      "mass_error_ppm": 0.71,
+      "rt_seconds": 423.52,
+      "rt_minutes": 7.0586,
+      "area": "2.145E3",
+      "mz_range_min": "832.75244"
+    },
+    {
+      "feature_id": "1460",
+      "observed_mz": 832.75338,
+      "charge_assumption": "2+",
+      "mass_error_ppm": 0.46,
+      "rt_seconds": 513.98,
+      "rt_minutes": 8.5663,
+      "area": "1.503E3",
+      "mz_range_min": "832.75262"
+    }
+  ],
+  "acceptance": "vendor-native .raw -> mzML conversion + feature detection; precursor-mass and RT screening pending MS/MS confirmation",
+  "evidence_level": "live integration run; NOT a broad scientific validation; single-file single-compound standard",
+  "precursor_query_ion": "thiostrepton [M+2H]2+ (mono neutral 1663.4914)",
+  "note": "Re-queried after initial run: script had reused the tetracycline mass (445.1605) for a thiostrepton file; correct 2+ ion is 832.7530."
+}

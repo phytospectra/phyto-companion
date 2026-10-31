@@ -293,3 +293,36 @@ integration — one file, one ion mode, one recorded run. It is NOT a
 scientific performance benchmark for the platform, and fixture/demo
 outputs remain excluded from scientific performance claims (enterprise
 brief).
+
+### 11b. Vendor-native `.raw` file for M1-b (ADR-0087) — same dataset
+
+Added 2026-10-31 for the vendor-conversion acceptance test (M1-b).
+
+| Field | Value |
+|---|---|
+| File | `20220426_UMETAB266_POS_Thiostreptone.raw` (Thermo vendor-native, same UMETAB266_POS batch as the tetracycline mzML) |
+| Source | Zenodo record 6948449 (mirror of MassIVE MSV000090047), downloaded 2026-10-31 |
+| Size | 68,362,907 bytes (matches the Zenodo `files[].size` exactly) |
+| MD5 | `ac0890f515c05f2ad3d3b6e599a3b11c` (authoritative: Zenodo record 6948449 `files[].checksum`; recomputed locally after download — match) |
+| SHA-256 (local) | `0f039d2578c2b244f57cc212362e438e20fab242c483f3f5defc650596ebe6d8` |
+| Committed to git? | **No** — `data/raw/` is gitignored (bulk data rule) |
+| Conversion | ThermoRawFileParser 2.0.0.0 (bundled under the pinned MZmine 4.11.0 `external_tools/`; ADR-0087) → indexed mzML, 5,023 scans, 34,638,312 bytes |
+| Converted mzML SHA-256 | `f1e7409e717790a7456f31216b343ce35239930c3fd869ebca9df0704449ae15` |
+| Integration mode | Local acceptance anchor for the vendor-conversion + feature-detection chain |
+
+Independently checkable expected signals used for acceptance:
+
+1. Thiostrepton (PubChem CID 16129666): formula C72H85N19O18S5,
+   monoisotopic neutral mass 1663.4923528 Da → [M+2H]2+ theoretical
+   m/z 832.7530 (monoisotopic; the 5-sulfur isotope envelope makes the
+   M+1/M+2 satellites prominent).
+2. Measured in the recorded run (`data/validated_runs/M1b/`): feature
+   1423 at m/z 832.75345 (+0.54 ppm), RT 8.4204 min, area 6.9e5
+   (base peak by area); isotope-satellite group 832.75/833.75 at the
+   same RT (833.754 = M+2 per-charge, as expected for 5 S atoms).
+3. The run's mzML contains NO MS2 scans (full-scan-only acquisition) —
+   so, as for M1-a, this is a precursor-mass + RT match pending MS/MS
+   confirmation, NOT an identification.
+
+Scope note: same as section 11 — acceptance anchor for the conversion
+and detection integration, not a scientific performance benchmark.

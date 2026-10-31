@@ -302,3 +302,37 @@ Reporting template per the enterprise handoff brief. One row per milestone.
   pending MS/MS confirmation" — NOT an identification. Not a broad
   scientific validation.
 - **Next**: M1-b vendor-native conversion acceptance test (separate).
+
+## Milestone: M1-b vendor-native conversion PASSED (measured) — ThermoRawFileParser chain (ADR-0087)
+
+- **Milestone/status**: **M1-b passed** — a Thermo `.raw` file was converted
+  vendor-natively by the pinned ThermoRawFileParser 2.0.0.0 (bundled under
+  the pinned MZmine 4.11.0 `external_tools/`) and the resulting mzML was
+  run through the same `MZmineDetector` batch as M1-a. Recorded in
+  ADR-0087. The fail-closed contract (no parser → `CloudServiceError`
+  naming the gap) is covered by `tests/test_metabolomics/test_vendor_conversion.py`.
+- **Measured result (2026-10-31)**:
+  - Input: `20220426_UMETAB266_POS_Thiostreptone.raw` (MSV000090047, Zenodo
+    mirror; 68,362,907 bytes; MD5 `ac0890f515c05f2ad3d3b6e599a3b11c`
+    matching the Zenodo record checksum; SHA-256 `0f039d2578c2b244f…`).
+  - Conversion: 5,023 scans, indexed mzML 34,638,312 bytes
+    (SHA-256 `f1e7409e717790a7…`).
+  - Detection: MZmine 4.11.0 batch → 1,926 features.
+  - **Thiostrepton [M+2H]²⁺ (precursor-mass + RT match, pending MS/MS
+    confirmation)**: theoretical m/z 832.75345 (neutral 1663.492353,
+    C72H85N19O18S5); measured feature 1423 at m/z 832.75345 (0.54 ppm),
+    RT 505.22 s (8.4204 min), area 6.9e5; the per-charge M+2 satellite
+    (833.75404, feature 1424) appears at the identical RT — consistent
+    with the 5-sulfur isotope envelope. Two weaker 832.753 features at
+    other RTs (1187, 1460) are also recorded.
+- **Evidence boundaries**: same as M1-a — single dataset, single compound
+  standard, precursor-mass + RT match pending MS/MS confirmation, NOT an
+  identification. The file has no MS2 scans (full-scan-only acquisition),
+  so MS/MS confirmation remains pending for both M1-a and M1-b.
+- **Preserved artifacts** (`data/validated_runs/M1b/`): `run_summary.json`
+  (checksums, engine identity, per-match m/z/ppm/RT), `batch.mzbatch`
+  (sha256 0c101f42…), `features.csv`, `mzmine_run.log`,
+  `converted/20220426_UMETAB266_POS_Thiostreptone.mzML`.
+- **Next**: MS/MS confirmation path (needs an MS2-containing file) and/or
+  additional vendor converters (Waters, Bruker, Agilent, Sciex) under
+  follow-up ADRs.
