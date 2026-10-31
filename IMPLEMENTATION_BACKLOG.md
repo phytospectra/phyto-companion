@@ -49,7 +49,7 @@ must end with its acceptance test and evidence in `AGENT_STATUS.md`.
    owner-provided private test datasets **without publishing them**; record
    the access route and license for each. Gate: rights must be verified per
    dataset before download; nothing unpublished leaves the workspace.
-3. **[M1-a] MZmine live-integration contract** (implemented; blocked on the MZmine user profile):
+3. **[M1-a] MZmine live-integration contract — DONE (ADR-0086)**: authenticated replay produced a 1,388-feature table via `/metabolomics/detect`; tetracycline precursor-mass + RT match recorded pending MS/MS confirmation. Next:
    install/locate a real MZmine (`MZMINE_HOME`), verify its version, emit the
    XML batch from `DetectParams`, run one small real mzML file, capture the
    actual CSV-export schema, and pin a live integration test skipped when

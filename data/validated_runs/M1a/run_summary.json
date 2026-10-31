@@ -1,0 +1,64 @@
+{
+  "recorded_at_utc": "2026-10-31T08:49:16.356781+00:00",
+  "dataset": {
+    "accession": "MSV000090047",
+    "file": "20220426_UMETAB266_POS_Tetracycline.mzML",
+    "size_bytes": 33379150,
+    "md5": "396f11793f20870de150b56408a33c21",
+    "sha256": "fa3910452ae96f754a3eb05b2cf07ae2993f053fa4862b78d365cf1d857f6b9e"
+  },
+  "engine": {
+    "name": "MZmine",
+    "version": "4.11.0",
+    "executable": "tools/mzmine-4.11.0/mzmine.app/Contents/MacOS/mzmine",
+    "user_file": "<redacted username>.mzuser4 (machine-locked; created interactively by the user via 'mzmine -login')"
+  },
+  "batch": {
+    "sha256": "dddf7310d7dec8ad116810a6bca1ec41eae2744ef9ac4b76696371a90e289c36",
+    "steps": 11,
+    "sha256_as_executed": "dddf7310d7dec8ad116810a6bca1ec41eae2744ef9ac4b76696371a90e289c36",
+    "sha256_as_committed": "bcbff0da527868bc5c119c614857e8c748f0a0164ccb1d828fc3e863d304b45a",
+    "note": "as_committed differs from as_executed only by redaction of absolute local paths (home dir, username) from the import step; parameter content is unchanged"
+  },
+  "cli_command": "tools/mzmine-4.11.0/mzmine.app/Contents/MacOS/mzmine -user <redacted-user>.mzuser4 -batch data/validated_runs/M1a/batch.mzbatch",
+  "feature_count_total": 1388,
+  "tetracycline_matches_10ppm": [
+    {
+      "feature_id": "559",
+      "observed_mz": 445.16056,
+      "mass_error_ppm": 0.135,
+      "rt_seconds": 326.65,
+      "rt_minutes": 5.4442,
+      "height": 51290.0,
+      "rt_in_expected_window_320_380s": true
+    },
+    {
+      "feature_id": "576",
+      "observed_mz": 445.16058,
+      "mass_error_ppm": 0.18,
+      "rt_seconds": 332.44,
+      "rt_minutes": 5.5407,
+      "height": 3151000.0,
+      "rt_in_expected_window_320_380s": true
+    },
+    {
+      "feature_id": "610",
+      "observed_mz": 445.16068,
+      "mass_error_ppm": 0.404,
+      "rt_seconds": 345.96,
+      "rt_minutes": 5.766,
+      "height": 159600000.0,
+      "rt_in_expected_window_320_380s": true
+    }
+  ],
+  "acceptance": "precursor-mass (10 ppm) and retention-time (320-380 s) match pending MS/MS confirmation",
+  "evidence_level": "live integration run on a single-file single-compound standard; NOT a broad scientific validation",
+  "http_verification": {
+    "endpoint": "POST /metabolomics/detect (real mode: PHYTO_ENV=cloud, PHYTO_DRY_RUN=0, PHYTO_AUTH_ENABLED=0 for the local unauthenticated replay)",
+    "http_status": 200,
+    "provenance_manifest_id": "aa51f3cefea506e61fe7cdc5d1b7ef1f (prefix; full id in api_detect_response.json)",
+    "feature_count_total": 1388,
+    "matches_identical_to_direct_detector_run": true,
+    "response_preserved_at": "data/validated_runs/M1a/api_detect_response.json"
+  }
+}

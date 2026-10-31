@@ -98,3 +98,4 @@ authoritative full text of every numbered decision remains in
 | ADR-0083 | Fail-closed startup validation extends to metabolomics (`MZMINE_HOME`), networking (authorized GNPS route), pharmacology (`NEO4J_URI`; real mode explicitly unavailable until Step 8) | accepted | `services/metabolomics/app/runtime_config.py` |
 | ADR-0084 | MZmineDetector batch contract is unverified — raw LC–MS processing is a blocked capability, not a claimed one | accepted | `services/metabolomics/app/feature_detection.py` |
 | ADR-0085 | MZmine 4.11 batch contract pinned and validated to the CLI login gate; feature run pending a user profile | accepted | `services/metabolomics/app/batch_xml.py`, `services/metabolomics/app/feature_detection.py` |
+| ADR-0086 | M1-a accepted: measured MZmine feature run through the platform entry point; M1-b (vendor-native) explicitly still open | accepted | `data/validated_runs/M1a/`, `services/metabolomics/app/feature_detection.py` |

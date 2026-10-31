@@ -268,3 +268,37 @@ Reporting template per the enterprise handoff brief. One row per milestone.
   measured comparison in `ANALYTICAL_CAPABILITY_MATRIX.md` and this file.
   Vendor-native conversion (.raw/.d) remains the separate M1-b acceptance
   test.
+
+## Milestone: M1-a detector replay PASSED (measured) — record + HTTP verification
+
+- **Milestone/status**: **M1-a replay passed** — authenticated live run
+  produced a real feature table and the tetracycline acceptance anchors
+  were met; recorded in ADR-0086. M1-b (vendor-native conversion) is the
+  next acceptance test and has not started.
+- **Base SHA → result SHA**: base `1bd5dfb`; result pending commit.
+- **Measured result (2026-10-31)**:
+  - Engine: MZmine 4.11.0 (pinned), macOS ARM, user profile
+    `subhadip.ban@mfu.ac.th.mzuser4` (user-created; machine-locked; no
+    credentials recorded in the repo).
+  - Dataset: MSV000090047 tetracycline mzML, MD5/SHA-256 re-verified at
+    run time and recorded in the run summary.
+  - **Direct path**: `MZmineDetector.detect()` → 1,388 features.
+  - **Platform entry point**: `POST /metabolomics/detect` (real mode) →
+    HTTP 200, identical table, provenance notes carry engine version +
+    batch sha256 prefix `61a4bf375c5a9ac7`.
+  - **Tetracycline (precursor-mass + RT match, pending MS/MS
+    confirmation)**: features 559 (445.16056, +0.135 ppm, RT 326.65 s),
+    576 (445.16058, +0.180 ppm, RT 332.44 s), 610 (445.16068, +0.404 ppm,
+    RT 345.96 s; dominant height 1.6e8; 0.019 min from the MassBank apex
+    anchor 5.747 min).
+- **Preserved artifacts** (`data/validated_runs/M1a/`, gitignored under
+  `data/raw/` rules but the run dir itself is intended for commit unless
+  policy says otherwise — flagged for review): `batch.mzbatch`
+  (sha256 dddf7310…), `features.csv` (sha256 549c4dbd…),
+  `mzmine_run.log`, `run_summary.json` (checksums, engine identity,
+  feature count, per-match m/z/ppm/RT), `api_detect_response.json`.
+- **Evidence boundaries**: single dataset, single compound standard, one
+  engine version. Cite as "precursor-mass and retention-time match
+  pending MS/MS confirmation" — NOT an identification. Not a broad
+  scientific validation.
+- **Next**: M1-b vendor-native conversion acceptance test (separate).
