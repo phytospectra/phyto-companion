@@ -93,22 +93,22 @@ class TestMZmineDetector:
                 [Path("/nonexistent/sample.mzML")], DetectParams()
             )
 
-    def test_detect_is_blocked_until_contract_validated(self, monkeypatch, tmp_path):
-        # ADR-0084: even with an "installed" MZmine the batch contract was
-        # never validated against a real installation, so detect() refuses
-        # rather than return mis-shaped results. This pin stays until the
-        # live integration test (real binary, XML batch, verified export
-        # schema) replaces it.
+    def test_detect_fails_closed_without_user_file(self, monkeypatch, tmp_path):
+        # MZmine 4.11 requires an authenticated user for batch mode
+        # (confirmed live: the CLI aborts with "Requires user login").
+        # Without MZMINE_USER_FILE the detector refuses even with a
+        # resolvable executable.
         fake_bin = tmp_path / "mzmine"
         fake_bin.write_text("#!/bin/sh\n")
         fake_bin.chmod(0o755)
         monkeypatch.setattr(
             "metabolomics.feature_detection.shutil.which", lambda _: str(fake_bin)
         )
+        monkeypatch.delenv("MZMINE_USER_FILE", raising=False)
         real_file = tmp_path / "sample.mzML"
         real_file.write_bytes(b"<indexedmzML/>")
         detector = MZmineDetector(mzmine_home=str(tmp_path))
-        with pytest.raises(CloudServiceError, match="unverified"):
+        with pytest.raises(CloudServiceError, match="mzuser4"):
             detector.detect([real_file], DetectParams())
 
 

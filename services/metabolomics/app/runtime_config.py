@@ -37,6 +37,7 @@ class MetabolomicsConfig:
     env: str
     dry_run: bool
     mzmine_home: str | None
+    mzmine_user_file: str | None = None
 
     @property
     def real_detection(self) -> bool:
@@ -57,6 +58,7 @@ class MetabolomicsConfig:
             env=env,
             dry_run=dry_run,
             mzmine_home=os.getenv("MZMINE_HOME") or None,
+            mzmine_user_file=os.getenv("MZMINE_USER_FILE") or None,
         )
 
     def validate(self) -> "MetabolomicsConfig":

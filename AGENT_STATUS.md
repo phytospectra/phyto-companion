@@ -182,3 +182,89 @@ Reporting template per the enterprise handoff brief. One row per milestone.
   reference mzML dataset (accession + hash recorded, nothing unpublished);
   then **[M1-a]** the MZmine live-integration contract when a binary is
   available.
+
+## Milestone: M0-b dataset selection + M1-a MZmine batch contract (ADR-0085)
+
+- **Milestone/status**: M0-b **complete (dataset verified, recorded)**; M1-a
+  **implemented + unit-tested, live feature run BLOCKED on MZmine user
+  profile** (see below — the run has not happened; do not cite a feature
+  table).
+- **Base SHA → result SHA**: base `d971478` (branch
+  `agent/phase0a-phase1a-failclosed-runtime`); work currently uncommitted in
+  the working tree.
+- **Implemented behavior**:
+  - **M0-b dataset**: MassIVE `MSV000090047`
+    (`20220426_UMETAB266_POS_Tetracycline.mzML`, 33,379,150 bytes), downloaded
+    to `data/raw/MSV000090047/` (gitignored; not redistributed), MD5
+    `396f11793f20870de150b56408a33c21` matches the Zenodo record
+    (10.5281/zenodo.6948449), local SHA-256
+    `fa3910452ae96f754a3eb05b2cf07ae2993f053fa4862b78d365cf1d857f6b9e`.
+    Rights: MassIVE page states CC0 1.0, Zenodo mirror records CC-BY-4.0 —
+    divergence recorded, CC-BY attribution treated as the stricter term
+    (`docs/DATA_SOURCES.md` §11). Independent anchors: instrument/scan
+    metadata inside the file (Orbitrap ID-X, 4,988 scans = 782 MS1 + 4,206
+    MS2, RT 0.708–11.002 min), MassBank `MSBNK-BAFG-CSL23111012700`
+    (tetracycline [M+H]+ m/z 445.1605, dl-de/by-2-0 attribution), formula
+    arithmetic on the file's own MS2 fragments.
+  - **M1-a batch contract**: new `services/metabolomics/app/batch_xml.py`
+    generates a version-pinned 11-step XML batch (import → MS1/MS2 mass
+    detection → ADAP chromatogram building → smoothing → local-minimum
+    resolver → isotope grouper → join aligner → gap filling → duplicate
+    filter → modular CSV export), authored from the official v4.11 CI
+    integration-test batch and cross-checked against `BatchQueue.java`;
+    module/parameter versions verified at tags v4.11, v4.10.90, v4.10.6;
+    any other version is refused. `DetectParams` values (m/z tolerance, RT
+    tolerance, min intensity, noise threshold) now map into the relevant
+    batch steps.
+  - **Adapter**: `parse_mzmine_csv` maps the CSVExportModular schema
+    (`id/mz/rt(minutes)/...` + `datafile:<name>:<quantity>` columns) to the
+    platform `FeatureTable` (RT minutes → seconds), fail-closed on missing
+    columns/empty export. `MZmineDetector` resolves the executable (macOS
+    `.app` or `bin/` layouts), validates inputs, then runs
+    `mzmine -user <profile> -batch <xml>` with NO `-input`/`-output`
+    overrides — the resolved input paths and the exact CSV export path are
+    written into the batch XML itself (MZmine's documented `-output` renames
+    every export file with module suffixes, which would make the parser's
+    expected path a guess). Provenance records engine version + batch
+    SHA-256. `runtime_config` gained `MZMINE_USER_FILE`; the login gate is
+    fail-closed at detect time.
+  - **Login gate (measured)**: MZmine 4.11.0, 4.10.90 and 4.10.6 ALL abort
+    batch mode without an authenticated user ("Requires user login" /
+    "Invalid user: You need to be logged in to continue"; gate in source
+    since v4.0.x). Options are `-cli-token`, `-login` (interactive browser),
+    `-user <file>`. No account was created and no credentials supplied —
+    creating one requires explicit user authorization.
+- **Evidence**:
+  - Focused suites: `test_mzmine_batch_contract.py` +
+    `test_feature_detection.py` + `test_detector_runtime_modes.py` +
+    `test_mzmine_live_integration.py` → **39 passed, 4 skipped** (skips =
+    live tests without `MZMINE_USER_FILE`).
+  - Partial-run probe: MZmine 4.10.90 accepted a generated batch and parsed
+    all 4,988 scans of the dataset, then stopped at the login gate. This
+    validates batch-XML acceptance and mzML import ONLY — mass detection,
+    feature resolution, alignment and CSV export were never executed.
+  - Not yet run: full pytest, ruff, the live run itself.
+- **Local tests vs live integration vs scientific validation vs deployment**:
+  - Local tests: contract + adapter + fail-closed tests pass (above).
+  - Live integration: **incomplete** — engine executes only up to the login
+    gate; no feature table has ever been produced by this integration.
+    The live test module (`test_mzmine_live_integration.py`) is correctly
+    skipped, not faked.
+  - Scientific validation: none for M1-a — no feature table, no comparison
+    against the m/z 445.1605 / RT anchors. Nothing scientific may be
+    claimed.
+  - Deployment: none; nothing pushed, no PR, no external calls beyond the
+    dataset download (public, documented) and MZmine CLI help/version
+    probes.
+- **Remaining blockers**: the MZmine `.mzuser4` profile — a human action
+  (browser sign-in to an mzio account, or an mzio console token) that the
+  agent cannot and must not perform for the user. Second-order: once the
+  profile exists, verify the first real export's column naming against
+  `parse_mzmine_csv` before any downstream use.
+- **Next bounded task**: with `MZMINE_USER_FILE` set, run
+  `scripts/replay_mzmine_m0b.sh` (pytest entry → validated config →
+  `MZmineDetector.detect` on the verified dataset), compare the resulting
+  feature table against the three independent anchors, then record the
+  measured comparison in `ANALYTICAL_CAPABILITY_MATRIX.md` and this file.
+  Vendor-native conversion (.raw/.d) remains the separate M1-b acceptance
+  test.

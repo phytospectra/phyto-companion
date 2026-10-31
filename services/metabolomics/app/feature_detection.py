@@ -7,6 +7,8 @@ ground truth to assert against.
 
 from __future__ import annotations
 
+import hashlib
+import csv
 import os
 import shutil
 from pathlib import Path
@@ -24,6 +26,7 @@ __all__ = [
     "FeatureTable",
     "FeatureDetector",
     "MZmineDetector",
+    "parse_mzmine_csv",
     "MockDetector",
     "table_to_matrix",
     "matrix_to_table",
@@ -93,7 +96,9 @@ def table_to_matrix(
 
 
 def matrix_to_table(
-    table: FeatureTable, sample_ids: list[str], feature_ids: list[str],
+    table: FeatureTable,
+    sample_ids: list[str],
+    feature_ids: list[str],
     matrix: np.ndarray,
 ) -> FeatureTable:
     """Rebuild a FeatureTable's intensities from a matrix."""
@@ -105,8 +110,7 @@ def matrix_to_table(
             base.model_copy(
                 update={
                     "intensities": {
-                        sample_ids[i]: float(matrix[i, j])
-                        for i in range(len(sample_ids))
+                        sample_ids[i]: float(matrix[i, j]) for i in range(len(sample_ids))
                     }
                 }
             )
@@ -119,30 +123,147 @@ def matrix_to_table(
     )
 
 
+def parse_mzmine_csv(csv_path: Path, sample_names: list[str] | None = None) -> FeatureTable:
+    """Parse MZmine's modular CSV export into a FeatureTable.
+
+    Schema (validated live against MZmine 4.11.0's CSVExportModular,
+    ADR-0085): header ``id, mz, mz_range:min, ..., rt, rt_range:min,
+    rt_range:max, area, height, ..., charge, fragment_scans, ...`` then
+    one column block per data file named
+    ``datafile:<filename>:<quantity>``.  Row ``mz`` is the aligned
+    average m/z and ``rt`` the aligned RT **in minutes**.  Per-sample
+    intensities come from each file's ``height`` column.
+    """
+    with open(csv_path, newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+        fieldnames = reader.fieldnames or []
+
+    if not rows or not fieldnames:
+        raise InvalidInputError("MZmine CSV export is empty", context={"path": str(csv_path)})
+    required = {"id", "mz", "rt"}
+    missing_columns = sorted(required - set(fieldnames))
+    if missing_columns:
+        raise InvalidInputError(
+            "MZmine CSV export is missing required columns",
+            context={"missing": missing_columns, "path": str(csv_path)},
+        )
+
+    # Identify the per-file height columns; fall back to the aligned
+    # height column when the export contains a single (unaligned) file.
+    per_file: dict[str, str] = {}
+    for column in fieldnames:
+        if column.startswith("datafile:") and column.endswith(":height"):
+            per_file[column.removeprefix("datafile:").removesuffix(":height")] = column
+    if not per_file and "height" in fieldnames:
+        per_file = {"": "height"}
+
+    samples = [
+        SampleMetadata(sample_id=name or f"sample{i + 1}", injection_order=i + 1)
+        for i, name in enumerate(sample_names or [])
+    ]
+    sample_keys = list(per_file)
+
+    features: list[Feature] = []
+    for row in rows:
+        intensities: dict[str, float] = {}
+        for sample, key in zip(samples, sample_keys):
+            raw = (row.get(per_file[key]) or "").strip()
+            intensities[sample.sample_id] = float(raw) if raw else 0.0
+        if not samples:
+            aligned = (row.get("height") or "").strip()
+            if aligned:
+                intensities["aligned"] = float(aligned)
+        features.append(
+            Feature(
+                feature_id=str(row["id"]),
+                mz=float(row["mz"]),
+                # MZmine exports RT in minutes; the platform's canonical
+                # unit is seconds.
+                rt=float(row["rt"]) * 60.0,
+                intensities=intensities,
+            )
+        )
+    return FeatureTable(
+        features=features,
+        samples=samples,
+        qc_flags=[],
+        provenance_notes=[
+            "parsed from MZmine 4.11 CSVExportModular export "
+            "(RT minutes -> seconds; per-file height columns)"
+        ],
+    )
+
+
 class MZmineDetector:
     """MZmine batch mode via subprocess (real plane).
 
-    .. warning:: **UNVERIFIED INTEGRATION (ADR-0084).** The batch file
-       this detector once wrote was a one-column CSV, but MZmine's
-       official batch files are XML documents with explicit module
-       steps, invoked as ``-batch <batch.xml> -input "<mzML glob>"``.
-       The CSV "batch" cannot have worked against a real MZmine 3 and
-       no test has ever run one; the expected output schema is equally
-       an assumption. Raw LC-MS processing is therefore a BLOCKED
-       capability: it fails closed at startup (ADR-0083) and must not
-       be claimed as working in any report until a live integration
-       test has validated the XML batch format, the executable version
-       and the actual CSV-export schema against a real installation.
+    Contract (validated live, ADR-0085): a version-pinned XML batch
+    (see ``batch_xml``) is executed with MZmine 4.11.0's CLI
+    (``-user <mzuser4> -batch <xml>``) and the modular CSV export is
+    parsed back into a FeatureTable.  The input file list and the CSV
+    output path are written into the batch XML itself (import step +
+    CSV export step), so the CLI carries no ``-input``/``-output``
+    overrides: MZmine documents ``-output`` as renaming every export
+    file with module suffixes, which would make the parser's expected
+    ``features.csv`` path a guess.
+    MZmine 4.11 requires an authenticated user file for batch mode;
+    ``MZMINE_USER_FILE`` must point at an ``.mzuser4`` profile.
 
-    Requires the MZmine home directory (MZMINE_HOME); fails closed
-    otherwise.
+    The single recorded live run (MSV000090047 tetracycline mzML,
+    positive mode) validated this contract once.  It is NOT a broad
+    scientific validation; vendor-native conversion (.raw/.d) is a
+    separate acceptance test and must not be claimed.
     """
 
-    def __init__(self, mzmine_home: str | None = None) -> None:
+    def __init__(
+        self,
+        mzmine_home: str | None = None,
+        user_file: str | None = None,
+        threads: int | None = None,
+    ) -> None:
         self.mzmine_home = mzmine_home or os.environ.get("MZMINE_HOME", "")
-        self.executable = shutil.which("mzmine") or (
-            str(Path(self.mzmine_home) / "bin" / "mzmine") if self.mzmine_home else None
-        )
+        self.user_file = user_file or os.environ.get("MZMINE_USER_FILE", "")
+        self.threads = threads
+        self.executable = shutil.which("mzmine") or self._find_executable()
+
+    def _find_executable(self) -> str | None:
+        if not self.mzmine_home:
+            return None
+        home = Path(self.mzmine_home)
+        # macOS .app bundle (portable academia build) and classic bin/ layout
+        for candidate in (
+            home / "mzmine.app" / "Contents" / "MacOS" / "mzmine",
+            home / "bin" / "mzmine",
+            home / "mzmine",
+        ):
+            if candidate.is_file():
+                return str(candidate)
+        return None
+
+    def _require_login_gate_inputs(self) -> None:
+        if not self.executable:
+            raise CloudServiceError(
+                "MZmine executable not found under MZMINE_HOME; the local "
+                "plane must use MockDetector (split-plane rule)",
+                context={"mzmine_home": self.mzmine_home},
+            )
+        # MEASURED (ADR-0085): every official MZmine 4.x build (4.11.0,
+        # 4.10.90 and 4.10.6 confirmed live; the gate exists in source
+        # since v4.0.x) aborts batch mode without an authenticated
+        # user: "Requires user login." / "Invalid user: You need to be
+        # logged in to continue."  MZMINE_USER_FILE must point at an
+        # .mzuser4 profile created via 'mzmine -login' (browser sign-in
+        # with an mzio account).
+        if not self.user_file or not Path(self.user_file).is_file():
+            raise CloudServiceError(
+                "MZmine batch mode requires an authenticated user "
+                "profile (measured on 4.11.0, 4.10.90 and 4.10.6); set "
+                "MZMINE_USER_FILE to an .mzuser4 file created via "
+                "'mzmine -login' or the mzio account console. Refusing "
+                "to run without it.",
+                context={"mzmine_user_file": self.user_file},
+            )
 
     def detect(self, mzml_paths: list[Path], params: DetectParams) -> FeatureTable:
         if not mzml_paths:
@@ -153,22 +274,118 @@ class MZmineDetector:
                 "mzML input files do not exist",
                 context={"missing": missing},
             )
-        if not self.executable:
+        self._require_login_gate_inputs()
+        version = self._engine_version()
+        return self._run_batch(mzml_paths, params, version)
+
+    def _run_batch(
+        self, mzml_paths: list[Path], params: DetectParams, version: str
+    ) -> FeatureTable:
+        import subprocess
+        import tempfile
+
+        from .batch_xml import build_batch_xml
+
+        if version not in ("4.11.0", "4.10.90", "4.10.6"):
             raise CloudServiceError(
-                "MZmine executable not found; the local plane must use "
-                "MockDetector (split-plane rule)",
-                context={"mzmine_home": self.mzmine_home},
+                "MZmine version mismatch: this integration is pinned to "
+                "4.11.0 / 4.10.90 / 4.10.6 (all login-gated, see "
+                f"ADR-0085) but the executable reports {version!r}. "
+                "Regenerate the batch template against the installed "
+                "engine before running raw LC-MS processing.",
+                context={"expected": "4.11.0 | 4.10.90 | 4.10.6", "found": version},
             )
-        raise CloudServiceError(
-            "MZmine integration is unverified (ADR-0084): the batch "
-            "contract (XML batch format, export schema, executable "
-            "version) has never been validated against a real "
-            "installation. Refusing to run rather than return "
-            "mis-shaped results. See the capability register: raw "
-            "LC-MS processing is a blocked capability.",
-            context={"mzmine_home": self.mzmine_home,
-                     "executable": str(self.executable)},
+
+        with tempfile.TemporaryDirectory(prefix="phyto-mzmine-") as tmp:
+            tmp_dir = Path(tmp)
+            batch_path = tmp_dir / "batch.mzbatch"
+            output_csv = tmp_dir / "features.csv"
+            resolved = [str(p.resolve()) for p in mzml_paths]
+            batch_xml_text = build_batch_xml(
+                resolved,
+                str(output_csv),
+                params,
+                mzmine_version=version,
+            )
+            batch_path.write_text(batch_xml_text, encoding="utf-8")
+            # No -input/-output overrides: the batch XML already carries
+            # the resolved input paths (import step) and the exact CSV
+            # path (export step).  MZmine's -output rewrites every
+            # export filename with module-specific suffixes, which would
+            # make the parser's expected path a guess instead of a
+            # contract.
+            cmd: list[str] = [
+                str(self.executable),
+                "-user",
+                self.user_file,
+                "-batch",
+                str(batch_path),
+            ]
+            if self.threads:
+                cmd.extend(["--threads", str(self.threads)])
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=3600,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise CloudServiceError(
+                    "MZmine batch run timed out",
+                    context={"timeout_s": exc.timeout},
+                ) from exc
+            log_path = tmp_dir / "mzmine_run.log"
+            log_path.write_text(
+                (proc.stdout or "") + "\n" + (proc.stderr or ""),
+                encoding="utf-8",
+            )
+            if proc.returncode != 0 or not output_csv.is_file():
+                raise CloudServiceError(
+                    "MZmine batch run failed; see the engine log in the error context",
+                    context={
+                        "returncode": proc.returncode,
+                        "mzmine_version": version,
+                        "log_tail": "\n".join(
+                            ((proc.stdout or "") + (proc.stderr or "")).splitlines()[-40:]
+                        ),
+                    },
+                )
+            table = parse_mzmine_csv(output_csv, sample_names=[p.stem for p in mzml_paths])
+        table.provenance_notes.append(
+            f"engine=MZmine {version}; batch sha256="
+            f"{hashlib.sha256(batch_xml_text.encode()).hexdigest()[:16]}; "
+            "pinned integration ADR-0085; vendor-native conversion is a "
+            "separate acceptance test"
         )
+        return table
+
+    def _engine_version(self) -> str:
+        import re
+        import subprocess
+
+        try:
+            proc = subprocess.run(
+                [str(self.executable), "-v"],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            raise CloudServiceError(
+                "could not determine the MZmine version",
+                context={"error": str(exc)},
+            ) from exc
+        match = re.search(
+            r"mzmine (\d+\.\d+\.\d+)",
+            (proc.stdout or "") + (proc.stderr or ""),
+        )
+        if not match:
+            raise CloudServiceError(
+                "could not parse the MZmine version from its -v output",
+                context={"stdout_tail": (proc.stdout or "")[-500:]},
+            )
+        return match.group(1)
 
 
 class MockDetector:
@@ -194,8 +411,10 @@ class MockDetector:
                 SampleMetadata(
                     sample_id=path.stem,
                     group=(
-                        "qc" if stem.startswith("qc") or stem.startswith("pooled")
-                        else "treated" if stem.startswith("treated")
+                        "qc"
+                        if stem.startswith("qc") or stem.startswith("pooled")
+                        else "treated"
+                        if stem.startswith("treated")
                         else "control"
                     ),
                     is_qc=stem.startswith("qc") or stem.startswith("pooled"),
@@ -207,9 +426,7 @@ class MockDetector:
         for j, (mz, rt) in enumerate(zip(self.FEATURE_MZ, self.FEATURE_RT), start=1):
             intensities: dict[str, float] = {}
             for sample in samples:
-                intensities[sample.sample_id] = round(
-                    self._intensity(j, sample), 3
-                )
+                intensities[sample.sample_id] = round(self._intensity(j, sample), 3)
             features.append(
                 Feature(
                     feature_id=f"FT{j}",
@@ -274,4 +491,8 @@ def get_detector(**kwargs) -> FeatureDetector:
             "detection",
             context={"env": config.env, "capability": "feature_detection"},
         )
-    return MZmineDetector(mzmine_home=config.mzmine_home, **kwargs)
+    return MZmineDetector(
+        mzmine_home=config.mzmine_home,
+        user_file=getattr(config, "mzmine_user_file", None),
+        **kwargs,
+    )

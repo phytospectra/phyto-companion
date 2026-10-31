@@ -90,3 +90,6 @@ frontend/
 phytospectra-frontend-phase1.bundle
 phytospectra-frontend-phase1.tar.gz
 desktop/report_engine/
+
+# Downloaded third-party engine archives (MZmine etc.) stay local
+tools/

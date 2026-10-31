@@ -245,3 +245,51 @@ Added 2026-10-22 for the retention service (ADR-0063).
 | Committed to git? | **No** — the pilot does not ship the dataset; the production model trains on it in the cloud plane |
 | Pilot stand-in | Hand-curated 20-compound lookup table (literature-typical RTs on the reference gradient) + logP descriptor baseline, both inside `services/retention/app/main.py` |
 | NP fine-tuning data | Surveyed 2026-10-22: public natural-product RT sets too sparse to fine-tune without overfitting; deferred (ADR-0063). When a fine-tuned model lands, its version string changes and the lookup becomes the fallback. |
+
+## 11. MSV000090047 — Commercial standards of Streptomyces antibiotics (M0-b LC–MS acceptance dataset)
+
+Added 2026-10-31 for the MZmine live integration (ADR-0085).
+
+| Field | Value |
+|---|---|
+| Repository | MassIVE (UCSD), accession `MSV000090047`, marked **Public** |
+| Landing page | https://massive.ucsd.edu/ProteoSAFe/dataset.jsp?accession=MSV000090047 |
+| Dataset license (MassIVE page, verbatim) | `[dataset license: CC0 1.0 Universal (CC0 1.0)]` → http://creativecommons.org/publicdomain/zero/1.0/ |
+| Zenodo mirror | DOI `10.5281/zenodo.6948449` — metadata records **CC-BY-4.0** (divergence from MassIVE's CC0; treat CC-BY-4.0 as the stricter applicable term and attribute Kontou & Weber when redistributing) |
+| Publication | UmetaFlow, J. Cheminform. 2023, doi:10.1186/s13321-023-00724-w |
+| Download route | `https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090047/peak/<name>.mzML&forceDownload=true` (verified 200; the `ccms_peak/` copies are different bytes and 500 on this route) |
+| File used | `20220426_UMETAB266_POS_Tetracycline.mzML` (positive mode, Thermo Orbitrap ID-X DDA, converted by ThermoRawFileParser 1.3.4), 33,379,150 bytes |
+| MD5 | `396f11793f20870de150b56408a33c21` (authoritative: Zenodo record 6948449 `files[].checksum`; recomputed locally after download — match) |
+| SHA-256 (local) | `fa3910452ae96f754a3eb05b2cf07ae2993f053fa4862b78d365cf1d857f6b9e` |
+| Committed to git? | **No** — `data/raw/` is gitignored (bulk data rule) |
+| Integration mode | Local acceptance anchor for the pinned MZmine batch integration |
+
+Integrity caveats: the mzML's embedded `<fileChecksum>` could not be
+reconciled with any local hash (whole-file SHA-1, prefix-to-index SHA-1)
+— do not use it; anchor on the Zenodo MD5. Only `peak/` files are
+covered by those checksums.
+
+Independently checkable expected signals used for acceptance:
+
+1. Instrument-level (parsed from the mzML itself): indexedmzML 1.1.0,
+   centroid, positive polarity only, `spectrumList count="4988"` =
+   782 MS1 + 4206 MS2, RT 0.708–11.002 min, HCD 40, isolation ±0.8 m/z,
+   instrument `MS:1003112 Orbitrap ID-X`.
+2. Reference spectrum: MassBank `MSBNK-BAFG-CSL23111012700`
+   (Tetracycline, LC-ESI-QTOF, MS2 40 V, precursor 445.1605 [M+H]+,
+   51 peaks, license `dl-de/by-2-0` — attribution REQUIRED with any
+   stored copy of the reference peak list).
+   https://massbank.jp/MassBank/RecordDisplay?id=MSBNK-BAFG-CSL23111012700
+3. Formula arithmetic anchors measured in the dataset's own MS2
+   (scan 2517, precursor 445.1610, RT 5.844 min): 445.1600 [M+H]+
+   (−0.1 ppm), 428.1332 [M+H−NH3]+ (−1.6 ppm), 427.1494 [M+H−H2O]+
+   (−0.2 ppm), 410.1229 [M+H−NH3−H2O]+, 154.0496 (ring-A fragment),
+   98.0599.
+4. The dataset's own `quant/annotated_FeatureMatrix_commercial_std.csv`
+   lists `Tetracycline///tetracycline(1-)` at m/z 445.1606.
+
+Scope note: this dataset is the acceptance anchor for the MZmine live
+integration — one file, one ion mode, one recorded run. It is NOT a
+scientific performance benchmark for the platform, and fixture/demo
+outputs remain excluded from scientific performance claims (enterprise
+brief).

@@ -33,8 +33,7 @@ must end with its acceptance test and evidence in `AGENT_STATUS.md`.
   (`NEO4J_URI`; real mode explicitly unavailable until Step 8). `create_app`
   validates eagerly in all four services with real dependencies. Full suite
   1591, ruff clean.
-- **[ADR-0084] MZmine batch contract marked unverified** — the CSV "batch" is
-  not MZmine's XML batch format; raw LC–MS processing is a blocked capability
+- **[ADR-0085] MZmine batch contract implemented and validated to the CLI login gate** — the 11-step XML batch generator is pinned to MZmine 4.11/4.10.90/4.10.6 and derived from upstream CI fixtures; every 4.x CLI needs an authenticated user (`MZMINE_USER_FILE`), so the first feature-table run is blocked on the user creating an `.mzuser4` profile (agent cannot do this)
   until validated against a real installation (register row says so).
 
 ## Next (M0/M1 of the multi-vendor prompt — priority order)
@@ -50,7 +49,7 @@ must end with its acceptance test and evidence in `AGENT_STATUS.md`.
    owner-provided private test datasets **without publishing them**; record
    the access route and license for each. Gate: rights must be verified per
    dataset before download; nothing unpublished leaves the workspace.
-3. **[M1-a] MZmine live-integration contract** (blocked on environment):
+3. **[M1-a] MZmine live-integration contract** (implemented; blocked on the MZmine user profile):
    install/locate a real MZmine (`MZMINE_HOME`), verify its version, emit the
    XML batch from `DetectParams`, run one small real mzML file, capture the
    actual CSV-export schema, and pin a live integration test skipped when
