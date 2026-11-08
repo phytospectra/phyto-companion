@@ -1,0 +1,5 @@
+Package commit: 4eda5abfdc35039c0e60f7d0a3a2cf8dbd5d75f7
+Built from repository: phyto-companion
+ADR basis: ADR-0085..0088 (see adr/)
+Third-party data: referenced by accession + checksum in dataset_reference.json; never copied into this package.
+Redaction: usernames, absolute home paths, and profile names replaced with <redacted> markers before this package was built; the redaction is recorded in each run_summary.json.

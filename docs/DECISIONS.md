@@ -2482,9 +2482,12 @@ own enforcement surface.
   features detected by the MZmine 4.11.0 batch); the thiostrepton
   [M+2H]2+ anchor is observed at
   m/z 832.75345 (0.54 ppm), RT 505.2 s, base-peak feature 1423, area
-  6.9e5. Note: this dataset has NO MS2 scans (full-scan only), matching
-  the file's acquisition; MS/MS confirmation remains pending for both
-  M1-a and M1-b.
+  6.9e5. Note: the converted mzML contains 5,023 scans = 768 MS1 + 4,255
+  MS2 (data-dependent acquisition; verified by re-parsing the mzML's
+  `ms level` CV params against the MZmine log's "parsed 5023 scans").
+  One MS2 scan was acquired at the thiostrepton [M+2H]2+ precursor
+  (m/z 832.7535), but no MS/MS confirmation has been performed, so the
+  anchor remains a precursor-mass + RT match, NOT an identification.
 
 ### ADR-0088: OSF project registered as the citable acceptance-evidence archive (embargoed until owner flip); registration is created, never edited post-hoc
 

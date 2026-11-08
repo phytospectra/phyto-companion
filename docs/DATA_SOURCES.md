@@ -239,7 +239,7 @@ Added 2026-10-22 for the retention service (ADR-0063).
 
 | Field | Value |
 |---|---|
-| Dataset | METLIN SMRT small-molecule retention time dataset (Domingo-Almenara et al. 2019, Nature Biotechnology, https://doi.org/10.1038/s41587-019-0267-4) |
+| Dataset | METLIN SMRT small-molecule retention time dataset (Domingo-Almenara et al. 2019, Nature Communications, 10:5811, https://doi.org/10.1038/s41467-019-13680-7) |
 | Size | ~80,000 compounds with experimental RT on standardized LC-MS gradients |
 | Licence | open (CC-BY-style per METLIN SMRT release; verify at refresh) |
 | Committed to git? | **No** — the pilot does not ship the dataset; the production model trains on it in the cloud plane |
@@ -320,8 +320,12 @@ Independently checkable expected signals used for acceptance:
    1423 at m/z 832.75345 (+0.54 ppm), RT 8.4204 min, area 6.9e5
    (base peak by area); isotope-satellite group 832.75/833.75 at the
    same RT (833.754 = M+2 per-charge, as expected for 5 S atoms).
-3. The run's mzML contains NO MS2 scans (full-scan-only acquisition) —
-   so, as for M1-a, this is a precursor-mass + RT match pending MS/MS
+3. The run's mzML contains 5,023 scans = 768 MS1 + 4,255 MS2
+   (data-dependent acquisition; verified by re-parsing the mzML's
+   `ms level` CV params against the MZmine log's "parsed 5023 scans").
+   One MS2 scan was acquired at the thiostrepton [M+2H]2+ precursor
+   (m/z 832.7535), but no MS/MS confirmation has been performed — so,
+   as for M1-a, this is a precursor-mass + RT match pending MS/MS
    confirmation, NOT an identification.
 
 Scope note: same as section 11 — acceptance anchor for the conversion

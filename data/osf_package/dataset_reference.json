@@ -1,0 +1,17 @@
+{
+  "dataset": "MSV000090047 (MassIVE, UCSD; public)",
+  "landing_page": "https://massive.ucsd.edu/ProteoSAFe/dataset.jsp?accession=MSV000090047",
+  "usage": "third-party instrument data used for acceptance testing only; not redistributed in this package. CC-BY-4.0 attribution duties respected by reference.",
+  "files": [
+    {
+      "name": "20220426_UMETAB266_POS_Tetracycline.mzML",
+      "sha256": "fa3910452ae96f754a3eb05b2cf07ae2993f053fa4862b78d365cf1d857f6b9e",
+      "size_bytes": 33379150
+    },
+    {
+      "name": "20220426_UMETAB266_POS_Thiostreptone.raw",
+      "sha256": "0f039d2578c2b244f57cc212362e438e20fab242c483f3f5defc650596ebe6d8",
+      "size_bytes": 68362907
+    }
+  ]
+}

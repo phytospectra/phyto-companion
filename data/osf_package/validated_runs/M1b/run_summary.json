@@ -1,0 +1,78 @@
+{
+  "recorded_at_utc": "2026-10-31T11:21:54.706292+00:00",
+  "dataset": {
+    "accession": "MSV000090047",
+    "file": "20220426_UMETAB266_POS_Thiostreptone.raw",
+    "size_bytes": 68362907,
+    "sha256": "0f039d2578c2b244f57cc212362e438e20fab242c483f3f5defc650596ebe6d8"
+  },
+  "conversion": {
+    "parser": "ThermoRawFileParser",
+    "parser_version": "2.0.0.0",
+    "parser_path": "tools/mzmine-4.11.0/mzmine.app/Contents/external_tools/thermo_raw_file_parser/ThermoRawFileParser",
+    "mzml_path": "data/validated_runs/M1b/converted/20220426_UMETAB266_POS_Thiostreptone.mzML",
+    "mzml_size_bytes": 34638312,
+    "mzml_sha256_as_executed": "f1e7409e717790a7456f31216b343ce35239930c3fd869ebca9df0704449ae15",
+    "mzml_sha256_as_committed": "45b67fd57332c9bf6080233679e8d743cbaa704dddd91380638a6e2019d5b283",
+    "note": "as_committed differs from as_executed only by redaction of the absolute local path in the sourceFile location attribute; spectral content unchanged"
+  },
+  "converted_scans": {
+    "total": 5023,
+    "ms1": 768,
+    "ms2": 4255,
+    "acquisition": "data-dependent (DDA)",
+    "verified_by": "re-parsed ms level CV params of the committed converted mzML; matches MZmine log 'parsed 5023 scans'",
+    "ms2_scans_at_thiostrepton_precursor_mz_832_7535": 1
+  },
+  "engine": {
+    "name": "MZmine",
+    "version": "4.11.0",
+    "user_file": "<redacted username>.mzuser4 (machine-locked; created interactively by the user via 'mzmine -login')"
+  },
+  "batch": {
+    "path": "data/validated_runs/M1b/batch.mzbatch",
+    "steps": 11,
+    "sha256_as_executed": "0c101f428511ecb9c2c81705b0e283a123b58a870697fa0dee0913bb5c8e3d07",
+    "sha256_as_committed": "973fea5d7db9649d707efa56373ce9db5aff53db7a0a866cd5858f40add6e69d",
+    "note": "as_committed differs from as_executed only by redaction of absolute local paths (home dir, username) from the import step; parameter content is unchanged"
+  },
+  "cli_command": "tools/mzmine-4.11.0/mzmine.app/Contents/MacOS/mzmine -user <redacted-user>.mzuser4 -batch data/validated_runs/M1b/batch.mzbatch",
+  "feature_count_total": 1926,
+  "precursor_query_mz": 832.753,
+  "precursor_matches_10ppm": [
+    {
+      "feature_id": "1423",
+      "observed_mz": 832.75345,
+      "charge_assumption": "2+",
+      "mass_error_ppm": 0.54,
+      "rt_seconds": 505.22,
+      "rt_minutes": 8.4204,
+      "area": "6.905E5",
+      "mz_range_min": "832.75317"
+    },
+    {
+      "feature_id": "1187",
+      "observed_mz": 832.75359,
+      "charge_assumption": "2+",
+      "mass_error_ppm": 0.71,
+      "rt_seconds": 423.52,
+      "rt_minutes": 7.0586,
+      "area": "2.145E3",
+      "mz_range_min": "832.75244"
+    },
+    {
+      "feature_id": "1460",
+      "observed_mz": 832.75338,
+      "charge_assumption": "2+",
+      "mass_error_ppm": 0.46,
+      "rt_seconds": 513.98,
+      "rt_minutes": 8.5663,
+      "area": "1.503E3",
+      "mz_range_min": "832.75262"
+    }
+  ],
+  "acceptance": "vendor-native .raw -> mzML conversion + feature detection; precursor-mass and RT screening pending MS/MS confirmation",
+  "evidence_level": "live integration run; NOT a broad scientific validation; single-file single-compound standard",
+  "precursor_query_ion": "thiostrepton [M+2H]2+ (mono neutral 1663.4914)",
+  "note": "Re-queried after initial run: script had reused the tetracycline mass (445.1605) for a thiostrepton file; correct 2+ ion is 832.7530."
+}
