@@ -176,3 +176,40 @@ deployment, paid inference or training. None occurred.
 Readiness split remains: source-code research preview GO-with-caveats;
 scientifically evaluated workflow NO-GO; production service NO-GO;
 manuscript submission NO-GO.
+
+## Third-pass closure — 2026-11-09
+
+- **Accounting guarantee audited.** At-most-once handler admission per
+  (user, key) with exactly-once accounting settlement; content-blind keys,
+  no expiry, process-local mock window, crash recovery = new key plus
+  operator reconciliation. Fault-injection tests added
+  (tests/test_accounting_guarantees.py, 7 tests). Precise statement and
+  failure/recovery matrix: docs/ACCOUNTING-GUARANTEE.md; wording narrowed in
+  staging/frontend docs. "Exactly-once" claims are now scoped correctly.
+- **Manuscript visual QA complete.** New export builder renders Markdown
+  correctly (bold/italic/lists/tables/references), chunks large tables with
+  repeated headers and embedded captions, keeps the NOT AUTHOR APPROVED
+  banner. DOCX + PDF in phytospectra-paper/review-export-2026-11-09/;
+  24/24 rendered pages passed the visual acceptance judge after iterative
+  fixes (QA-RECORD.md). [TBD-USER] placeholders remain by design.
+- **Evaluation protocol review packet.** DECISION-SHEET.md enumerates the
+  seven scientific decisions requiring adjudication and the lock checklist;
+  protocol remains NOT locked/NOT preregistered. Harness/scorer execute
+  synthetic contracts only (67 focused tests green).
+- **Measured-data clearance record.** DATA-CLEARANCE-2026-11-09.md lists
+  the empty cleared manifest, the unresolved records with exact reasons,
+  and one consolidated request for a single integration pair plus the
+  evaluation-set question. Quarantine unchanged.
+- **Staging packet.** Read-only gcloud shows only production project
+  (no staging exists); docs/STAGING-ACCEPTANCE-2026-11-09.md now contains
+  the exact approval packet for an isolated staging project with pinned
+  revisions, cost boundary, cleanup and the full acceptance checklist.
+- **Author form.** phytospectra-paper/AUTHOR-INPUT-FORM-2026-11-09.md
+  consolidates every unresolved author item and the version-hash approval
+  requirement.
+
+Final revisions and CI are updated after the last commit; no deployment,
+publication, paid inference/training or third-party contact occurred.
+Readiness split unchanged: preview GO-with-caveats; scientific evaluation,
+production service, and manuscript submission NO-GO pending the exact
+inputs listed in the three request documents.
