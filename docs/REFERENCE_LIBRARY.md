@@ -57,3 +57,10 @@ references with the rights and acquisition evidence above. Synthetic tests,
 rounded literature tables, and a single self-match do not satisfy that criterion.
 The import/quarantine infrastructure can be reviewed now; scientific-library
 completion remains blocked on suitable records and rights confirmation.
+
+Builder v2 requires the existing manifest columns plus `source_accession_url`,
+`identity_source_url`, `rights_evidence_url` (HTTPS) and
+`redistribution_assertion=cleared`; expected InChIKey, declared formula and
+evidence nature are mandatory. The template is non-spectral. These strings
+are curator assertions, not verification; direct runtime JSON bypasses the
+builder. Legitimate private local use is not prohibited by this distribution gate.

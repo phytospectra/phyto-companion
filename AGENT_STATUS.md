@@ -2,6 +2,15 @@
 
 Reporting template per the enterprise handoff brief. One row per milestone.
 
+## Integrity correction — 2026-11-09 (supersedes starter-library completion)
+
+- Commit `02f54cc` quarantines the attempted literature starter: record-level rights/source evidence was missing and the quercetin structure disagreed with independently retrieved PubChem identity. No cleared measured library is bundled. Original pre-existing fixtures are unchanged; historical commits retain the attempted import.
+- Builder v2 requires explicit record-level accession/identity/rights URLs and curator clearance assertions; these are not software-verified rights. Synthetic-only tests replace the unsafe library regression.
+- Assessment now examines all hits before truncation and requires distinct matched evidence and candidate/reference completeness before reporting a separated ranking.
+- Revised acceptance runner passes 6/6 deterministic synthetic contracts; measured and independent validation counts remain zero. Superseded exploratory results retain the negative isomer-mix flag outcome without an accuracy claim.
+- Model-comparison harness is implemented; no inference run; fine-tuning NOT JUSTIFIED. Citation metadata validates after removing invented optional placeholders.
+- See final completion ledger and dated review packets for final revisions, tests and external blockers. Earlier completion language below is historical and superseded where inconsistent.
+
 ## Milestone: Execution-boundary hardening — assessment signals + cloud real/mock-auth rejection (2026-11-09)
 
 - **Milestone/status**: complete locally; full suite 1,744 passed / 4 skipped, CI-scope Ruff clean.
