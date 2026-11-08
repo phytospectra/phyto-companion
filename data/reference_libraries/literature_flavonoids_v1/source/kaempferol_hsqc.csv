@@ -1,0 +1,14 @@
+# Kaempferol HSQC (1H/13C) reference table -- TEST FIXTURE.
+# Flavonol aglycone, formula C15H10O6, solvent DMSO-d6.
+# Hand-curated from standard published assignments for kaempferol in
+# DMSO-d6 (the values commonly reported across flavonoid isolation papers
+# and NP-MRD-style spectral tables), rounded to 2 dp.  Kaempferol is a
+# flavonol: the C-ring carries a 3-OH, so it has no H-2/H-3 cross-peak.
+# Isomeric with luteolin (C15H10O6), which differs by bearing H-3 --
+# that overlap is deliberate and exercises ambiguous ranking.
+# Curated for ranking tests; not an authoritative database record.
+position,dH,dC
+H-6,6.19,98.5
+H-8,6.43,93.6
+H-2'/H-6',8.04,130.4
+H-3'/H-5',6.92,115.1

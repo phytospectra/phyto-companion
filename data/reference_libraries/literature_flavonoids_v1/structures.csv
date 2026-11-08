@@ -1,0 +1,4 @@
+name,smiles,provenance,source
+Kaempferol,C1=CC(=CC=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O,structure_only,Hand-curated literature assignments (rounded 2 dp) from tests/fixtures/real_npmrd/kaempferol_hsqc.csv; NP-MRD/SUMMIT v4 fixture set; structure identity PubChem CID 5280863; not an authoritative database record
+Luteolin,C1=CC(=C(C=C1C2=CC(=O)C3=C(C=C(C=C3O2)O)O)O)O,structure_only,Hand-curated literature assignments (rounded 2 dp) from tests/fixtures/real_npmrd/luteolin_hsqc.csv; NP-MRD/SUMMIT v4 fixture set; structure identity PubChem CID 5280445; not an authoritative database record
+Quercetin,O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12,structure_only,Hand-curated literature assignments (rounded 2 dp) from tests/fixtures/real_npmrd/quercetin_hsqc.csv; NP-MRD/SUMMIT v4 fixture set; values commonly reported across flavonoid isolation papers; not an authoritative database record

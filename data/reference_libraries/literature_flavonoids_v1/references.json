@@ -1,0 +1,95 @@
+[
+  {
+    "candidate_id": "kaempferol",
+    "inchikey": "IYRMWMYZSQPJKC-UHFFFAOYSA-N",
+    "license": "CC-BY-NC (NP-MRD fixture README; noncommercial attributed research use)",
+    "peaks": [
+      {
+        "c_ppm": 98.5,
+        "h_ppm": 6.19
+      },
+      {
+        "c_ppm": 93.6,
+        "h_ppm": 6.43
+      },
+      {
+        "c_ppm": 130.4,
+        "h_ppm": 8.04
+      },
+      {
+        "c_ppm": 115.1,
+        "h_ppm": 6.92
+      }
+    ],
+    "provenance": "experimental",
+    "reference_id": "kaempferol-0529b2328a51",
+    "solvent": "DMSO-d6",
+    "source": "Hand-curated literature assignments (rounded 2 dp) from tests/fixtures/real_npmrd/kaempferol_hsqc.csv; NP-MRD/SUMMIT v4 fixture set; structure identity PubChem CID 5280863; not an authoritative database record"
+  },
+  {
+    "candidate_id": "luteolin",
+    "inchikey": "IQPNAANSBPBGFQ-UHFFFAOYSA-N",
+    "license": "CC-BY-NC (NP-MRD fixture README; noncommercial attributed research use)",
+    "peaks": [
+      {
+        "c_ppm": 102.9,
+        "h_ppm": 6.68
+      },
+      {
+        "c_ppm": 98.8,
+        "h_ppm": 6.19
+      },
+      {
+        "c_ppm": 94.0,
+        "h_ppm": 6.44
+      },
+      {
+        "c_ppm": 113.4,
+        "h_ppm": 7.41
+      },
+      {
+        "c_ppm": 115.9,
+        "h_ppm": 6.89
+      },
+      {
+        "c_ppm": 118.9,
+        "h_ppm": 7.43
+      }
+    ],
+    "provenance": "experimental",
+    "reference_id": "luteolin-e8698b4a789d",
+    "solvent": "DMSO-d6",
+    "source": "Hand-curated literature assignments (rounded 2 dp) from tests/fixtures/real_npmrd/luteolin_hsqc.csv; NP-MRD/SUMMIT v4 fixture set; structure identity PubChem CID 5280445; not an authoritative database record"
+  },
+  {
+    "candidate_id": "quercetin",
+    "inchikey": "ISJMMWDSNQVANM-UHFFFAOYSA-N",
+    "license": "CC-BY-NC (NP-MRD fixture README; noncommercial attributed research use)",
+    "peaks": [
+      {
+        "c_ppm": 98.3,
+        "h_ppm": 6.19
+      },
+      {
+        "c_ppm": 93.5,
+        "h_ppm": 6.42
+      },
+      {
+        "c_ppm": 115.2,
+        "h_ppm": 7.68
+      },
+      {
+        "c_ppm": 116.0,
+        "h_ppm": 6.9
+      },
+      {
+        "c_ppm": 120.1,
+        "h_ppm": 7.54
+      }
+    ],
+    "provenance": "experimental",
+    "reference_id": "quercetin-226ce4d48558",
+    "solvent": "DMSO-d6",
+    "source": "Hand-curated literature assignments (rounded 2 dp) from tests/fixtures/real_npmrd/quercetin_hsqc.csv; NP-MRD/SUMMIT v4 fixture set; values commonly reported across flavonoid isolation papers; not an authoritative database record"
+  }
+]

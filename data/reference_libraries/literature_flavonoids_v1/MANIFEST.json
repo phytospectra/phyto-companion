@@ -1,0 +1,48 @@
+{
+  "builder_version": "1",
+  "evidence_nature": {
+    "kaempferol": "literature_hand_curated_rounded",
+    "luteolin": "literature_hand_curated_rounded",
+    "quercetin": "literature_hand_curated_rounded"
+  },
+  "input_hashes": {
+    "andrographolide_hsqc_literature.csv": "32eacebda81a2f43f03eabaa9664c1efc0a88bed7c6ece9a08b4c8d49a8cbe13",
+    "kaempferol_hsqc.csv": "0529b2328a5145c830516151aed4f548cda34ee549a6de7a4ef324cf44abf94d",
+    "luteolin_hsqc.csv": "e8698b4a789d8a8922f0c3263315e2b2ad9ae9ed61d4975e849ae7af551fa41a",
+    "quercetin_hsqc.csv": "226ce4d48558916b93282ad5de5115b125aa6a54d06835529359f59372948b06"
+  },
+  "manifest_sha256": "63773599584566cd5ba0e60d8da7094de43456fa8f772614c11dc36f8f85aecb",
+  "notes": "reference provenance 'experimental' is a curator assertion, not software-verified measurement; see evidence_nature per record",
+  "output_hashes": {
+    "references.json": "9c3241e5fa1608cc8ed3399fd8d80b8f06d979d49d9e3ad14b71a9ae6cf0149c",
+    "structures.csv": "5009aa7593aed2b40656ff480a519c1749cc59b3a62ea84cd3acf92807caf7ff"
+  },
+  "per_record": [
+    {
+      "name": "Quercetin",
+      "reason": "",
+      "status": "imported",
+      "table": "quercetin_hsqc.csv"
+    },
+    {
+      "name": "Kaempferol",
+      "reason": "",
+      "status": "imported",
+      "table": "kaempferol_hsqc.csv"
+    },
+    {
+      "name": "Luteolin",
+      "reason": "",
+      "status": "imported",
+      "table": "luteolin_hsqc.csv"
+    },
+    {
+      "name": "Andrographolide",
+      "reason": "no verified structure available for this record (blank SMILES); literature shifts without a resolvable structure identity cannot be attached to a candidate",
+      "status": "quarantined",
+      "table": "andrographolide_hsqc_literature.csv"
+    }
+  ],
+  "records_imported": 3,
+  "records_quarantined": 1
+}
