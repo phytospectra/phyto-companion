@@ -15,7 +15,6 @@ Covers the six required checks:
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import subprocess
 import sys
@@ -23,8 +22,6 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-import score_run  # noqa: E402
 
 PY = sys.executable
 failures: list[str] = []
@@ -66,7 +63,6 @@ def main() -> int:
     from rdkit import Chem
     from rdkit.Chem import rdMolDescriptors
     bad = []
-    canon_seen = {}
     for p in sorted((HERE / "cases").glob("*.json")):
         c = json.loads(p.read_text())
         for cand in c["task"]["candidates"]:
@@ -77,11 +73,8 @@ def main() -> int:
             f = rdMolDescriptors.CalcMolFormula(m)
             if f != cand["formula"]:
                 bad.append(f"{p.name}:{cand['label']}: {f} != {cand['formula']}")
-            cs = Chem.MolToSmiles(m)
-            canon_seen.setdefault(cs, []).append(f"{p.name}:{cand['label']}")
     check("2a. displayed formula matches validated structure (all candidates)",
           not bad, str(bad))
-    dups = {k: v for k, v in canon_seen.items() if False}  # dups across DIFFERENT labels within a case are allowed; across identical labels would be a bug — check within-case only:
     dup_within = {}
     for p in sorted((HERE / "cases").glob("*.json")):
         c = json.loads(p.read_text())
@@ -136,10 +129,6 @@ def main() -> int:
         (td / "C999.response.json").write_text(json.dumps({
             "case_id": "C999", "selected_candidate": "cand-a"}))
 
-        import io, contextlib
-        buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            rc = score_run.main() if False else None
         # call scorer as subprocess for a clean report
         out = subprocess.run([PY, str(HERE / "score_run.py"), str(td)],
                              capture_output=True, text=True, check=True).stdout
@@ -216,7 +205,6 @@ def canon_seen_key(smiles: str) -> str:
 
 
 def smiles_of(compound: str) -> str:
-    reg = json.loads((HERE / "cases").glob("*.json").__next__().read_text())  # unused fallback
     # read from builder registry instead
     import importlib.util
     spec = importlib.util.spec_from_file_location("bc", HERE / "build_cases.py")

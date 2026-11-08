@@ -37,8 +37,8 @@ stage-auth: ## Expose services/auth/app as the importable `auth` package
 test: ## Run the local-plane test suite (mocks only, no cloud calls)
 	$(PY_BIN) -m pytest
 
-lint: ## Ruff error-class gate (F + E9) over shared/services/scripts/tests
-	$(RUFF) check shared services scripts tests
+lint: ## Ruff error-class gate (F + E9), including benchmark scripts/notebooks
+	$(RUFF) check shared services scripts tests benchmark
 
 dry-run: ## Alias for test: the whole suite runs in dry-run mode by design
 	$(PY_BIN) -m pytest

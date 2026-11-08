@@ -2,7 +2,21 @@
 
 Project: `phyto-companion-prod` (billing enabled, region `us-central1`)
 
-## Current state (deployed 2026-10-25)
+## Readiness update — 2026-11-08
+
+The October bring-up instructions below have been superseded. Firebase providers
+were already enabled in the November 8 readiness inspection. Fresh unauthenticated
+and deliberately invalid-token requests to `/tools` both return 401. This does
+not verify valid-user login, accounting, or scientific execution.
+
+Use [the readiness report](RELEASE-AUTH-READINESS-2026-11-08.md) for the recorded
+configuration, staging gates and rollback requirements. The source orchestrator
+still uses `MockToolExecutor`; its new health fields explicitly report
+`scientific_execution: mock` and `scientific_ready: false`, independently of auth
+`dry_run`. These new fields require deployment of the updated source; the observed
+live service still returns the older health payload.
+
+## Historical infrastructure inventory (2026-10-25; not re-certified)
 
 | Component | Status | Where |
 |---|---|---|
@@ -16,64 +30,43 @@ Deployed image = `infrastructure/Dockerfile.fullplane` (orchestrator + all 18
 specialist services staged on `PYTHONPATH`, exactly the layout the local
 full-plane boot uses).
 
-## Redeploy
+## Deployment prerequisites
+
+Before deployment, select a reviewed source revision with passing CI, build and
+record an immutable image digest, and establish an isolated staging target and
+rollback configuration. Preserve existing CORS origins, secret references and
+other service settings. Staging specialist modules on `PYTHONPATH` does not wire
+them into the orchestrator's executor or expose their routes.
+
+Real authentication uses `PHYTO_AUTH_ENABLED=1` and `PHYTO_DRY_RUN=0` with the
+intended project and workload identity. Do not set mock authentication on a public
+service. These settings do not turn the mock scientific executor into a real one.
+Use Cloud Run workload identity/ADC where configured. If
+`FIREBASE_CREDENTIALS_PATH` is used, it is a path to a readable credentials file,
+not raw secret JSON. Do not create empty credential secrets or replace the full
+environment using the former bring-up command.
+
+Firebase activation is not a pending step established by current evidence.
+Valid-user login, refresh/revocation, browser CORS, ledger/IAM and scientific
+provider acceptance remain staging checks. No deployment was performed during
+this update.
+
+## Non-mutating access checks
 
 ```bash
-gcloud builds submit --project=phyto-companion-prod --region=us-central1 \
-  --config=infrastructure/cloudbuild-fullplane.yaml .
-gcloud run deploy phyto-orchestrator --project=phyto-companion-prod \
-  --region=us-central1 \
-  --image=us-central1-docker.pkg.dev/phyto-companion-prod/phyto/orchestrator-fullplane:latest \
-  --allow-unauthenticated --memory=2Gi --cpu=2 --timeout=900 --max-instances=10 \
-  --set-env-vars=PHYTO_ENV=cloud,PHYTO_DRY_RUN=1,PHYTO_APP_BASE_URL=https://www.phytospectra.com,PHYTO_FREE_TOKENS=50
+BASE=https://phyto-orchestrator-sbqloxr3xa-uc.a.run.app
+curl -sS "$BASE/health"
+curl -sS -o /dev/null -w '%{http_code}\n' "$BASE/tools"
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -H 'Authorization: Bearer deliberately-invalid' "$BASE/tools"
 ```
 
-(`infrastructure/cloudbuild-fullplane.yaml` wraps the Dockerfile build.)
+Both `/tools` checks returned 401 on November 8. `/health` returned 200 with
+`dry_run:false`; this is not proof of real science. The former mock-token analysis
+and approval commands are removed from this public-deployment guide. A mock
+citation is not a registered DOI.
 
-## Firebase Auth — one manual step remains
-
-`identitytoolkit.googleapis.com` is enabled but the default auth config is
-`CONFIGURATION_NOT_FOUND`. Activating Identity Platform from the CLI is
-denied (`servicemanagement.services.bind` refused for both the gmail owner
-and the firebase-admin service account — it requires the interactive
-console consent):
-
-1. Open https://console.firebase.google.com/project/phyto-companion-prod/authentication
-2. Click **Get started** → enable **Email/Password**.
-3. Under Users, add the first user if needed.
-
-Then redeploy with real Firebase credentials:
-
-```bash
-gcloud secrets create firebase-credentials --data-file=- <<< '{}'   # real SA json
-gcloud run deploy phyto-orchestrator ... \
-  --set-secrets=FIREBASE_CREDENTIALS_PATH=... \
-  --set-env-vars=PHYTO_ENV=cloud,PHYTO_DRY_RUN=0,PHYTO_AUTH_ENABLED=1,...
-```
-
-Until that step, the deployment runs with `PHYTO_DRY_RUN=1`, which keeps
-the mock token verifier active: any request with
-`Authorization: Bearer mock:<uid>` is accepted as that user. This is
-intended for bring-up only; **flip to real Firebase Auth before public
-launch.**
-
-## Smoke test (verified)
-
-```bash
-BASE=https://phyto-orchestrator-819429615655.us-central1.run.app
-curl -s $BASE/health
-curl -s -X POST $BASE/analysis -H "Authorization: Bearer mock:smoketest" \
-  -H "Content-Type: application/json" \
-  -d '{"sample_id":"smoke-1","workflow":"identify","dry_run":false,
-       "modalities":["h_1d","c_1d","hsqc","ms1","ms2"]}'
-# -> awaiting_review (checkpoint before_confirmed_claim)
-curl -s -X POST $BASE/runs/<run_id>/approve \
-  -H "Authorization: Bearer mock:smoketest" -H "Content-Type: application/json" \
-  -d '{"checkpoint":"before_confirmed_claim","actor":"me"}'
-# -> status complete + citation minted
-```
-
-## Public domains (phytospectra.com, phytospectra.org)
+## Historical domain configuration (2026-10-26; verify before changes)
 
 The web app is the only Phytospectra client — the desktop app (and with it
 the download site) was removed on 2026-10-26, and on the same day the .org

@@ -984,6 +984,11 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
             "registry_size": len(runtime.registry),
             "audit_records": len(runtime.audit.records()),
             "dry_run": cfg.dry_run,
+            # Auth dry-run does not select the scientific executor. Keep
+            # this explicit until a real executor has its own readiness gate.
+            "tool_executor": type(runtime.engine.executor).__name__,
+            "scientific_execution": "mock",
+            "scientific_ready": False,
         }
 
     return application

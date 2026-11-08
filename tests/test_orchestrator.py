@@ -760,6 +760,28 @@ class TestQACritic:
 
 
 class TestAPI:
+    @pytest.mark.parametrize("auth_dry_run", [True, False])
+    def test_health_discloses_mock_science_independently_of_auth(self, monkeypatch, auth_dry_run):
+        from dataclasses import replace
+        from auth.config import AuthConfig
+        from orchestrator import main
+
+        config = replace(AuthConfig.from_env(), dry_run=auth_dry_run)
+        # Isolate this status contract from external Firebase/ledger clients.
+        monkeypatch.setattr(main, "install_auth", lambda app, cfg: cfg)
+        main.get_runtime.cache_clear()
+        try:
+            with TestClient(main.create_app(config)) as client:
+                response = client.get("/health")
+            assert response.status_code == 200
+            body = response.json()
+            assert body["dry_run"] is auth_dry_run
+            assert body["tool_executor"] == "MockToolExecutor"
+            assert body["scientific_execution"] == "mock"
+            assert body["scientific_ready"] is False
+        finally:
+            main.get_runtime.cache_clear()
+
     def test_health(self, client):
         response = client.get("/health")
         assert response.status_code == 200
