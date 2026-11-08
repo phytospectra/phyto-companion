@@ -276,6 +276,28 @@ def _tier_for_plan(plan: str | None) -> str:
     return "distilled" if plan_features(plan).distilled_llm else "full"
 
 
+def _run_principal(request: Request) -> str | None:
+    """UID when authenticated; anonymous runs exist only on the local offline plane."""
+    user = _request_user(request)
+    if user is not None:
+        return user.uid
+    from auth.config import AuthConfig
+
+    config = AuthConfig.from_env()
+    if os.getenv("PHYTO_ENV", "local") == "local" and not config.enabled:
+        return None
+    raise HTTPException(status_code=401, detail="Authentication required")
+
+
+def _owned_run(runtime: _Runtime, run_id: str, request: Request) -> dict[str, Any]:
+    principal = _run_principal(request)
+    entry = runtime.runs.get(run_id)
+    # Missing legacy owner metadata is denied, never implicitly public.
+    if entry is None or "owner_uid" not in entry or entry["owner_uid"] != principal:
+        raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
+    return entry
+
+
 def _analytics_user(request: Request | None) -> str:
     user = _request_user(request)
     return user.uid if user is not None else "anonymous-local"
@@ -611,6 +633,7 @@ def _chromatography_layers_status(graph: TaskGraph) -> dict[str, Any]:
 @router.post("/analysis", response_model=AnalysisResponse, status_code=200)
 def submit_analysis(request: AnalysisRequest, http_request: Request) -> AnalysisResponse:
     runtime = get_runtime()
+    owner_uid = _run_principal(http_request)
     run_id = f"run-{uuid.uuid4().hex[:12]}"
     manifest_id = _build_manifest(run_id, request)
     runtime.manifests[run_id] = manifest_id
@@ -659,6 +682,7 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
     )
     result = runtime.engine.run(graph, context)
     runtime.runs[run_id] = {
+        "owner_uid": owner_uid,
         "graph": graph,
         "context": context,
         "result": result,
@@ -705,10 +729,9 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
 
 
 @router.get("/runs/{run_id}", response_model=RunStatusResponse)
-def get_run(run_id: str) -> RunStatusResponse:
+def get_run(run_id: str, http_request: Request) -> RunStatusResponse:
     runtime = get_runtime()
-    if run_id not in runtime.runs:
-        raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
+    _owned_run(runtime, run_id, http_request)
     return _run_status_payload(run_id, runtime)
 
 
@@ -717,10 +740,7 @@ def approve_checkpoint(
     run_id: str, request: ApproveRequest, http_request: Request
 ) -> ApproveResponse:
     runtime = get_runtime()
-    if run_id not in runtime.runs:
-        raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
-
-    entry = runtime.runs[run_id]
+    entry = _owned_run(runtime, run_id, http_request)
     graph: TaskGraph = entry["graph"]
     context: ExecutionContext = entry["context"]
     result: EngineResult = entry["result"]
@@ -743,6 +763,7 @@ def approve_checkpoint(
     new_context = context.with_approval(request.checkpoint, actor=request.actor)
     new_result = runtime.engine.run(graph, new_context)
     runtime.runs[run_id] = {
+        "owner_uid": entry["owner_uid"],
         "graph": graph,
         "context": new_context,
         "result": new_result,
@@ -783,9 +804,7 @@ def get_citation(run_id: str, http_request: Request) -> dict[str, Any]:
     """The run's citable record.  Free by design: metering citation
     retrieval would stop users citing, which is the whole point."""
     runtime = get_runtime()
-    if run_id not in runtime.runs:
-        raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
-    entry = runtime.runs[run_id]
+    entry = _owned_run(runtime, run_id, http_request)
     if entry.get("citation") is None:
         if runtime.executor.mode != "mock":
             raise HTTPException(
@@ -821,10 +840,9 @@ def get_citation(run_id: str, http_request: Request) -> dict[str, Any]:
 
 
 @router.post("/runs/{run_id}/share", response_model=ShareCreateResponse)
-def create_share(run_id: str, request: ShareCreateRequest) -> ShareCreateResponse:
+def create_share(run_id: str, request: ShareCreateRequest, http_request: Request) -> ShareCreateResponse:
     runtime = get_runtime()
-    if run_id not in runtime.runs:
-        raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
+    _owned_run(runtime, run_id, http_request)
     token, claims = runtime.share_manager.create_token(
         run_id, expires_in_days=request.expires_in_days
     )
