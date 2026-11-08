@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 Q = "REFJWTPEDVJJIY-UHFFFAOYSA-N"
-Q_SMILES = "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12"
+Q_SMILES = "C1=CC(=C(C=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O)O"
 K = "VNEYFRNUTPLQCC-UHFFFAOYSA-N"
 
 DISCLAIMER = (

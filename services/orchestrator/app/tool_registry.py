@@ -1237,12 +1237,12 @@ def _mock_species_paper_search(
     )
 
 
-# Fixture library for the mock ranker: formula/mass verified via RDKit.
+# Synthetic mock ranking distances; identity/formula/mass are not measurements.
 _MOCK_RANK_LIBRARY: tuple[tuple[str, str, dict[str, int], float, float], ...] = (
     # (name, smiles, formula counts, exact mass, mock spectral distance)
     ("caffeine", "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
      {"C": 8, "H": 10, "N": 4, "O": 2}, 194.080376, 1.00),
-    ("quercetin", "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12",
+    ("quercetin", "C1=CC(=C(C=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O)O",
      {"C": 15, "H": 10, "O": 7}, 302.042653, 1.10),
     # quercetin-3-O-glucoside: a flavonol GLYCOSIDE one log unit more
     # polar than its aglycone; its fixture distance sits just behind
@@ -1275,7 +1275,7 @@ def _mock_rank_candidates(inp: RankCandidatesInput) -> RankCandidatesOutput:
             smiles=smiles,
             formula=MolecularFormula(counts=counts),
             exact_mass=mass,
-            provenance="experimental",
+            provenance="synthetic",
             source="orchestrator mock library",
         )
         ranks.append(

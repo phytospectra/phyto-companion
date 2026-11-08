@@ -31,7 +31,7 @@ from elucidation.uv_reranker import (
     rerank_with_uv,
 )
 
-QUERCETIN = "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12"
+QUERCETIN = "C1=CC(=C(C=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O)O"
 PANDURATIN = "CC(C)=CCC[C@@H](C)C(=O)c1c(O)cc(O)c(C)c1"
 CAFFEINE = "Cn1c(=O)c2c(ncn2C)n(C)c1=O"
 

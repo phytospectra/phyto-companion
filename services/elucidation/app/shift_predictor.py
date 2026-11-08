@@ -1,10 +1,9 @@
 """ShiftMPNN shift prediction: Vertex AI in the cloud plane, deterministic
 mock locally.
 
-The mock carries a small hard-coded lookup for five reference molecules
-(benzene, ethanol, quercetin, kaempferol, caffeine) plus two fixtures used
-by downstream tests (phenol, ethylene glycol), and a rule-based fallback
-for anything else.  Per the Step 5 specification the mock is NOT accurate
+The mock carries a small hard-coded lookup for fixture molecules and a
+rule-based fallback for anything else, including quercetin and kaempferol.
+Their former mislabeled isomer tables were removed, not reassigned.  Per the Step 5 specification the mock is NOT accurate
 chemistry -- it exercises code paths deterministically.
 
 Note: the specification named andrographolide as the fifth reference, but
@@ -158,24 +157,8 @@ _REFERENCE_TABLE: dict[str, list[tuple[float, float]]] = {
         (-1.0, -1.0), (33.0, 3.55), (28.0, 3.30), (-1.0, -1.0),
         (-1.0, -1.0), (30.0, 3.85),
     ],
-    # quercetin: O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12 -- 22 heavy atoms
-    "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12": [
-        (-1.0, -1.0), (176.0, -1.0), (146.9, -1.0), (135.8, -1.0),
-        (-1.0, 9.40), (122.1, -1.0), (115.2, 7.55), (145.1, -1.0),
-        (-1.0, 9.30), (115.7, 6.88), (-1.0, 9.60), (120.1, 7.52),
-        (147.7, -1.0), (103.1, -1.0), (-1.0, 9.50), (156.2, -1.0),
-        (98.3, 6.19), (-1.0, 9.80), (164.0, -1.0), (93.5, 6.40),
-        (-1.0, 10.10), (161.3, -1.0),
-    ],
-    # kaempferol: O=c1cc(-c2ccc(O)cc2O)oc2cc(O)cc(O)c12 -- 21 heavy atoms
-    "O=c1cc(-c2ccc(O)cc2O)oc2cc(O)cc(O)c12": [
-        (-1.0, -1.0), (176.0, -1.0), (146.9, -1.0), (135.8, -1.0),
-        (122.1, -1.0), (115.2, 7.55), (130.0, 7.38), (145.1, -1.0),
-        (-1.0, 9.30), (115.7, 6.88), (130.5, 7.02), (-1.0, 9.60),
-        (-1.0, 9.90), (147.7, -1.0), (103.1, -1.0), (156.2, -1.0),
-        (-1.0, 9.50), (98.3, 6.19), (164.0, -1.0), (-1.0, 10.00),
-        (161.3, -1.0),
-    ],
+    # The former quercetin and kaempferol tables used different isomers and
+    # have no verified atom assignments. Both identities use the mock rules.
     # phenol: Oc1ccccc1 -- [O, C, C, C, C, C, C]
     "Oc1ccccc1": [
         (-1.0, 5.30), (155.0, -1.0), (116.0, 6.85), (130.0, 7.20),

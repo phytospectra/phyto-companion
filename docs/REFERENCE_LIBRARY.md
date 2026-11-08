@@ -40,10 +40,11 @@ merely because the runtime accepts a `provenance: experimental` string.
 - **NP-MRD**: the existing fixture README reports noncommercial CC-BY-NC terms.
   Obtain current authoritative terms and per-record accessions/downloads; clarify
   allowed redistribution and inference use. An account may be required.
-- **NMRShiftDB2**: acquire an authoritative licence statement and the relevant
-  records before reuse. Connection probes failed here; an unlinked search summary
-  is not licence evidence. Do not infer experimental HSQC cross-peaks merely by
-  combining unverified 1D atom assignments.
+- **NMRShiftDB2**: its [home page](https://nmrshiftdb.nmr.uni-koeln.de/)
+  was accessible and describes open-content licensing and assigned spectra, but
+  neither exact terms nor an eligible HSQC accession were verified. Obtain both
+  before reuse. Do not infer experimental HSQC cross-peaks merely by combining
+  unverified 1D atom assignments.
 - **BMRB**: inspect the current dataset-specific reuse terms and appropriate
   small-molecule assigned records. Accessibility is not clearance.
 - **Owner data**: publication/redistribution permission and scientific assignment
@@ -58,9 +59,47 @@ rounded literature tables, and a single self-match do not satisfy that criterion
 The import/quarantine infrastructure can be reviewed now; scientific-library
 completion remains blocked on suitable records and rights confirmation.
 
-Builder v2 requires the existing manifest columns plus `source_accession_url`,
-`identity_source_url`, `rights_evidence_url` (HTTPS) and
-`redistribution_assertion=cleared`; expected InChIKey, declared formula and
-evidence nature are mandatory. The template is non-spectral. These strings
-are curator assertions, not verification; direct runtime JSON bypasses the
-builder. Legitimate private local use is not prohibited by this distribution gate.
+### Import-ready procedure (builder v3)
+
+Use the non-spectral `source/manifest.template.csv` as the header for a private
+source directory's `manifest.csv`. Supply the transformed peak CSV and original
+source file inside that directory; record the actual original SHA-256, the
+transformation, a stable acquisition ID, measurement and assignment evidence
+URLs, acquisition conditions, full identity and formula, and the applicable
+rights scope and evidence. Dataset-level terms can serve as `rights_evidence_url`
+if their applicability to the accession is documented in `rights_scope`.
+`measurement_status` must be `measured` and `redistribution_assertion` must be
+`cleared`. All evidence URLs must be HTTPS. The builder checks the original
+file hash and separately records the transformed table hash; it emits unchanged
+runtime structures/reference schemas and records provenance in `MANIFEST.json`.
+Run `python scripts/build_reference_library.py --source <private-source> --output
+<private-output> --strict`; inspect quarantine reasons before any release.
+Never publish original files or outputs without appropriate rights.
+
+All evidence and rights fields are curator assertions, not software verification;
+direct runtime JSON bypasses this gate. This gate does not establish the separate
+query/reference acquisition independence required for evaluation. Private local
+use outside this distribution gate is not prohibited.
+
+### Quercetin investigation
+
+[PubChem CID 5280343](https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/5280343/property/MolecularFormula,InChIKey,CanonicalSMILES/JSON)
+identifies quercetin as `REFJWTPEDVJJIY-UHFFFAOYSA-N` (C15H10O7). The historical
+starter manifest instead paired the fixture peaks with
+`ISJMMWDSNQVANM-UHFFFAOYSA-N`, [PubChem CID 5381322](https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/inchikey/ISJMMWDSNQVANM-UHFFFAOYSA-N/property/IUPACName,MolecularFormula,InChIKey/JSON),
+5,7-dihydroxy-2-(2,4,6-trihydroxyphenyl)chromen-4-one, an isomer with the same
+formula. Historical commit `424fdda` propagated the incorrect structure into
+`source/manifest.csv`, `structures.csv`, `references.json` record
+`quercetin-226ce4d48558`, its generated `MANIFEST.json` and self-match tests.
+These library artifacts were removed from the release tree in `02f54cc`; their
+history remains. The pre-existing fixture is a rounded hand-curated table with
+no exact source accession, not evidence identifying a measured acquisition.
+Correcting the structure alone cannot validate or transfer those peaks.
+
+The same incorrect SMILES also appeared in the mock structure database,
+shift predictor and orchestrator ranker, and directly affected tests. Their
+identity-only mock structures now use PubChem quercetin and kaempferol
+(CID 5280863, `IYRMWMYZSQPJKC-UHFFFAOYSA-N`); the former kaempferol lookup
+also represented an isomer. Both unverified shift tables were removed rather
+than transferred. The mock predictor uses its generic, non-scientific fallback;
+the mock ranker distances and provenance are synthetic.

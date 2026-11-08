@@ -18,7 +18,7 @@ LOGP_GRID = [-2.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0]
 class TestEstimateLogP:
     def test_signs_are_chemically_sane_and_bad_smiles_raise(self) -> None:
         caffeine = estimate_logp("Cn1c(=O)c2c(ncn2C)n(C)c1=O")
-        quercetin = estimate_logp("O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12")
+        quercetin = estimate_logp("C1=CC(=C(C=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O)O")
         assert caffeine < 0 < quercetin
         with pytest.raises(InvalidInputError):
             estimate_logp("not-a-smiles")

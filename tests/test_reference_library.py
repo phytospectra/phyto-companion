@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import subprocess
 import sys
@@ -19,6 +20,7 @@ def _input(tmp_path, **overrides):
     source = tmp_path / "source"
     source.mkdir()
     (source / "invented.csv").write_text("position,dH,dC\nA,1.2,18\nB,3.6,58\n")
+    (source / "raw.txt").write_text("invented raw data")
     row = dict(name="Synthetic ethanol", smiles="CCO", solvent="invented",
                source="Invented fixture; not measured", license="synthetic test data",
                table="invented.csv", expected_inchikey=Chem.MolToInchiKey(Chem.MolFromSmiles("CCO")),
@@ -26,7 +28,12 @@ def _input(tmp_path, **overrides):
                source_accession_url="https://example.org/synthetic-record",
                identity_source_url="https://example.org/synthetic-identity",
                rights_evidence_url="https://example.org/synthetic-rights",
-               redistribution_assertion="cleared") | overrides
+               redistribution_assertion="cleared", source_acquisition_id="synthetic-acquisition-1",
+               measurement_status="measured", measurement_evidence_url="https://example.org/measurement",
+               assignment_evidence_url="https://example.org/assignment", acquisition_conditions="invented",
+               rights_scope="synthetic only", original_file="raw.txt",
+               original_sha256=hashlib.sha256((source / "raw.txt").read_bytes()).hexdigest(),
+               transformation="invented table") | overrides
     with (source / "manifest.csv").open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=COLUMNS)
         writer.writeheader()
@@ -65,6 +72,15 @@ def test_synthetic_build_is_deterministic_and_records_assertions(tmp_path):
     ({"source_accession_url": ""}, "stable HTTPS"),
     ({"identity_source_url": "file:///tmp/identity"}, "stable HTTPS"),
     ({"rights_evidence_url": ""}, "stable HTTPS"),
+    ({"measurement_evidence_url": ""}, "stable HTTPS"),
+    ({"assignment_evidence_url": ""}, "stable HTTPS"),
+    ({"measurement_status": "predicted"}, "measurement_status"),
+    ({"source_acquisition_id": ""}, "acquisition ID"),
+    ({"acquisition_conditions": ""}, "acquisition ID"),
+    ({"rights_scope": ""}, "acquisition ID"),
+    ({"transformation": ""}, "acquisition ID"),
+    ({"original_file": "../outside.csv"}, "original file must be within"),
+    ({"original_sha256": "0" * 64}, "original file SHA-256"),
     ({"expected_inchikey": ""}, "expected InChIKey"),
     ({"expected_inchikey": "REFJWTPEDVJJIY-UHFFFAOYSA-N"}, "expected_inchikey"),
     ({"declared_formula": "C15H10O7"}, "declared formula"),
@@ -76,6 +92,16 @@ def test_missing_or_conflicting_evidence_quarantines(tmp_path, changes, reason):
     result = _run(source, out, "--strict")
     assert result.returncode == 1
     assert reason in result.stdout
+    assert json.loads((out / "references.json").read_text()) == []
+
+
+def test_quercetin_identity_mismatch_quarantined(tmp_path):
+    source = _input(tmp_path, name="Quercetin",
+                    smiles="O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12",
+                    expected_inchikey="REFJWTPEDVJJIY-UHFFFAOYSA-N", declared_formula="C15H10O7")
+    out = tmp_path / "out"
+    assert _run(source, out, "--strict").returncode == 1
+    assert "ISJMMWDSNQVANM-UHFFFAOYSA-N" in json.loads((out / "MANIFEST.json").read_text())["per_record"][0]["reason"]
     assert json.loads((out / "references.json").read_text()) == []
 
 

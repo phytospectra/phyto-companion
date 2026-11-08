@@ -24,7 +24,7 @@ from elucidation.taxonomy_reranker import (
 
 PANDURATIN = "CC(C)=CCC[C@@H](C)C(=O)c1c(O)cc(O)c(C)c1"  # logP ~ 4.0
 PINOCEMBRIN = "O=c1cc(-c2ccccc2O)oc2cc(O)ccc12"  # logP ~ 2.4
-QUERCETIN = "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12"
+QUERCETIN = "C1=CC(=C(C=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O)O"
 
 
 def _ik(smiles: str) -> str:

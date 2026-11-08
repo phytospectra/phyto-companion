@@ -42,8 +42,9 @@ MOCK_LIBRARY: list[tuple[str, str]] = [
     ("catechol", "Oc1ccccc1O"),
     ("ethanol", "CCO"),
     ("ethylene glycol", "OCCO"),
-    ("quercetin", "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12"),
-    ("kaempferol", "O=c1cc(-c2ccc(O)cc2O)oc2cc(O)cc(O)c12"),
+    # Identity only: PubChem CIDs 5280343 / 5280863; no shift assignments.
+    ("quercetin", "C1=CC(=C(C=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O)O"),
+    ("kaempferol", "C1=CC(=CC=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O"),
     ("caffeine", "Cn1c(=O)c2c(ncn2C)n(C)c1=O"),
     # acyclic diterpenoid C20H40O (formula-verified positional isomer,
     # phytol series; ADR-0018)

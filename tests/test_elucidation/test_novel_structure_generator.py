@@ -39,7 +39,7 @@ ETHANOL = _candidate("ethanol", "CCO")
 PHENOL = _candidate("phenol", "Oc1ccccc1")
 ANISOLE = _candidate("anisole", "COc1ccccc1")
 BUTENE = _candidate("2-butene", "CC=CC")
-QUERCETIN = _candidate("quercetin", "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12")
+QUERCETIN = _candidate("quercetin", "C1=CC(=C(C=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O)O")
 
 
 def _product_formula_smiles(smiles: str) -> str:
@@ -117,16 +117,17 @@ class TestInvariants:
     def test_priority_ordering_hydroxylation_first(self):
         # kaempferol = quercetin minus one OH: hydroxylation reaches it,
         # and hydroxylation products must come first in the list
-        kaempferol = _candidate("kaempferol", "O=c1cc(-c2ccc(O)cc2O)oc2cc(O)cc(O)c12")
+        kaempferol = _candidate("kaempferol", "C1=CC(=CC=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O")
         products = generate_novel_candidates(
             "C15H10O7", [kaempferol],
             ["hydroxylation", "methylation", "prenylation", "glycosylation", "acetylation"],
         )
         assert products
         assert products[0].edit_type == "hydroxylation"
-        assert "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12" in [
-            p.generated_smiles for p in products if p.edit_type == "hydroxylation"
-        ]
+        assert Chem.MolToInchiKey(Chem.MolFromSmiles(QUERCETIN.smiles)) in {
+            Chem.MolToInchiKey(Chem.MolFromSmiles(p.generated_smiles))
+            for p in products if p.edit_type == "hydroxylation"
+        }
 
 
 class TestFailureModes:

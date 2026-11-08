@@ -56,8 +56,17 @@ MANIFEST_COLUMNS = (
     "identity_source_url",
     "rights_evidence_url",
     "redistribution_assertion",
+    "source_acquisition_id",
+    "measurement_status",
+    "measurement_evidence_url",
+    "assignment_evidence_url",
+    "acquisition_conditions",
+    "rights_scope",
+    "original_file",
+    "original_sha256",
+    "transformation",
 )
-BUILDER_VERSION = "2"
+BUILDER_VERSION = "3"
 
 
 def _https_url(value: str) -> bool:
@@ -172,9 +181,29 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
             quarantine("redistribution not explicitly cleared for this record")
             continue
         urls = {key: (row.get(key) or "").strip() for key in
-                ("source_accession_url", "identity_source_url", "rights_evidence_url")}
+                ("source_accession_url", "identity_source_url", "rights_evidence_url",
+                 "measurement_evidence_url", "assignment_evidence_url")}
         if not all(_https_url(value) for value in urls.values()):
-            quarantine("stable HTTPS source accession, identity source, and record-specific rights evidence are required")
+            quarantine("stable HTTPS source accession, identity, rights, measurement and assignment evidence are required")
+            continue
+        if (row.get("measurement_status") or "").strip() != "measured":
+            quarantine("measurement_status must be measured; predicted or unknown spectra cannot be imported")
+            continue
+        evidence_fields = ("source_acquisition_id", "acquisition_conditions", "rights_scope", "transformation")
+        if not all((row.get(key) or "").strip() for key in evidence_fields):
+            quarantine("acquisition ID and conditions, rights scope and transformation are required")
+            continue
+        original_name = (row.get("original_file") or "").strip()
+        original_path = source / original_name if original_name else None
+        if original_path is None or not original_path.resolve().is_relative_to(source.resolve()):
+            quarantine("original file must be within source directory")
+            continue
+        if not original_path.is_file():
+            quarantine("original file not found")
+            continue
+        original_sha256 = (row.get("original_sha256") or "").strip()
+        if _sha256_bytes(original_path.read_bytes()) != original_sha256:
+            quarantine("original file SHA-256 missing or does not match")
             continue
         if not all((row.get(key) or "").strip() for key in
                    ("expected_inchikey", "declared_formula", "evidence_nature")):
@@ -261,6 +290,15 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
                 "identity_source_url": urls["identity_source_url"],
                 "rights_evidence_url": urls["rights_evidence_url"],
                 "redistribution_assertion": "cleared",
+                "source_acquisition_id": row["source_acquisition_id"].strip(),
+                "measurement_status": "measured",
+                "measurement_evidence_url": urls["measurement_evidence_url"],
+                "assignment_evidence_url": urls["assignment_evidence_url"],
+                "acquisition_conditions": row["acquisition_conditions"].strip(),
+                "rights_scope": row["rights_scope"].strip(),
+                "original_file": original_name,
+                "original_sha256": original_sha256,
+                "transformation": row["transformation"].strip(),
                 "table_sha256": table_digest,
             }
         )
@@ -320,7 +358,9 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
             record["candidate_id"]: {
                 key: record[key] for key in (
                     "source_accession_url", "identity_source_url", "rights_evidence_url",
-                    "redistribution_assertion", "table_sha256"
+                    "redistribution_assertion", "source_acquisition_id", "measurement_status",
+                    "measurement_evidence_url", "assignment_evidence_url", "acquisition_conditions",
+                    "rights_scope", "original_file", "original_sha256", "transformation", "table_sha256"
                 )
             }
             for record in records

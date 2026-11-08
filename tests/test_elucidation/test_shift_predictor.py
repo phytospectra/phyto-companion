@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from rdkit import Chem
 from pydantic import ValidationError
 
 from phyto_shared.exceptions import CloudServiceError
@@ -13,7 +14,7 @@ from elucidation.shift_predictor import (
     get_shift_predictor,
 )
 
-QUERCETIN = "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12"
+QUERCETIN = "C1=CC(=C(C=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O)O"
 
 
 @pytest.fixture()
@@ -35,13 +36,24 @@ class TestMockLookup:
             ("c1ccccc1", 6),
             ("CCO", 3),
             (QUERCETIN, 22),
-            ("O=c1cc(-c2ccc(O)cc2O)oc2cc(O)cc(O)c12", 21),  # kaempferol
+            ("C1=CC(=CC=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O", 21),  # kaempferol
             ("Cn1c(=O)c2c(ncn2C)n(C)c1=O", 14),  # caffeine
         ]:
             prediction = predictor.predict(smiles)
             assert len(prediction.atom_indices) == expected
             assert len(prediction.predicted_c_shifts) == expected
             assert len(prediction.predicted_h_shifts) == expected
+
+    def test_mock_structure_identities_match_authoritative_keys(self):
+        from elucidation.structure_db import MockStructureDB
+        from orchestrator.tool_registry import _MOCK_RANK_LIBRARY
+        db = MockStructureDB()
+        for name, key in [("quercetin", "REFJWTPEDVJJIY-UHFFFAOYSA-N"),
+                          ("kaempferol", "IYRMWMYZSQPJKC-UHFFFAOYSA-N")]:
+            assert db.candidate_by_inchikey(key).name == name
+        rank_quercetin = next(row for row in _MOCK_RANK_LIBRARY if row[0] == "quercetin")
+        assert Chem.MolToInchiKey(Chem.MolFromSmiles(rank_quercetin[1])) == "REFJWTPEDVJJIY-UHFFFAOYSA-N"
+        assert db.candidate_by_inchikey("ISJMMWDSNQVANM-UHFFFAOYSA-N") is None
 
     def test_deterministic(self, predictor):
         first = predictor.predict(QUERCETIN)
@@ -54,6 +66,19 @@ class TestMockLookup:
 
 
 class TestFallbackRules:
+    def test_mislabeled_tables_not_transferred(self, predictor):
+        corrected = [QUERCETIN, "C1=CC(=CC=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O"]
+        former = ["O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12",
+                  "O=c1cc(-c2ccc(O)cc2O)oc2cc(O)cc(O)c12"]
+        for smiles in corrected + former:
+            canonical = Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
+            assert canonical not in predictor._table
+            mol = Chem.MolFromSmiles(canonical)
+            prediction = predictor.predict(smiles)
+            assert list(zip(prediction.predicted_c_shifts, prediction.predicted_h_shifts)) == [
+                predictor._rule_shift(atom) for atom in mol.GetAtoms()
+            ]
+
     def test_unknown_molecule_gets_rules_not_exception(self, predictor):
         prediction = predictor.predict("CCCCCC")  # hexane: not in the table
         assert len(prediction.atom_indices) == 6
