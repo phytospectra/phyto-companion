@@ -42,3 +42,29 @@ remain unverified. Runs/shares are process-local; cloud restart/cross-instance
 persistence and revocation semantics are a separate production design decision.
 
 See docs/ACCOUNTING-GUARANTEE.md for the precise guarantee (at-most-once admission, exactly-once settlement) and failure/recovery matrix.
+
+## Read-only cloud observation (2026-11-09)
+
+Active `gcloud` session lists exactly one project, `phyto-companion-prod`,
+with services `phyto-orchestrator` and `phyto-frontend` on Cloud Run. No
+staging/isolated project or service exists in the visible inventory. Live
+acceptance therefore requires creating (or being granted access to) a
+separate non-production project — a consequential action that needs
+approval: no project, identity, IAM, traffic, billing or secret change was
+made and none is requested here beyond the preparation below.
+
+## Approval packet for staging creation (prepared, not executed)
+
+Requested change: create an isolated project `phyto-companion-staging`
+(exact name to be chosen by the operator), deploy the pinned revisions
+(backend `5d56a24863f492a0b1fee4e9296a39cf85f65157`, frontend
+`e8bdbe6875ca3f587dfdc27dd56d3be0804079a5`) with two disposable test
+identities, CORS limited to the staging frontend URL, and run the offline
+checklist from this document against it. Cost boundary: compute/storage
+only, no paid inference, Stripe test mode or emulator, no production data.
+Cleanup: delete the project or disable the services after the run.
+Rollback: none needed in an isolated project; production untouched.
+
+If the user approves staging creation, the checklist above is the exact
+acceptance run. If they prefer, supply an existing isolated project +
+two test identities instead, and no new project is needed.
