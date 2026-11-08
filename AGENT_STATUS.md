@@ -327,8 +327,10 @@ Reporting template per the enterprise handoff brief. One row per milestone.
     other RTs (1187, 1460) are also recorded.
 - **Evidence boundaries**: same as M1-a — single dataset, single compound
   standard, precursor-mass + RT match pending MS/MS confirmation, NOT an
-  identification. The file has no MS2 scans (full-scan-only acquisition),
-  so MS/MS confirmation remains pending for both M1-a and M1-b.
+  identification. The converted mzML has 768 MS1 + 4,255 MS2 scans (DDA);
+  one MS2 scan targeted the thiostrepton precursor (m/z 832.7535) but no
+  MS/MS confirmation has been performed, so confirmation remains pending
+  for both M1-a and M1-b.
 - **Preserved artifacts** (`data/validated_runs/M1b/`): `run_summary.json`
   (checksums, engine identity, per-match m/z/ppm/RT), `batch.mzbatch`
   (sha256 0c101f42…), `features.csv`, `mzmine_run.log`,
@@ -336,3 +338,90 @@ Reporting template per the enterprise handoff brief. One row per milestone.
 - **Next**: MS/MS confirmation path (needs an MS2-containing file) and/or
   additional vendor converters (Waters, Bruker, Agilent, Sciex) under
   follow-up ADRs.
+
+## Milestone: MS/MS assessments (M1-a, M1-b) + blinded benchmark scaffolding (executed 2026-11-02)
+
+- **Milestone/status**: MS/MS evidence assessment of the two known LC–MS
+  acceptance cases **executed locally** (library-reference comparison, not
+  an identification); blinded NMR–MS benchmark **scaffolding only**; fine-
+  tuning decision-gate memo + Colab notebook **template only, not run**.
+  Nothing in this milestone upgrades any acceptance status.
+- **MS/MS assessments** (`data/validated_runs/msms_assessment/`):
+  - **M1-b thiostrepton** (report `M1B-THIOSTREPTON-MSMS-ASSESSMENT.md`):
+    streamed the committed mzML (SHA-256 re-verified 45b67fd5…). Parsed
+    5,023 scans = 768 MS1 + 4,255 MS2. Two MS2 isolation events at
+    m/z 832.7535: scan 3084 (RT 7.07 min, weak, uninterpretable) and
+    **scan 3754 (RT 8.50 min, TIC 3.4e5, 54 peaks — the usable one)**.
+    Charge 2+ verified from MS1 isotope spacing (~0.500 Da in precursor
+    scan 3742). HCD 40, isolation ±0.8 Da. Matched against MassBank
+    `MSBNK-ACES_SU-AS001032` ([M+2H]²⁺, HCD ramp 20–70%, CC BY) via the
+    massbank.jp MassBank3 API: **24/76 ref peaks matched at ±10 ppm
+    (52% relative-intensity coverage), 100% of the reference's top-6
+    diagnostic ions matched ≤4.3 ppm; the reference's ramp-specific
+    999% base peak (86.096) is absent at our fixed CE 40.** Decoy
+    control: random scans elsewhere in the run match 0–1/76. Verdict:
+    acquisition proven; library agreement partial-to-moderate (MSI ≤2);
+    confirmation still pending (no authentic standard under matched
+    conditions). Collision-program mismatch named as the limiting factor.
+  - **M1-a tetracycline** (report `M1A-TETRACYCLINE-MSMS-ASSESSMENT.md`):
+    30 MS2 isolation events at m/z 445.1605; apex scan 2517 (RT 5.84 min,
+    TIC 6.0e6, 83 peaks). Matched against the documented MassBank
+    `MSBNK-BAFG-CSL23111012700` (QTOF CID 40 V): **11/51 at ±5 ppm
+    (30% coverage), 18/51 at ±10, 29/51 at ±20 ppm (90% coverage) with
+    all dominant diagnostic ions (410/428 series, 154, 98, 267, 269,
+    241, 337, 321, 349) present; the strict-tolerance shortfall is a
+    piecewise ~10–20 ppm offset of the QTOF reference, not missing
+    fragments** (linear recalibration does not reconcile it). Decoy
+    control 0–1/51. Same verdict shape as M1-b: acquisition proven,
+    library agreement partial-to-moderate, confirmation pending.
+    Follow-up noted: compare against the ~100 Orbitrap HBM4EU tetracycline
+    MS2 records (CE series) available on the same API.
+  - Machine-readable match tables + mirror plots committed alongside
+    (`M1a_…vs_MassBank-BAFG….json`, `M1b_…vs_MassBank-ACES….json`,
+    `tet_mirror.png`, `thio_mirror.png`). Predeclared rules: ±5/±10 ppm,
+    one-to-one greedy, ref rel-int ≥1%, precursor retained.
+  - **Reference-infrastructure note (honest)**: massbank.eu MassBank3 API
+    refused all queries on 2026-11-02 ("pq: sorry, too many clients
+    already"); MoNA search returned zero results even for caffeine
+    (site in maintenance). massbank.jp worked and supplied both records.
+- **Blinded benchmark scaffolding** (`benchmark/blinded_pilot/`):
+  `schemas/case.schema.json` (manifest fields per the study prompt:
+  source/version/license/modality/solvent/field strength/provenance/
+  experimental status/identity confidence/reviewer + separate
+  training/external-inference/redistribution permissions);
+  `build_cases.py` (opaque IDs, shuffled candidate order, seed recorded,
+  answers only in `keys/`); 6 scaffold cases (4 real: flavonoid near-
+  isomer trio + one designed abstention case; 2 placeholders requiring
+  NMRShiftDB2 retrieval); `score_run.py` scoring **candidate accuracy,
+  invented evidence, and abstention separately** (smoke-tested: catches
+  an invented HSQC citation and a missed abstention);
+  `PROTOCOL.md` — denominator plan (target 20–30 expert-reviewed cases;
+  actual count 6 scaffolds, 4 runnable), three-arm modality ablation
+  (nmr_only / ms_only / paired), rights gates per NMR_RESEARCH_REGISTER
+  (NMRTrans-Data MIT usable after per-record check; NMRGym counts zero
+  until access; NMRArena zero until license readable; CC-BY-NC sources
+  academic-only), dedup/partition rules, execution checklist (nothing
+  run; no accuracy numbers may be quoted).
+- **Fine-tune decision gate** (`benchmark/fine_tune_gate/`):
+  `FINETUNE-DECISION-GATE.md` — pre-registered gate (fine-tune only if
+  the pilot shows correct-candidates-but-misinterpreted-correlations;
+  retrieval/parser/packaging errors route elsewhere);
+  `colab_finetune_template.ipynb` — **template, never executed**: GPU
+  probe, one-batch memory check that refuses to proceed on OOM,
+  checkpoint/restart cells, adapter export; sized at run time against
+  the actually-assigned Colab GPU.
+- **Manuscript citation fix (outside this repo)**:
+  `phytospectra-paper/PHYTOSPECTRA-MANUSCRIPT-DRAFT1.md` ref 43 corrected
+  against the Crossref record for DOI 10.1038/s41467-019-13680-7:
+  byline now Domingo-Almenara X, Guijas C, Billings E, Montenegro-Burke
+  JR, Uritboonthai W, Aisporna AE, et al. (the draft's "Majumder ELW" is
+  not an author of that paper); Nature Communications 2019, 10:5811
+  already correct. `docs/DATA_SOURCES.md` §10 METLIN SMRT row already
+  carries the corrected citation (independent change in the working
+  tree).
+- **Evidence boundaries**: as before — M1-a/M1-b remain "precursor-mass +
+  RT match pending MS/MS confirmation, NOT an identification"; this
+  milestone verifies the MS2 acquisitions exist and adds partial
+  spectral-library agreement (MSI ≤2 territory), still not confirmation.
+  Benchmark numbers: none exist yet; the pilot's first run must record
+  its actual denominator.

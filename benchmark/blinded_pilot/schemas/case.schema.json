@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Phytospectra blinded elucidation benchmark case",
+  "type": "object",
+  "required": ["case_id", "partition", "modalities", "manifest"],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "description": "Opaque identifier given to the model. MUST NOT encode the compound name, source dataset or class."
+    },
+    "partition": {
+      "enum": ["smoke_test", "dev", "test", "test_source_held_out"],
+      "description": "smoke_test = the two known LC-MS acceptance cases (M1-a, M1-b) and platform regression archives; NEVER in reported accuracy. dev = prompt/protocol tuning. test = untouched scored partition. test_source_held_out = scored subset whose source corpus is absent from training."
+    },
+    "modalities": {
+      "type": "array",
+      "items": {"enum": ["1H", "13C", "COSY", "HSQC", "HMBC", "MS1", "MS2"]},
+      "minItems": 1
+    },
+    "arm": {
+      "enum": ["nmr_only", "ms_only", "nmr_ms_paired"],
+      "description": "Required. Paired only when the NMR and MS come from the SAME documented sample."
+    },
+    "manifest": {
+      "type": "object",
+      "required": ["source", "source_version", "license", "provenance_id", "experimental_status", "identity_confidence", "reviewer",
+                   "permissions"],
+      "properties": {
+        "source": {"type": "string"},
+        "source_version": {"type": "string"},
+        "license": {"type": "string", "description": "SPDX or database licence verbatim."},
+        "provenance_id": {"type": "string"},
+        "experimental_status": {"enum": ["experimental", "simulated", "predicted", "literature_curated"]},
+        "identity_confidence": {"enum": ["MSI-1", "MSI-2", "MSI-3", "MSI-4", "confirmed_standard", "curated_literature"]},
+        "reviewer": {"type": "string", "description": "Human expert who approved the decisive-evidence annotation."},
+        "field_strength_MHz": {"type": ["number", "null"]},
+        "solvent": {"type": ["string", "null"]},
+        "permissions": {
+          "type": "object",
+          "required": ["training", "external_inference", "redistribution"],
+          "properties": {
+            "training": {"enum": ["allowed", "allowed_only_local", "forbidden", "unknown"]},
+            "external_inference": {"enum": ["allowed", "forbidden", "unknown"],
+              "description": "May the case content be sent to a named external provider (e.g. Claude API)?"},
+            "redistribution": {"enum": ["allowed", "allowed_with_attribution", "forbidden", "unknown"]}
+          }
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"enum": ["candidate_ranking", "interpretation", "abstention"]},
+        "candidates": {
+          "type": "array",
+          "items": {"type": "object",
+                    "required": ["label", "smiles", "formula"],
+                    "properties": {"label": {"type": "string"}, "smiles": {"type": "string"}, "formula": {"type": "string"}}},
+          "description": "For candidate_ranking. Order must be shuffled at packaging time with a recorded seed; the correct answer's position is stored ONLY in the key file."
+        },
+        "expects_abstention": {"type": "boolean",
+          "description": "True for cases with insufficient/ambiguous evidence; the correct behaviour is a calibrated 'insufficient evidence' answer naming the missing correlation."}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "description": "Blinded payload shown to the model. Answers stripped from filenames, headers and candidate order.",
+      "properties": {
+        "peak_tables": {"type": "object"},
+        "correlation_ids": {
+          "type": "array",
+          "items": {"type": "object",
+                    "required": ["id", "type", "from", "to"],
+                    "properties": {"id": {"type": "string"}, "type": {"enum": ["COSY", "HMBC"]},
+                                   "from": {"type": "string"}, "to": {"type": "string"},
+                                   "observed": {"type": "boolean"},
+                                   "snr": {"type": ["number", "null"]}}}
+        },
+        "ms": {"type": "object", "properties": {
+          "precursor_mz": {"type": ["number", "null"]},
+          "adduct": {"type": ["string", "null"]},
+          "peaks": {"type": "array", "items": {"type": "object", "properties": {"mz": {"type": "number"}, "intensity": {"type": "number"}}}}
+        }}
+      }
+    }
+  }
+}

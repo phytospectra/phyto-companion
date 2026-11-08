@@ -1,0 +1,212 @@
+[
+ {
+  "candidate_structures": [
+   {
+    "formula": "C15H10O6",
+    "label": "cand-a",
+    "smiles": "O=c1c(O)c(-c2ccc(O)cc2)oc2cc(O)cc(O)c12"
+   },
+   {
+    "formula": "C15H10O7",
+    "label": "cand-b",
+    "smiles": "O=c1c(O)c(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12"
+   },
+   {
+    "formula": "C15H10O6",
+    "label": "cand-c",
+    "smiles": "O=c1cc(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12"
+   }
+  ],
+  "case_id": "C001",
+  "decisive_observations_proposed": "PROPOSED (awaiting expert review): (1) Luteolin shows an H-3 cross-peak (~6.68/~102.9 ppm in the curated table); quercetin and kaempferol (flavonols) lack H-3. (2) B-ring pattern separates quercetin (catechol: three distinct B-ring protons) from kaempferol (single 2H-equivalent H-2'/H-6' pair at ~8.04/~130.4 and H-3'/H-5' at ~6.92/~115.1). (3) Caution: absence of H-3 in a curated table is weak evidence \u2014 overlapping or weak peaks must be considered; reviewer decides whether absence alone can decide or the case must be marked ambiguous.",
+  "evidence_with_labels": [
+   {
+    "dC": 98.3,
+    "dH": 6.19,
+    "evidence_id": "E001",
+    "position": "H-6"
+   },
+   {
+    "dC": 93.5,
+    "dH": 6.42,
+    "evidence_id": "E002",
+    "position": "H-8"
+   },
+   {
+    "dC": 115.2,
+    "dH": 7.68,
+    "evidence_id": "E003",
+    "position": "H-2'"
+   },
+   {
+    "dC": 116.0,
+    "dH": 6.9,
+    "evidence_id": "E004",
+    "position": "H-5'"
+   },
+   {
+    "dC": 120.1,
+    "dH": 7.54,
+    "evidence_id": "E005",
+    "position": "H-6'"
+   }
+  ],
+  "insufficient_evidence_field": null,
+  "plausible_alternatives": "kaempferol vs luteolin share C15H10O6 and differ only in the C-3 oxygen; separation relies on the presence (luteolin) vs absence (kaempferol) of an H-3 cross-peak \u2014 an ABSENCE argument whose strength the reviewer must weigh against possible weak/overlapped H-3.",
+  "reviewer": null,
+  "true_compound": "quercetin"
+ },
+ {
+  "candidate_structures": [
+   {
+    "formula": "C15H10O6",
+    "label": "cand-a",
+    "smiles": "O=c1cc(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12"
+   },
+   {
+    "formula": "C15H10O7",
+    "label": "cand-b",
+    "smiles": "O=c1c(O)c(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12"
+   },
+   {
+    "formula": "C15H10O6",
+    "label": "cand-c",
+    "smiles": "O=c1c(O)c(-c2ccc(O)cc2)oc2cc(O)cc(O)c12"
+   }
+  ],
+  "case_id": "C002",
+  "decisive_observations_proposed": "PROPOSED (awaiting expert review): (1) Luteolin shows an H-3 cross-peak (~6.68/~102.9 ppm in the curated table); quercetin and kaempferol (flavonols) lack H-3. (2) B-ring pattern separates quercetin (catechol: three distinct B-ring protons) from kaempferol (single 2H-equivalent H-2'/H-6' pair at ~8.04/~130.4 and H-3'/H-5' at ~6.92/~115.1). (3) Caution: absence of H-3 in a curated table is weak evidence \u2014 overlapping or weak peaks must be considered; reviewer decides whether absence alone can decide or the case must be marked ambiguous.",
+  "evidence_with_labels": [
+   {
+    "dC": 98.5,
+    "dH": 6.19,
+    "evidence_id": "E006",
+    "position": "H-6"
+   },
+   {
+    "dC": 93.6,
+    "dH": 6.43,
+    "evidence_id": "E007",
+    "position": "H-8"
+   },
+   {
+    "dC": 130.4,
+    "dH": 8.04,
+    "evidence_id": "E008",
+    "position": "H-2'/H-6'"
+   },
+   {
+    "dC": 115.1,
+    "dH": 6.92,
+    "evidence_id": "E009",
+    "position": "H-3'/H-5'"
+   }
+  ],
+  "insufficient_evidence_field": null,
+  "plausible_alternatives": "kaempferol vs luteolin share C15H10O6 and differ only in the C-3 oxygen; separation relies on the presence (luteolin) vs absence (kaempferol) of an H-3 cross-peak \u2014 an ABSENCE argument whose strength the reviewer must weigh against possible weak/overlapped H-3.",
+  "reviewer": null,
+  "true_compound": "kaempferol"
+ },
+ {
+  "candidate_structures": [
+   {
+    "formula": "C15H10O6",
+    "label": "cand-a",
+    "smiles": "O=c1cc(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12"
+   },
+   {
+    "formula": "C15H10O6",
+    "label": "cand-b",
+    "smiles": "O=c1c(O)c(-c2ccc(O)cc2)oc2cc(O)cc(O)c12"
+   },
+   {
+    "formula": "C15H10O7",
+    "label": "cand-c",
+    "smiles": "O=c1c(O)c(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12"
+   }
+  ],
+  "case_id": "C003",
+  "decisive_observations_proposed": "PROPOSED (awaiting expert review): (1) Luteolin shows an H-3 cross-peak (~6.68/~102.9 ppm in the curated table); quercetin and kaempferol (flavonols) lack H-3. (2) B-ring pattern separates quercetin (catechol: three distinct B-ring protons) from kaempferol (single 2H-equivalent H-2'/H-6' pair at ~8.04/~130.4 and H-3'/H-5' at ~6.92/~115.1). (3) Caution: absence of H-3 in a curated table is weak evidence \u2014 overlapping or weak peaks must be considered; reviewer decides whether absence alone can decide or the case must be marked ambiguous.",
+  "evidence_with_labels": [
+   {
+    "dC": 102.9,
+    "dH": 6.68,
+    "evidence_id": "E010",
+    "position": "H-3"
+   },
+   {
+    "dC": 98.8,
+    "dH": 6.19,
+    "evidence_id": "E011",
+    "position": "H-6"
+   },
+   {
+    "dC": 94.0,
+    "dH": 6.44,
+    "evidence_id": "E012",
+    "position": "H-8"
+   },
+   {
+    "dC": 113.4,
+    "dH": 7.41,
+    "evidence_id": "E013",
+    "position": "H-2'"
+   },
+   {
+    "dC": 115.9,
+    "dH": 6.89,
+    "evidence_id": "E014",
+    "position": "H-5'"
+   },
+   {
+    "dC": 118.9,
+    "dH": 7.43,
+    "evidence_id": "E015",
+    "position": "H-6'"
+   }
+  ],
+  "insufficient_evidence_field": null,
+  "plausible_alternatives": "kaempferol vs luteolin share C15H10O6 and differ only in the C-3 oxygen; separation relies on the presence (luteolin) vs absence (kaempferol) of an H-3 cross-peak \u2014 an ABSENCE argument whose strength the reviewer must weigh against possible weak/overlapped H-3.",
+  "reviewer": null,
+  "true_compound": "luteolin"
+ },
+ {
+  "candidate_structures": [
+   {
+    "formula": "C15H10O6",
+    "label": "cand-a",
+    "smiles": "O=c1c(O)c(-c2ccc(O)cc2)oc2cc(O)cc(O)c12"
+   },
+   {
+    "formula": "C15H10O6",
+    "label": "cand-b",
+    "smiles": "O=c1cc(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12"
+   },
+   {
+    "formula": "C15H10O7",
+    "label": "cand-c",
+    "smiles": "O=c1c(O)c(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12"
+   }
+  ],
+  "case_id": "C004",
+  "decisive_observations_proposed": "None decisive in-packet: the two A-ring HSQC cross-peaks (H-6, H-8) are common to all three candidates. Designed abstention case.",
+  "evidence_with_labels": [
+   {
+    "dC": 98.5,
+    "dH": 6.19,
+    "evidence_id": "E016",
+    "position": "H-6"
+   },
+   {
+    "dC": 93.6,
+    "dH": 6.43,
+    "evidence_id": "E017",
+    "position": "H-8"
+   }
+  ],
+  "insufficient_evidence_field": "CONFIRM: is abstention the required behaviour, or would you rank?",
+  "plausible_alternatives": "all three candidates remain plausible on the packet's evidence alone",
+  "reviewer": null,
+  "true_compound": "kaempferol"
+ }
+]

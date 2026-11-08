@@ -1,0 +1,143 @@
+[
+ {
+  "answer_label": "cand-b",
+  "assigned_peaks": [
+   {
+    "dC": 98.3,
+    "dH": 6.19,
+    "position": "H-6"
+   },
+   {
+    "dC": 93.5,
+    "dH": 6.42,
+    "position": "H-8"
+   },
+   {
+    "dC": 115.2,
+    "dH": 7.68,
+    "position": "H-2'"
+   },
+   {
+    "dC": 116.0,
+    "dH": 6.9,
+    "position": "H-5'"
+   },
+   {
+    "dC": 120.1,
+    "dH": 7.54,
+    "position": "H-6'"
+   }
+  ],
+  "case_id": "C001",
+  "decisive_evidence_proposal": {
+   "proposal": "PROPOSED (awaiting expert review): (1) Luteolin shows an H-3 cross-peak (~6.68/~102.9 ppm in the curated table); quercetin and kaempferol (flavonols) lack H-3. (2) B-ring pattern separates quercetin (catechol: three distinct B-ring protons) from kaempferol (single 2H-equivalent H-2'/H-6' pair at ~8.04/~130.4 and H-3'/H-5' at ~6.92/~115.1). (3) Caution: absence of H-3 in a curated table is weak evidence \u2014 overlapping or weak peaks must be considered; reviewer decides whether absence alone can decide or the case must be marked ambiguous.",
+   "status": "awaiting expert review"
+  },
+  "true_compound": "quercetin"
+ },
+ {
+  "answer_label": "cand-c",
+  "assigned_peaks": [
+   {
+    "dC": 98.5,
+    "dH": 6.19,
+    "position": "H-6"
+   },
+   {
+    "dC": 93.6,
+    "dH": 6.43,
+    "position": "H-8"
+   },
+   {
+    "dC": 130.4,
+    "dH": 8.04,
+    "position": "H-2'/H-6'"
+   },
+   {
+    "dC": 115.1,
+    "dH": 6.92,
+    "position": "H-3'/H-5'"
+   }
+  ],
+  "case_id": "C002",
+  "decisive_evidence_proposal": {
+   "proposal": "PROPOSED (awaiting expert review): (1) Luteolin shows an H-3 cross-peak (~6.68/~102.9 ppm in the curated table); quercetin and kaempferol (flavonols) lack H-3. (2) B-ring pattern separates quercetin (catechol: three distinct B-ring protons) from kaempferol (single 2H-equivalent H-2'/H-6' pair at ~8.04/~130.4 and H-3'/H-5' at ~6.92/~115.1). (3) Caution: absence of H-3 in a curated table is weak evidence \u2014 overlapping or weak peaks must be considered; reviewer decides whether absence alone can decide or the case must be marked ambiguous.",
+   "status": "awaiting expert review"
+  },
+  "true_compound": "kaempferol"
+ },
+ {
+  "answer_label": "cand-a",
+  "assigned_peaks": [
+   {
+    "dC": 102.9,
+    "dH": 6.68,
+    "position": "H-3"
+   },
+   {
+    "dC": 98.8,
+    "dH": 6.19,
+    "position": "H-6"
+   },
+   {
+    "dC": 94.0,
+    "dH": 6.44,
+    "position": "H-8"
+   },
+   {
+    "dC": 113.4,
+    "dH": 7.41,
+    "position": "H-2'"
+   },
+   {
+    "dC": 115.9,
+    "dH": 6.89,
+    "position": "H-5'"
+   },
+   {
+    "dC": 118.9,
+    "dH": 7.43,
+    "position": "H-6'"
+   }
+  ],
+  "case_id": "C003",
+  "decisive_evidence_proposal": {
+   "proposal": "PROPOSED (awaiting expert review): (1) Luteolin shows an H-3 cross-peak (~6.68/~102.9 ppm in the curated table); quercetin and kaempferol (flavonols) lack H-3. (2) B-ring pattern separates quercetin (catechol: three distinct B-ring protons) from kaempferol (single 2H-equivalent H-2'/H-6' pair at ~8.04/~130.4 and H-3'/H-5' at ~6.92/~115.1). (3) Caution: absence of H-3 in a curated table is weak evidence \u2014 overlapping or weak peaks must be considered; reviewer decides whether absence alone can decide or the case must be marked ambiguous.",
+   "status": "awaiting expert review"
+  },
+  "true_compound": "luteolin"
+ },
+ {
+  "answer_label": null,
+  "assigned_peaks": [
+   {
+    "dC": 98.5,
+    "dH": 6.19,
+    "position": "H-6"
+   },
+   {
+    "dC": 93.6,
+    "dH": 6.43,
+    "position": "H-8"
+   },
+   {
+    "dC": 130.4,
+    "dH": 8.04,
+    "position": "H-2'/H-6'"
+   },
+   {
+    "dC": 115.1,
+    "dH": 6.92,
+    "position": "H-3'/H-5'"
+   }
+  ],
+  "case_id": "C004",
+  "decisive_evidence_proposal": {
+   "proposal": "PROPOSED (awaiting expert review): (1) Luteolin shows an H-3 cross-peak (~6.68/~102.9 ppm in the curated table); quercetin and kaempferol (flavonols) lack H-3. (2) B-ring pattern separates quercetin (catechol: three distinct B-ring protons) from kaempferol (single 2H-equivalent H-2'/H-6' pair at ~8.04/~130.4 and H-3'/H-5' at ~6.92/~115.1). (3) Caution: absence of H-3 in a curated table is weak evidence \u2014 overlapping or weak peaks must be considered; reviewer decides whether absence alone can decide or the case must be marked ambiguous.",
+   "status": "awaiting expert review"
+  },
+  "designed_ablation": "B-ring peaks removed by design; A-ring peaks identical across all three candidates",
+  "expected_behaviour": "abstain; name the missing decisive evidence (B-ring 1H-13C pattern and/or H-3 presence)",
+  "true_compound": "kaempferol"
+ }
+]

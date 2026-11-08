@@ -1,0 +1,53 @@
+{
+ "acquisition": {
+  "field_strength_MHz": null,
+  "modality": "HSQC (1H-detected 1H-13C single-bond correlations)",
+  "note": "peak list is unassigned; coordinates rounded to 2 dp",
+  "solvent": "DMSO-d6"
+ },
+ "case_id": "C002",
+ "evidence": {
+  "HSQC": [
+   {
+    "dC": 98.5,
+    "dH": 6.19,
+    "evidence_id": "E006"
+   },
+   {
+    "dC": 93.6,
+    "dH": 6.43,
+    "evidence_id": "E007"
+   },
+   {
+    "dC": 130.4,
+    "dH": 8.04,
+    "evidence_id": "E008"
+   },
+   {
+    "dC": 115.1,
+    "dH": 6.92,
+    "evidence_id": "E009"
+   }
+  ]
+ },
+ "task": {
+  "candidates": [
+   {
+    "formula": "C15H10O6",
+    "label": "cand-a",
+    "smiles": "O=c1cc(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12"
+   },
+   {
+    "formula": "C15H10O7",
+    "label": "cand-b",
+    "smiles": "O=c1c(O)c(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12"
+   },
+   {
+    "formula": "C15H10O6",
+    "label": "cand-c",
+    "smiles": "O=c1c(O)c(-c2ccc(O)cc2)oc2cc(O)cc(O)c12"
+   }
+  ],
+  "type": "candidate_ranking"
+ }
+}
