@@ -101,6 +101,15 @@ def source_revision():
         require(re.fullmatch(r"[0-9a-f]{40}", git) is not None, "invalid git HEAD revision")
         require(supplied is None or supplied == git, "source revision disagrees with git HEAD")
         return git
+    # Source archives carry the exact revision in a sidecar file.
+    sidecar = ROOT / ".source-revision"
+    if sidecar.is_file():
+        recorded = sidecar.read_text().strip().lower()
+        require(re.fullmatch(r"[0-9a-f]{40}", recorded) is not None,
+                ".source-revision must contain a full 40-hex source revision")
+        require(supplied is None or supplied == recorded,
+                "source revision disagrees with archive .source-revision")
+        return recorded
     require(supplied is not None, "source archive requires PHYTO_SOURCE_REVISION")
     return supplied
 

@@ -343,8 +343,18 @@ def test_archive_revision_provenance(tmp_path, monkeypatch):
         h.source_revision()
     monkeypatch.setenv("PHYTO_SOURCE_REVISION", "A" * 40)
     assert h.source_revision() == "a" * 40
-    monkeypatch.setattr(h, "ROOT", ROOT)
+    sidecar = tmp_path / ".source-revision"
+    sidecar.write_text("B" * 40)
     monkeypatch.delenv("PHYTO_SOURCE_REVISION")
+    assert h.source_revision() == "b" * 40
+    monkeypatch.setenv("PHYTO_SOURCE_REVISION", "C" * 40)
+    with pytest.raises(ValueError, match="disagrees"):
+        h.source_revision()
+    sidecar.write_text("not-a-revision")
+    monkeypatch.delenv("PHYTO_SOURCE_REVISION")
+    with pytest.raises(ValueError, match="40-hex"):
+        h.source_revision()
+    monkeypatch.setattr(h, "ROOT", ROOT)
     real = h.source_revision()
     monkeypatch.setenv("PHYTO_SOURCE_REVISION", real)
     assert h.source_revision() == real
