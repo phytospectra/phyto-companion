@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -89,8 +91,23 @@ def run() -> dict:
                 rows.append({"case_id": case_id, "status": "error",
                              "input_sha256": digest(inputs), "contract_pass": False,
                              "error_type": type(exc).__name__})
-    revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT,
-                              capture_output=True, text=True, check=True).stdout.strip()
+    supplied = os.environ.get("PHYTO_SOURCE_REVISION", "").lower()
+    if supplied and not re.fullmatch(r"[0-9a-f]{40}", supplied):
+        raise ValueError("PHYTO_SOURCE_REVISION must be a full 40-character commit SHA")
+    detected = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT,
+                              capture_output=True, text=True)
+    revision = detected.stdout.strip() if detected.returncode == 0 else supplied
+    # Source archives created by the reproducibility procedure carry the
+    # exact revision in a sidecar file instead of a Git object store.
+    sidecar = ROOT / ".source-revision"
+    if not revision and sidecar.is_file():
+        revision = sidecar.read_text().strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{40}", revision):
+            raise ValueError(".source-revision must contain a full 40-character commit SHA")
+    if not revision:
+        raise ValueError("Source archives require explicit PHYTO_SOURCE_REVISION provenance")
+    if supplied and supplied != revision:
+        raise ValueError("PHYTO_SOURCE_REVISION does not match checkout HEAD")
     return {"evidence_class": "SYNTHETIC SOFTWARE CONTRACT ONLY",
             "code_revision": revision,
             "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),

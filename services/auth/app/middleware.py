@@ -31,6 +31,7 @@ Errors are returned as ``JSONResponse`` rather than raised as
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 import uuid
@@ -128,6 +129,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return user
         request.state.user = user
         request.state.reservation_id = None
+        request.state.idempotency_reservation_id = None
         request.state.workspace_id = None
 
         entitlement_status = None
@@ -170,13 +172,35 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     },
                 )
 
-            reservation = self._reserve_tokens(
-                user_uid=user.uid,
-                idempotency_key=idempotency_key,
-                operation=operation,
-                tokens=price.tokens,
-            )
+            # Claim the client key atomically in the shared ledger before budget
+            # selection. This prevents concurrent retries, including retries that
+            # would otherwise switch between a workspace and personal balance.
+            digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
+            claim = self._tokens.reserve(ReservationRequest(
+                user_id=user.uid, idempotency_key=f"claim:{digest}",
+                operation=operation, tokens=0,
+            ))
+            if claim.status == "already_exists":
+                return JSONResponse(
+                    status_code=status.HTTP_409_CONFLICT,
+                    content={"detail": "Idempotency-Key already used; response replay is unavailable."},
+                )
+            if claim.status != "reserved":
+                return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                                    content={"detail": "Unable to claim Idempotency-Key."})
+            request.state.idempotency_reservation_id = claim.reservation_id
+            try:
+                reservation = self._reserve_tokens(
+                    user_uid=user.uid,
+                    idempotency_key=f"charge:{digest}",
+                    operation=operation,
+                    tokens=price.tokens,
+                )
+            except Exception:
+                self._tokens.refund(claim.reservation_id, "reservation_error")
+                raise
             if isinstance(reservation, JSONResponse):
+                self._tokens.refund(claim.reservation_id, "reservation_refused")
                 return reservation
             reservation_id, reserved, workspace_id = reservation
             request.state.reservation_id = reservation_id
