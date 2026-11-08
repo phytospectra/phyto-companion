@@ -235,6 +235,16 @@ class TestExecutionConfiguration:
         self, registry, synthetic_libraries, environment, dry_run,
     ):
         structures, references = synthetic_libraries
+        if environment == "cloud" and dry_run == "1":
+            # Offline mock authentication must never front real science on a
+            # cloud deployment (mock tokens would reach real execution).
+            with pytest.raises(InvalidInputError, match="PHYTO_DRY_RUN=1"):
+                ScientificExecutionConfig.from_env({
+                    "PHYTO_ENV": environment, "PHYTO_SCIENTIFIC_EXECUTION": "real",
+                    "PHYTO_DRY_RUN": dry_run, "PHYTO_STRUCTURE_DB_PATH": str(structures),
+                    "PHYTO_HSQC_REFERENCE_LIBRARY": str(references),
+                })
+            return
         cfg = ScientificExecutionConfig.from_env({
             "PHYTO_ENV": environment, "PHYTO_SCIENTIFIC_EXECUTION": "real",
             "PHYTO_DRY_RUN": dry_run, "PHYTO_STRUCTURE_DB_PATH": str(structures),
@@ -306,6 +316,127 @@ class TestLocalProviders:
         assert output.provenance["candidate_count"] == 0
         assert output.provenance["incomplete"] is True
         assert any("not an identification verdict" in text for text in output.limitations)
+        assessment = output.evidence_assessment
+        assert assessment["disposition"] == "no_hits"
+        assert assessment["top_hit"] is None and assessment["near_tie"] is False
+        assert "not a negative identification" in " ".join(assessment["reasons"])
+
+    class TestEvidenceAssessment:
+        """Engineering-default ranking-support signals; never identifications."""
+
+        def test_rules_are_surfaced_in_provenance_and_labelled(self, real):
+            output = real.execute(TOOL, _parameters())
+            rules = output.provenance["assessment_rules"]
+            assert rules["near_tie_score_gap"] > 0
+            assert rules["min_query_coverage"] > 0
+            assert rules["min_distinct_query_peaks"] > 0
+            assert "not scientifically evaluated" in rules["rule_source"]
+            assert rules["rule_source"] == output.evidence_assessment["rule_source"]
+
+        def test_few_distinct_peaks_is_insufficient_evidence(self, real):
+            # Both fixture peaks match the top reference exactly, but two
+            # distinct cross-peaks cannot support ranking.
+            output = real.execute(TOOL, _parameters())
+            assessment = output.evidence_assessment
+            assert assessment["disposition"] == "insufficient_evidence"
+            assert assessment["distinct_query_peaks"] == 2
+            assert assessment["near_tie"] is False
+            assert any("transparency only" in text for text in assessment["reasons"])
+
+        def test_low_query_coverage_is_insufficient_evidence(self, real):
+            # Four extra unmatched query peaks drag coverage to 2/6 < 50%.
+            peaks = [_peak(1.2, 18.0), _peak(3.6, 58.0)] + [
+                _peak(5.0 + 0.1 * i, 120.0 + i) for i in range(4)
+            ]
+            output = real.execute(TOOL, _parameters(peaks=peaks))
+            assessment = output.evidence_assessment
+            assert assessment["disposition"] == "insufficient_evidence"
+            top = assessment["top_hit"]
+            assert top["matched_peak_count"] == 2 and top["query_coverage"] == pytest.approx(1 / 3)
+
+        def test_near_tie_between_candidates_is_ambiguous(self, registry, tmp_path):
+            # Two formula-compatible candidates whose references sit at the
+            # same distance from the query: no ranking can separate them.
+            rows = [
+                {"name": "Ethyl Alcohol", "smiles": "CCO", "provenance": "synthetic",
+                 "source": "SYNTHETIC algorithm-test structure; not validation"},
+                {"name": "Dimethyl Ether", "smiles": "COC", "provenance": "synthetic",
+                 "source": "SYNTHETIC algorithm-test isomer; not validation"},
+            ]
+            identities = {row["name"].lower().replace(" ", "-"): _inchikey(row["smiles"]) for row in rows}
+            shared = [(1.5, 30.0), (2.5, 40.0), (3.5, 50.0)]
+            references = [
+                {"reference_id": f"synthetic-{name}", "candidate_id": cid,
+                 "inchikey": identities[cid],
+                 "source": "SYNTHETIC invented HSQC shifts; not measured",
+                 "solvent": "SYNTHETIC/no measured solvent",
+                 "license": "Test-generated numeric data only",
+                 "provenance": "experimental", "peaks": [{"h_ppm": h, "c_ppm": c} for h, c in shared]}
+                for name, cid in (("alcohol", "ethyl-alcohol"), ("ether", "dimethyl-ether"))
+            ]
+            structures, reference_path = _write_libraries(tmp_path, rows, references)
+            executor = RealToolExecutor(registry, structures, reference_path)
+            output = executor.execute(TOOL, _parameters(
+                formula="C2H6O",
+                peaks=[_peak(h, c) for h, c in reversed(shared)],
+            ))
+            assessment = output.evidence_assessment
+            assert assessment["disposition"] == "ambiguous"
+            assert assessment["near_tie"] is True and assessment["score_gap"] == pytest.approx(0)
+            assert assessment["top_hit"]["candidate_id"] != assessment["runner_up_hit"]["candidate_id"]
+            assert any("does not support a unique preference" in text for text in assessment["reasons"])
+
+        def test_separated_rich_query_is_ranked_not_identification(self, registry, tmp_path):
+            rows = [
+                {"name": "Ethyl Alcohol", "smiles": "CCO", "provenance": "synthetic",
+                 "source": "SYNTHETIC algorithm-test structure; not validation"},
+                {"name": "Dimethyl Ether", "smiles": "COC", "provenance": "synthetic",
+                 "source": "SYNTHETIC algorithm-test isomer; not validation"},
+            ]
+            identities = {row["name"].lower().replace(" ", "-"): _inchikey(row["smiles"]) for row in rows}
+            references = [
+                {"reference_id": "synthetic-alcohol", "candidate_id": "ethyl-alcohol",
+                 "inchikey": identities["ethyl-alcohol"],
+                 "source": "SYNTHETIC invented HSQC shifts; not measured",
+                 "solvent": "SYNTHETIC/no measured solvent",
+                 "license": "Test-generated numeric data only",
+                 "provenance": "experimental",
+                 "peaks": [{"h_ppm": h, "c_ppm": c} for h, c in
+                           [(1.5, 30.0), (2.5, 40.0), (3.5, 50.0)]]},
+                {"reference_id": "synthetic-ether", "candidate_id": "dimethyl-ether",
+                 "inchikey": identities["dimethyl-ether"],
+                 "source": "SYNTHETIC invented HSQC shifts; not measured",
+                 "solvent": "SYNTHETIC/no measured solvent",
+                 "license": "Test-generated numeric data only",
+                 "provenance": "experimental",
+                 "peaks": [{"h_ppm": h, "c_ppm": c} for h, c in
+                           [(2.9, 45.0), (3.0, 46.0), (3.1, 47.0)]]},
+            ]
+            structures, reference_path = _write_libraries(tmp_path, rows, references)
+            executor = RealToolExecutor(registry, structures, reference_path)
+            output = executor.execute(TOOL, _parameters(
+                formula="C2H6O",
+                peaks=[_peak(1.5, 30.0), _peak(2.5, 40.0), _peak(3.5, 50.0)],
+            ))
+            assessment = output.evidence_assessment
+            assert assessment["disposition"] == "ranked"
+            assert assessment["top_hit"]["candidate_id"] == "ethyl-alcohol"
+            assert assessment["runner_up_hit"]["candidate_id"] == "dimethyl-ether"
+            assert assessment["score_gap"] == pytest.approx(4.0)
+            assert assessment["near_tie"] is False
+            assert assessment["solvent_compatibility_checked"] is False
+            assert any("not an identification" in text for text in assessment["reasons"])
+
+        def test_all_candidates_without_references_reports_no_hits(self, registry, synthetic_libraries):
+            structures, references = synthetic_libraries
+            references.write_text("[]")
+            executor = RealToolExecutor(registry, structures, references)
+            output = executor.execute(TOOL, _parameters())
+            assert output.hits == []
+            assessment = output.evidence_assessment
+            assert assessment["disposition"] == "no_hits"
+            assert any("no measured reference" in text for text in assessment["reasons"])
+
 
     def test_missing_reference_is_unknown_not_a_fabricated_hit(self, registry, synthetic_libraries):
         structures, references = synthetic_libraries

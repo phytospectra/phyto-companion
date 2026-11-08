@@ -41,6 +41,16 @@ class ScientificExecutionConfig:
                 "a real cloud environment cannot silently select it",
                 context={"variable": SCIENTIFIC_MODE_VARIABLE},
             )
+        if mode == "real" and environment == "cloud" and env.get("PHYTO_DRY_RUN") == "1":
+            # Offline mock authentication accepts mock:<uid> tokens; it must
+            # never front real scientific execution on a cloud deployment.
+            # Local real + PHYTO_DRY_RUN=1 stays usable for offline tests.
+            raise InvalidInputError(
+                "Real cloud scientific execution cannot be combined with "
+                "offline mock authentication (PHYTO_DRY_RUN=1); use real "
+                "token verification",
+                context={"variable": SCIENTIFIC_MODE_VARIABLE},
+            )
         if mode == "mock":
             return cls(mode=mode, environment=environment)
         paths: dict[str, Path] = {}

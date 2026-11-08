@@ -2,6 +2,20 @@
 
 Reporting template per the enterprise handoff brief. One row per milestone.
 
+## Milestone: Execution-boundary hardening — assessment signals + cloud real/mock-auth rejection (2026-11-09)
+
+- **Milestone/status**: complete locally; full suite 1,744 passed / 4 skipped, CI-scope Ruff clean.
+- **Base SHA**: `d3dffc1` (branch `agent/phase0a-phase1a-failclosed-runtime`).
+- **Implemented behavior**:
+  - `ScientificExecutionConfig` now **rejects `PHYTO_ENV=cloud` + real science + `PHYTO_DRY_RUN=1`**: offline mock authentication (which accepts `mock:<uid>` tokens) must never front real scientific execution on a cloud deployment. Local real + dry-run remains usable for offline contract tests. This makes the previously documented intent (see the 2026-11-08 milestone text) true in code.
+  - `RealToolExecutor` output gained a typed **`evidence_assessment`** block (public schema field added to `ReferenceHSQCOutput`): disposition `no_hits` / `insufficient_evidence` / `ambiguous` / `ranked` with concrete reasons, top/runner-up hit facts (distance, coverage both directions, matched/unmatched counts), near-tie flag and score gap. Rules are engineering defaults (near-tie gap 0.25 distance units, minimum 50% query coverage, minimum 3 distinct observed cross-peaks), surfaced in `provenance.assessment_rules` and explicitly labelled "not scientifically evaluated decision rules"; every disposition states it is not an identification. Solvent compatibility is reported unchecked (`solvent_compatibility_checked: false`) with each hit carrying the reference's declared solvent.
+  - Docs corrected to match verified behavior: real-mode checkpoint approval returns HTTP 200 with `citation: null` (the earlier "503 on approval" description was stale); `ORCHESTRATOR_EXECUTION.md` configuration matrix and output-schema sections updated; dated correction note added to `RELEASE-AUTH-READINESS-2026-11-08.md` §10.
+  - New `WORKFLOW_CAPABILITY_MATRIX.md`: per-workflow REAL / MOCK-ONLY / UNSUPPORTED status, required real dependencies, mock components, enforcement points, claim rules, and the separately routed real capabilities (MZmine M1-a/M1-b, MS/MS assessments, elucidation retrieval).
+- **Evidence**: `tests/test_real_orchestrator.py` 100 passed (6 new: assessment rules surfaced; insufficient-evidence on few-distinct-peaks and on low coverage; ambiguous near-tie between two candidates; separated ranked case; no-hits with all references missing; cloud real+dry-run rejection folded into the config-matrix test). Full suite `1744 passed, 4 skipped, 14 warnings in 95.12s`; `ruff check shared services scripts tests` clean.
+- **Scientific validation**: NONE claimed — assessment dispositions are engineering transparency signals, not validated decision rules; no accuracy numbers exist.
+- **Security/deployment impact**: positive — closes the cloud real+mock-auth combination; no other auth behavior touched; no deployment performed.
+- **Remaining blockers**: unchanged — public measured reference library curation (data rights), scientific evaluation, staging verification, author confirmations, release approval.
+
 ## Milestone: Real scientific execution boundary — reference HSQC workflow (2026-11-08)
 
 - **Milestone/status**: complete locally; full suite + new acceptance tests green; pending push.

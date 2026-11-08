@@ -53,7 +53,14 @@ except ModuleNotFoundError as exc:
 if TYPE_CHECKING:
     from .tool_registry import ToolRegistry
 
-__all__ = ["ReferenceHSQCInput", "ReferenceHSQCOutput", "RealToolExecutor"]
+__all__ = [
+    "ReferenceHSQCInput",
+    "ReferenceHSQCOutput",
+    "ReferenceHSQCHit",
+    "AssessmentHit",
+    "EvidenceAssessment",
+    "RealToolExecutor",
+]
 
 _MAX_FILE_BYTES = 8 * 1024 * 1024
 _MAX_STRUCTURES = 1000
@@ -61,6 +68,19 @@ _MAX_REFERENCES = 256
 _MAX_PEAKS = 256
 _MAX_REFERENCE_PEAKS = 8192
 _FORMULA_TOKEN = re.compile(r"([A-Z][a-z]?)([0-9]*)")
+
+# Ranking-support assessment rules. These are ENGINEERING DEFAULTS chosen to
+# make weak or ambiguous evidence explicit for the reviewing human. They are
+# NOT scientifically evaluated decision rules, no identification follows from
+# any disposition, and their values are surfaced in every output's
+# provenance so a reviewer can see exactly which rule fired.
+_ASSESSMENT_RULE_SOURCE = (
+    "engineering defaults; not scientifically evaluated decision rules; "
+    "human review remains mandatory and no disposition is an identification"
+)
+_NEAR_TIE_SCORE_GAP = 0.25  # distance units on the matcher's 0..cap scale
+_MIN_QUERY_COVERAGE = 0.5  # fraction of observed query peaks the top hit matches
+_MIN_DISTINCT_QUERY_PEAKS = 3  # distinct observed cross-peaks needed to rank
 
 
 class _Contract(BaseModel):
@@ -146,6 +166,40 @@ class ReferenceHSQCHit(_Contract):
     matcher_result: MatchResult
 
 
+class AssessmentHit(_Contract):
+    """Per-hit ranking-support facts used by the assessment, precomputed so
+    reviewers do not have to rederive them from matcher indices."""
+
+    candidate_id: str
+    reference_id: str
+    distance: float
+    matched_peak_count: int
+    unmatched_query_count: int
+    unmatched_reference_count: int
+    query_coverage: float
+    reference_coverage: float
+
+
+class EvidenceAssessment(_Contract):
+    """Transparent abstention/ambiguity signals for the ranked output.
+
+    ``disposition`` describes how much the evidence supports the RANKING,
+    never an identification: "ranked" only means the top hit is separated
+    from the runner-up under the documented engineering rules.
+    """
+
+    disposition: Literal["no_hits", "insufficient_evidence", "ambiguous", "ranked"]
+    reasons: list[str]
+    rule_source: str
+    query_peak_count: int
+    distinct_query_peaks: int
+    near_tie: bool
+    score_gap: float | None
+    top_hit: AssessmentHit | None
+    runner_up_hit: AssessmentHit | None
+    solvent_compatibility_checked: Literal[False]
+
+
 class ReferenceHSQCOutput(_Contract):
     """Typed internal contract, serialized through the registry's public schema."""
 
@@ -154,6 +208,7 @@ class ReferenceHSQCOutput(_Contract):
     formula: str
     unavailable_references: list[str] = Field(default_factory=list)
     limitations: list[str]
+    evidence_assessment: EvidenceAssessment
     provenance: dict[str, Any]
 
 
@@ -206,6 +261,126 @@ def _versions() -> dict[str, str]:
             else:
                 result[package] = "unavailable"
     return result
+
+
+def _assessment_hit(hit: ReferenceHSQCHit, query_peak_count: int) -> AssessmentHit:
+    matcher = hit.matcher_result
+    matched = sum(1 for assignment in matcher.assignments if assignment.cost < 4.0)
+    return AssessmentHit(
+        candidate_id=hit.candidate.id,
+        reference_id=hit.reference_id,
+        distance=matcher.score,
+        matched_peak_count=matched,
+        unmatched_query_count=query_peak_count - matched,
+        unmatched_reference_count=matcher.n_predicted - matched,
+        query_coverage=round(matched / query_peak_count, 6) if query_peak_count else 0.0,
+        reference_coverage=round(matched / matcher.n_predicted, 6) if matcher.n_predicted else 0.0,
+    )
+
+
+def _assess(
+    hits: list[ReferenceHSQCHit],
+    query_peaks: list[tuple[float, float]],
+    candidate_count: int,
+    unavailable_count: int,
+) -> EvidenceAssessment:
+    """Apply the documented engineering rules to the ranked hits.
+
+    Precedence: no hits -> insufficient evidence -> ambiguity -> ranked.
+    Every branch names its numbers so the reviewer sees exactly why the
+    disposition fired. Nothing here is an identification or a confidence.
+    """
+    query_peak_count = len(query_peaks)
+    distinct = len(set(query_peaks))
+    top = _assessment_hit(hits[0], query_peak_count) if hits else None
+    runner_up = next(
+        (
+            _assessment_hit(hit, query_peak_count)
+            for hit in hits[1:]
+            if hit.candidate.id != hits[0].candidate.id
+        ),
+        None,
+    )
+    score_gap = (
+        round(runner_up.distance - top.distance, 6)
+        if top is not None and runner_up is not None
+        else None
+    )
+    near_tie = score_gap is not None and score_gap < _NEAR_TIE_SCORE_GAP
+    reasons: list[str] = []
+    if not hits:
+        disposition: Literal["no_hits", "insufficient_evidence", "ambiguous", "ranked"] = "no_hits"
+        if candidate_count == 0:
+            reasons.append(
+                "no formula-compatible candidates exist in the configured "
+                "structure library"
+            )
+        else:
+            reasons.append(
+                "no ranked reference hits; "
+                f"{candidate_count} formula-compatible candidate(s) found and "
+                f"{unavailable_count} of them have no measured reference"
+            )
+        reasons.append("absence of hits is incomplete evidence, not a negative identification")
+    else:
+        assert top is not None
+        if distinct < _MIN_DISTINCT_QUERY_PEAKS or top.query_coverage < _MIN_QUERY_COVERAGE:
+            disposition = "insufficient_evidence"
+            reasons.append(
+                f"only {distinct} distinct observed cross-peak(s) (rule minimum "
+                f"{_MIN_DISTINCT_QUERY_PEAKS})"
+            )
+            reasons.append(
+                f"top hit matches {top.matched_peak_count}/{query_peak_count} "
+                f"observed peaks (coverage {top.query_coverage:.0%}, rule "
+                f"minimum {int(_MIN_QUERY_COVERAGE * 100)}%)"
+            )
+            reasons.append(
+                "ranking is returned for transparency only; the evidence does "
+                "not support distinguishing the candidates"
+            )
+        elif runner_up is not None and near_tie:
+            disposition = "ambiguous"
+            reasons.append(
+                f"top candidate '{top.candidate_id}' and runner-up "
+                f"'{runner_up.candidate_id}' are separated by only "
+                f"{score_gap} distance units (rule near-tie gap "
+                f"{_NEAR_TIE_SCORE_GAP})"
+            )
+            reasons.append(
+                "the ranking does not support a unique preference between "
+                "these structures; both (and any unlisted stereoisomers) "
+                "require human review"
+            )
+        else:
+            disposition = "ranked"
+            reasons.append(
+                f"top hit '{top.candidate_id}' ({top.reference_id}) at distance "
+                f"{top.distance} with query coverage {top.query_coverage:.0%}"
+            )
+            if runner_up is None:
+                reasons.append("no other candidate has a measured reference")
+            else:
+                reasons.append(
+                    f"runner-up '{runner_up.candidate_id}' at distance "
+                    f"{runner_up.distance} (gap {score_gap})"
+                )
+            reasons.append(
+                "a separated ranking is not an identification; every hit "
+                "still requires human review"
+            )
+    return EvidenceAssessment(
+        disposition=disposition,
+        reasons=reasons,
+        rule_source=_ASSESSMENT_RULE_SOURCE,
+        query_peak_count=query_peak_count,
+        distinct_query_peaks=distinct,
+        near_tie=near_tie,
+        score_gap=score_gap,
+        top_hit=top,
+        runner_up_hit=runner_up,
+        solvent_compatibility_checked=False,
+    )
 
 
 class RealToolExecutor:
@@ -298,6 +473,12 @@ class RealToolExecutor:
                 "scientific_validation": "not_validated",
                 "human_review_required": True,
                 "reference_provenance": "curator_asserted_experimental",
+                "assessment_rules": {
+                    "near_tie_score_gap": _NEAR_TIE_SCORE_GAP,
+                    "min_query_coverage": _MIN_QUERY_COVERAGE,
+                    "min_distinct_query_peaks": _MIN_DISTINCT_QUERY_PEAKS,
+                    "rule_source": _ASSESSMENT_RULE_SOURCE,
+                },
             }
         except Exception:
             raise InvalidInputError("Invalid local reference-HSQC configuration") from None
@@ -388,6 +569,7 @@ class RealToolExecutor:
             "Solvent, temperature, pH, field strength, stereochemistry and mixtures are not corrected or resolved.",
             "Intensity, multiplicity and solvent flags are not used; all supplied HSQC coordinates are matched.",
             "Inherited matcher uses rectangular assignments: excess peaks are not explicitly penalized; inspect counts and unmatched indices.",
+            "evidence_assessment dispositions use engineering defaults, not scientifically evaluated rules; they never constitute an identification.",
         ]
         output = ReferenceHSQCOutput(
             hits=hits[: query.max_results],
@@ -395,6 +577,12 @@ class RealToolExecutor:
             formula=query.formula,
             unavailable_references=unavailable,
             limitations=limitations,
+            evidence_assessment=_assess(
+                hits[: query.max_results],
+                observed,
+                len(candidates),
+                len(unavailable),
+            ),
             provenance=provenance,
         )
         return spec.output_schema.model_validate(output.model_dump())

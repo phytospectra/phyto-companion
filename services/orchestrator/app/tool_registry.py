@@ -174,6 +174,14 @@ class ReferenceHSQCOutput(_Contract):
     formula: str
     unavailable_references: list[str] = Field(default_factory=list)
     limitations: list[str]
+    evidence_assessment: dict[str, Any] = Field(
+        ...,
+        description=(
+            "Transparent ranking-support signals (disposition no_hits / "
+            "insufficient_evidence / ambiguous / ranked) computed from "
+            "documented engineering defaults; never an identification"
+        ),
+    )
     provenance: dict[str, Any]
 
 
