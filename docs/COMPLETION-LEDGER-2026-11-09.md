@@ -63,3 +63,116 @@ Author-only: confirm author order/names, corresponding contact and affiliations/
 Technical gates: rights-cleared measured reference and independent-query acquisition; expert adjudication; reachable approved inference provider if comparison is pursued; frontend live API integration and runnable test/build environment; clean dependency installation and complete offline quickstart; controlled authenticated staging/rollback verification; reconcile three pre-existing freeze discrepancies and restore raw files before claiming fresh replay; public artifact and binary/history rights review.
 
 Deliverables are reviewable source and Markdown evidence, not a release, deployment, DOI, fine-tune, validated identification system or submission-ready manuscript. No PR merge or external publication action was performed.
+
+## Final certification (root record; no source change after tested HEAD)
+
+Backend final clean/pushed HEAD: `148599284adc04786ae56e21cb52c0327c4639a6`.
+Final CI https://github.com/phytospectra/phyto-companion/actions/runs/42508943153
+**success: 1,770 passed, four skipped, 14 warnings in 146.31 s; Ruff passed**.
+CI on fa3629b found one checkpoint test bypassing identity after the owner guard;
+fixed by retaining owner authentication while isolating only the test pricing
+gate. Focused rerun: 104 passed. This failure is not concealed.
+Frontend final clean HEAD `9632bb151316417822040d86019c9053899826b5`, verified
+on GitHub feature branch. Frontend tests/build remain unverified; no CI configured.
+No release tag, PR merge, deployment, DOI, model inference/training or paid call.
+
+The source-controlled ledger at fa3629b predates this last test correction and
+CI settlement; this root record and final response pin the actual final revision.
+All requested source work is delivered or explicitly blocked. Scientific-library
+completion, measured validation, frontend verification and full offline reproduction
+are NOT marked complete. Publication/submission/production decision: NO-GO.
+
+## Continuation requested after final certification
+
+Baseline reverified: backend 148599284adc04786ae56e21cb52c0327c4639a6 and frontend
+9632bb151316417822040d86019c9053899826b5 initially clean; CI 42508943153 verified
+success directly. No AGENTS.md found in workspace or checked ancestors.
+
+Active independent work: frontend timeout diagnosis/tests/build; isolated offline
+reproduction diagnosis; authoritative quercetin/rights investigation and import
+metadata; paired A/B scientific protocol/harness; operational middleware integration;
+study numerical reconciliation and new review exports. Parent owns top-level claims,
+release packet, final integration, commits and CI. No scientific result or clearance
+is presumed from the handoff. Final statuses above are historical until this
+continuation's final certification is recorded. Active subprocesses are owned by
+the relevant workstream and will be bounded and recorded.
+
+### Share-revocation authorization correction
+
+Confirmed DELETE /runs/{run_id}/share omitted ownership even though creation
+was protected. Fixed with shared _owned_run before registry or token mutation.
+Cross-user/anonymous denial and successful owner revocation covered. Focused:
+85 passed; Ruff passed. Committed/pushed f9d4ed4c275c2a382d4ea39db730efe6a07490b9.
+CI https://github.com/phytospectra/phyto-companion/actions/runs/42512862375
+success: 1,771 passed, four skipped, 14 warnings in 126.68 seconds.
+README and paired-protocol partial drafts remain uncommitted; reference agent
+is independently tracing/fixing persistent quercetin misidentity mappings.
+Several continuation agents stopped with provider HTTP402 credits errors;
+no purchases/retries implying new cost authorization were made. Their tasks
+are incomplete, not marked complete. Reference investigation continued and
+identified incorrect structure in structure_db/shift_predictor/tool examples;
+corrections require tests and no unsupported assignment transfer.
+
+### Identity cleanup and frontend verification delivered
+
+Backend b3bee2e150b1172e722361c2ac800c0123e8d2f7 corrected quercetin and kaempferol
+structure-only mock identities; removed rather than reassigned their unverifiable
+shift tables. Builder v3 requires acquisition/conditions/measurement/assignment/
+rights-scope/original-file-hash/transformation assertions; assertions remain curator
+claims, not independently verified clearance. No eligible measured reference/query
+pair established. CI 42513601847 success: 1,783 passed, four skipped, 14 warnings.
+
+Frontend source 9632bb1 reverified in fresh tracked-source temporary checkout,
+public network npm ci --ignore-scripts, then typecheck exit0; Vitest seven files,
+28 tests in2.70s; production build exit0 (13 static pages). Installed dependency
+files in Documents had dataless flags and idle reader; fresh dependency checkout
+resolved stalls. Verification document committed/pushed e8bdbe6. No code upgrade,
+assertion weakening or timeout increase. No live Firebase/billing/staging claim.
+
+Backend docs revision 1583c6d clarifies README preview boundaries and preserves
+paired protocol explicitly as INCOMPLETE REVIEW DRAFT, not locked or executed.
+Full backend isolated reproduction, paired harness implementation, independent
+measured evaluation, staging integration, manuscript export and author approval
+remain outstanding. No paid inference/training/deployment/publication occurred.
+
+## Final continuation certification — 2026-11-09 (second pass)
+
+Implemented and verified this pass:
+- Exactly-once idempotency claims in the auth middleware (shared ledger claim
+  before budget selection; duplicates 409 without handler rerun; cross-UID/
+  operation scoping; covered by tests/test_operational_integration.py).
+- Operational offline acceptance with real middleware + mock verifier (tokens,
+  CORS, reservations, ownership boundaries, capability shares).
+- Paired A/B evaluation harness (A production executor vs B nearest-reference
+  baseline), private evaluator keys outside the repo, scorer with compound
+  clusters and failure accounting, archive revision provenance (.source-revision
+  or PHYTO_SOURCE_REVISION). Protocol remains an INCOMPLETE REVIEW DRAFT, not
+  locked; only synthetic software contracts run (no measured cases cleared).
+- scripts/verify_offline.py: offline real-workflow quickstart verifier.
+- Clean-install isolated reproduction at the pinned revision outside the
+  cloud-managed tree: lint exit 0; full suite 1,843 passed, four skipped,
+  14 warnings in 104.03 s; quickstart and 6/6 synthetic contracts exit 0.
+- Manuscript: independent-evaluation status paragraph added; review DOCX export
+  generated and read back (166 paragraphs, NOT AUTHOR APPROVED banner);
+  author-declaration placeholders remain explicitly pending.
+- Staging acceptance procedure with exact live prerequisites committed
+  (docs/STAGING-ACCEPTANCE-2026-11-09.md); no live staging attempted.
+
+Backend revisions this pass: f9d4ed4 (share-revocation ownership),
+b3bee2e (identity/provenance), 1583c6d (scope docs), a64d9c0 (idempotency +
+paired harness + quickstart), 7e36f13 (archive sidecar), plus documentation
+commits. Final CI links and test totals for the last pushed revision are the
+authoritative record; local suites match CI totals at each pinned revision.
+
+Remaining external inputs (exact): (1) author-confirmed names/order/
+affiliations/ORCIDs, contributions, funding/conflicts/ethics, data publication
+permissions and final approval; (2) a rights-cleared measured reference and
+independently acquired query set with source evidence, or confirmation of a
+dataset-specific license; (3) an isolated non-production Firebase project,
+two disposable test identities and approved staging URL/origins for live
+acceptance; (4) explicit authorization before any merge to main, release/DOI,
+deployment, paid inference or training. None occurred.
+
+Readiness split remains: source-code research preview GO-with-caveats;
+scientifically evaluated workflow NO-GO; production service NO-GO;
+manuscript submission NO-GO.
