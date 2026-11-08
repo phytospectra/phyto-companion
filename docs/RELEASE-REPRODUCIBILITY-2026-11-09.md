@@ -105,3 +105,32 @@ Publication gates found:
 5. Five text files matched local-user path patterns (some placeholders/redactions); eight matched email-like metadata (largely citation/research/test material). This does not establish credential exposure, but metadata/minimization review is needed, including `data/inventory/dataset_inventory.json`, operational logs/batches under validated runs and copied `data/osf_package` metadata. No addresses/personal values are printed here. Root citation is parent-owned; archive citation metadata needs separate consistency review.
 
 No deletion, history rewrite, rotation or public-private switch was attempted. An Apache software license or data CC0 notice does not blanket-relicense third-party inputs. Final release requires reviewed public artifact boundaries, license-cleared evidence and a fresh audit of the selected final revision.
+
+## Clean-install isolated reproduction — final revision evidence (2026-11-09)
+
+Exact archive at backend `a64d9c0472d267edf1f8c4cf558f0209e90f52eb` plus the
+committed `7e36f13` sidecar-support pair (harness/test identical bytes),
+fetched from GitHub into a temporary directory outside the cloud-managed
+Documents tree (macOS `dataless` hydration had caused earlier stalls).
+
+- Environment setup (network-enabled): `make install` via uv on CPython
+  3.12.15; 48 resolved packages installed. Not air-gapped.
+- Offline execution after setup, with minimal environment, no ambient
+  credentials and explicit mode settings:
+  - `make stage-auth`, `make lint` (includes benchmark) — exit 0.
+  - `make test` — **1,843 passed, four skipped, 14 warnings in 104.03 s**, exit 0.
+  - `scripts/verify_offline.py` (real mode) — health, fail-closed config
+    contracts, synthetic real workflow, 422 unsupported workflow, checkpoint
+    completion — exit 0.
+  - `benchmark/reference_hsqc_acceptance/run_evaluation.py` — 6/6 synthetic
+    contracts, measured validation count 0.
+  - Full suite run at 251.08 s on the cold snapshot and 104.03 s after
+    hydration; both passes recorded. The earlier 600-second timeout was the
+    cloud-managed tree's `dataless` file reads, not a test defect.
+- Source archives require provenance: `PHYTO_SOURCE_REVISION` (40 hex) or a
+  `.source-revision` sidecar; harness and runner agree.
+
+Final CI on the pushed revision is recorded in the completion ledger; this
+isolated run is local reproduction evidence for the same source, not a
+substitute for GitHub CI. Scientific accuracy remains unvalidated: every
+fixture above is explicitly synthetic.
