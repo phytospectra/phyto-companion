@@ -16,6 +16,14 @@
     "mzml_sha256_as_committed": "45b67fd57332c9bf6080233679e8d743cbaa704dddd91380638a6e2019d5b283",
     "note": "as_committed differs from as_executed only by redaction of the absolute local path in the sourceFile location attribute; spectral content unchanged"
   },
+  "converted_scans": {
+    "total": 5023,
+    "ms1": 768,
+    "ms2": 4255,
+    "acquisition": "data-dependent (DDA)",
+    "verified_by": "re-parsed ms level CV params of the committed converted mzML; matches MZmine log 'parsed 5023 scans'",
+    "ms2_scans_at_thiostrepton_precursor_mz_832_7535": 1
+  },
   "engine": {
     "name": "MZmine",
     "version": "4.11.0",

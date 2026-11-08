@@ -1,0 +1,583 @@
+{
+ "reference": {
+  "database": "MassBank via massbank.jp MassBank3 API (queried 2026-11-02)",
+  "accession": "MSBNK-ACES_SU-AS001032",
+  "title": "Thiostrepton; LC-ESI-QFT; MS2; Ramp 20%-70% (nominal); 30000; [M+2H]2+",
+  "precursor_mz": "832.7526",
+  "precursor_type": "[M+2H]2+",
+  "license": "CC BY",
+  "instrument": "Exploris 480 Orbitrap (Thermo Scientific)",
+  "instrument_type": "LC-ESI-QFT",
+  "fragmentation_mode": "HCD",
+  "collision_energy": "Ramp 20%-70% (nominal)",
+  "n_ref_peaks_total": 76,
+  "n_ref_peaks_used": 76,
+  "ref_filter": "relative intensity >= 1%",
+  "formula": "C72H85N19O18S5"
+ },
+ "measured": {
+  "mzml_file": "data/validated_runs/M1b/converted/20220426_UMETAB266_POS_Thiostreptone.mzML",
+  "scan_id": "controllerType=0 controllerNumber=1 scan=3754",
+  "retention_time_min": 8.498790295733334,
+  "isolation_target_mz": 832.7539672851562,
+  "isolation_offsets": "\u00b10.8 Da",
+  "activation": {
+   "collision energy": 40.0,
+   "beam-type collision-induced dissociation": ""
+  },
+  "tic": 342579.3125,
+  "base_peak_mz": 234.07583618164062,
+  "base_peak_intensity": 39775.3359375,
+  "n_peaks": 54
+ },
+ "matching_rule": {
+  "tolerance_ppm": 10,
+  "method": "one-to-one greedy (reference sorted by rel. intensity descending; each measured peak used once)",
+  "precursor_removal": "none applied (precursor retained as evidence)",
+  "peak_filtering": "reference rel.int. >= 1%; all measured centroid peaks considered"
+ },
+ "results": {
+  "n_matched": 24,
+  "n_ref": 76,
+  "rel_intensity_coverage": 0.5186,
+  "median_abs_error_ppm": 3.24,
+  "max_abs_error_ppm": 7.48,
+  "matched_peaks": [
+   {
+    "ref_mz": 157.13301,
+    "ref_rel_int": 161.0,
+    "meas_mz": 157.13309,
+    "meas_int": 5048.046875,
+    "error_ppm": 0.49
+   },
+   {
+    "ref_mz": 159.02129,
+    "ref_rel_int": 71.0,
+    "meas_mz": 159.02206,
+    "meas_int": 2255.439697265625,
+    "error_ppm": 4.89
+   },
+   {
+    "ref_mz": 167.02757,
+    "ref_rel_int": 78.0,
+    "meas_mz": 167.02733,
+    "meas_int": 3066.973388671875,
+    "error_ppm": -1.46
+   },
+   {
+    "ref_mz": 185.12825,
+    "ref_rel_int": 206.0,
+    "meas_mz": 185.1283,
+    "meas_int": 3586.85107421875,
+    "error_ppm": 0.25
+   },
+   {
+    "ref_mz": 188.0701,
+    "ref_rel_int": 407.0,
+    "meas_mz": 188.07018,
+    "meas_int": 15009.47265625,
+    "error_ppm": 0.41
+   },
+   {
+    "ref_mz": 206.08134,
+    "ref_rel_int": 335.0,
+    "meas_mz": 206.08083,
+    "meas_int": 14391.0634765625,
+    "error_ppm": -2.52
+   },
+   {
+    "ref_mz": 234.07678,
+    "ref_rel_int": 677.0,
+    "meas_mz": 234.07584,
+    "meas_int": 39775.3359375,
+    "error_ppm": -4.04
+   },
+   {
+    "ref_mz": 257.16541,
+    "ref_rel_int": 87.0,
+    "meas_mz": 257.16458,
+    "meas_int": 3330.512939453125,
+    "error_ppm": -3.2
+   },
+   {
+    "ref_mz": 278.00513,
+    "ref_rel_int": 69.0,
+    "meas_mz": 278.00409,
+    "meas_int": 3431.273681640625,
+    "error_ppm": -3.73
+   },
+   {
+    "ref_mz": 301.15497,
+    "ref_rel_int": 273.0,
+    "meas_mz": 301.15463,
+    "meas_int": 17618.71484375,
+    "error_ppm": -1.11
+   },
+   {
+    "ref_mz": 319.16397,
+    "ref_rel_int": 451.0,
+    "meas_mz": 319.16516,
+    "meas_int": 22304.294921875,
+    "error_ppm": 3.73
+   },
+   {
+    "ref_mz": 320.16888,
+    "ref_rel_int": 77.0,
+    "meas_mz": 320.1683,
+    "meas_int": 4056.497802734375,
+    "error_ppm": -1.81
+   },
+   {
+    "ref_mz": 418.19656,
+    "ref_rel_int": 392.0,
+    "meas_mz": 418.19833,
+    "meas_int": 9900.6484375,
+    "error_ppm": 4.23
+   },
+   {
+    "ref_mz": 740.20947,
+    "ref_rel_int": 265.0,
+    "meas_mz": 740.21393,
+    "meas_int": 6385.61376953125,
+    "error_ppm": 6.02
+   },
+   {
+    "ref_mz": 740.71655,
+    "ref_rel_int": 387.0,
+    "meas_mz": 740.71252,
+    "meas_int": 5240.88232421875,
+    "error_ppm": -5.44
+   },
+   {
+    "ref_mz": 763.73322,
+    "ref_rel_int": 106.0,
+    "meas_mz": 763.73383,
+    "meas_int": 6319.28369140625,
+    "error_ppm": 0.8
+   },
+   {
+    "ref_mz": 774.71979,
+    "ref_rel_int": 277.0,
+    "meas_mz": 774.72559,
+    "meas_int": 4677.52001953125,
+    "error_ppm": 7.48
+   },
+   {
+    "ref_mz": 781.21814,
+    "ref_rel_int": 97.0,
+    "meas_mz": 781.22089,
+    "meas_int": 5177.3115234375,
+    "error_ppm": 3.52
+   },
+   {
+    "ref_mz": 783.23944,
+    "ref_rel_int": 506.0,
+    "meas_mz": 783.23688,
+    "meas_int": 7554.65234375,
+    "error_ppm": -3.27
+   },
+   {
+    "ref_mz": 783.74127,
+    "ref_rel_int": 315.0,
+    "meas_mz": 783.74054,
+    "meas_int": 11911.5703125,
+    "error_ppm": -0.93
+   },
+   {
+    "ref_mz": 789.72583,
+    "ref_rel_int": 565.0,
+    "meas_mz": 789.72858,
+    "meas_int": 8012.55419921875,
+    "error_ppm": 3.48
+   },
+   {
+    "ref_mz": 790.23383,
+    "ref_rel_int": 527.0,
+    "meas_mz": 790.23248,
+    "meas_int": 10794.4775390625,
+    "error_ppm": -1.7
+   },
+   {
+    "ref_mz": 824.2384,
+    "ref_rel_int": 211.0,
+    "meas_mz": 824.24139,
+    "meas_int": 3929.787353515625,
+    "error_ppm": 3.63
+   },
+   {
+    "ref_mz": 832.75439,
+    "ref_rel_int": 222.0,
+    "meas_mz": 832.75354,
+    "meas_int": 4775.83203125,
+    "error_ppm": -1.03
+   }
+  ],
+  "unmatched_reference_peaks": [
+   {
+    "ref_mz": 86.09634,
+    "ref_rel_int": 999.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 581.12762,
+    "ref_rel_int": 276.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 714.21436,
+    "ref_rel_int": 266.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 780.72034,
+    "ref_rel_int": 260.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 790.72681,
+    "ref_rel_int": 247.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 714.71869,
+    "ref_rel_int": 199.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 113.07068,
+    "ref_rel_int": 174.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 124.02164,
+    "ref_rel_int": 172.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 111.98528,
+    "ref_rel_int": 156.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 775.22437,
+    "ref_rel_int": 136.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 784.24109,
+    "ref_rel_int": 127.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 764.22748,
+    "ref_rel_int": 127.0,
+    "nearest_meas_mz": 764.24097,
+    "nearest_error_ppm": 17.65,
+    "nearest_meas_int": 3111.907958984375
+   },
+   {
+    "ref_mz": 582.14038,
+    "ref_rel_int": 124.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 69.07003,
+    "ref_rel_int": 124.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 151.03203,
+    "ref_rel_int": 121.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 824.74994,
+    "ref_rel_int": 119.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 697.66724,
+    "ref_rel_int": 116.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 115.05418,
+    "ref_rel_int": 114.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 776.23584,
+    "ref_rel_int": 106.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 754.71826,
+    "ref_rel_int": 106.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 771.72546,
+    "ref_rel_int": 92.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 195.02185,
+    "ref_rel_int": 90.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 775.71686,
+    "ref_rel_int": 87.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 755.22876,
+    "ref_rel_int": 81.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 111.05509,
+    "ref_rel_int": 80.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 230.3373,
+    "ref_rel_int": 79.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 767.71375,
+    "ref_rel_int": 79.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 591.69818,
+    "ref_rel_int": 76.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 670.19226,
+    "ref_rel_int": 75.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 815.23724,
+    "ref_rel_int": 75.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 230.32471,
+    "ref_rel_int": 71.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 424.20407,
+    "ref_rel_int": 70.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 731.70166,
+    "ref_rel_int": 70.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 750.97412,
+    "ref_rel_int": 70.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 52.17369,
+    "ref_rel_int": 68.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 750.23358,
+    "ref_rel_int": 68.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 138.90945,
+    "ref_rel_int": 67.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 83.58787,
+    "ref_rel_int": 65.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 65.35354,
+    "ref_rel_int": 64.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 231.05865,
+    "ref_rel_int": 63.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 160.08453,
+    "ref_rel_int": 63.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 298.07657,
+    "ref_rel_int": 62.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 63.15478,
+    "ref_rel_int": 61.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 137.3911,
+    "ref_rel_int": 61.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 225.81429,
+    "ref_rel_int": 61.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 67.71963,
+    "ref_rel_int": 60.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 199.73651,
+    "ref_rel_int": 59.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 64.72392,
+    "ref_rel_int": 59.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 160.07602,
+    "ref_rel_int": 58.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 87.92103,
+    "ref_rel_int": 58.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 138.19003,
+    "ref_rel_int": 58.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   },
+   {
+    "ref_mz": 76.80721,
+    "ref_rel_int": 57.0,
+    "nearest_meas_mz": null,
+    "nearest_error_ppm": null,
+    "nearest_meas_int": null
+   }
+  ]
+ },
+ "decoy_control": "random MS2 scans elsewhere in the same run matched 0-1 ref peaks (0-8% coverage) at the same tolerance"
+}
