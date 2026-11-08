@@ -2,6 +2,30 @@
 
 Reporting template per the enterprise handoff brief. One row per milestone.
 
+## Milestone: Real scientific execution boundary — reference HSQC workflow (2026-11-08)
+
+- **Milestone/status**: complete locally; full suite + new acceptance tests green; pending push.
+- **Base SHA → result SHA**: base `c3050ed` (feature branch HEAD at session start).
+- **Implemented behavior**:
+  - `ToolExecutor` protocol (`planner_agent.py`): the engine depends on the execution contract, not `MockToolExecutor`. Engine `run()` now calls `preflight()` over the whole graph BEFORE any task executes, and every tool-call audit record carries executor `provenance()` metadata (mode, provider, algorithm/library hashes, versions).
+  - `ScientificExecutionConfig.from_env()` (`execution_config.py`): `PHYTO_SCIENTIFIC_EXECUTION=mock|real` is authoritative and explicit in BOTH planes (absent/invalid fails closed). Auth `PHYTO_DRY_RUN` never selects an executor; real+`PHYTO_DRY_RUN=1` is contradictory and rejected; cloud+mock requires explicit offline `PHYTO_DRY_RUN=1`. Real mode requires readable `PHYTO_STRUCTURE_DB_PATH` and `PHYTO_HSQC_REFERENCE_LIBRARY`.
+  - `RealToolExecutor` (`real_executor.py`): ONE supported tool (`reference_hsqc.rank`) and ONE workflow (`reference_hsqc_identify`). Real providers only — `FileStructureDB` (RDKit) retrieval + `match_hsqc` (SciPy Hungarian); no predictor, no LLM, no network, zero API cost. Reference records must carry a full InChIKey that resolves to the same structure-library candidate (`candidate_id`), so relabelled measurements cannot attach to another compound. Bounded: 8 MiB/file, ≤1000 structures, ≤256 references, ≤256 query peaks, ≤8192 reference peaks. Startup/query errors are sanitized (no paths, no library contents).
+  - Planner: `reference_hsqc_identify` = rank task (registry-schema-validated `parameters`) → `before_confirmed_claim` human checkpoint. All other workflows in real mode are rejected 422 BEFORE any provider call.
+  - Honesty boundary: candidates without references are reported as `unavailable_references` (unknown, not negative); empty hits are incomplete evidence; every output carries fixed `limitations`, `scientific_ready: false`, `scientific_validation: "not_validated"`, `human_review_required: true`. Distances are not confidences.
+  - Health: `scientific_execution`, `tool_executor`, `execution_readiness` (mode, config validity, dependencies, supported tools/workflows, `requires_network`, scientific_ready false). No paid inference from health.
+  - Citations: real-mode runs never mint the mock DOI (registrar is None; guarded 503 on forced retrieval; approval completes citation-free).
+  - `MockToolExecutor` gained the same `preflight/provenance/health` surface; mock mode REFUSES the reference workflow (no honest offline implementation) with 422 — never fabricated science.
+  - Chromatography-layer mock handler import repaired (pre-existing failure on this branch: relative import path missed in test aliasing); 2 previously failing tests now pass.
+  - Dockerfile: stages `services/elucidation/` + rdkit/scipy/numpy for the in-process real providers.
+- **Evidence**:
+  - `tests/test_real_orchestrator.py` — 94 passed (new): config matrix incl. fail-closed paths; RDKit+Hungarian execution on synthetic algorithm fixtures; curated public quercetin CSV self-match labeled reference-regression, NOT validation; malformed libraries/provider outputs; failure/timeout propagation with no retry and no mock fallback; engine preflight zero-call/no-audit; health auth-independence with injected offline auth collaborators; full API rank→review→approve resume without re-execution; unsupported workflow 422-before-provider; audit chain verification.
+  - Full suite: see CI run for the pushed SHA (local: 1,735 passed, 4 skipped at time of commit incl. the 94 above).
+  - Ruff: CI scope clean.
+- **Scientific validation**: NONE claimed. The workflow is reference-library dereplication support with mandatory human review; no accuracy, no benchmark, no identification verdict. Tests prove software contracts and real-provider determinism on synthetic + locally-attributed fixtures only.
+- **Security/deployment impact**: positive — no silent mock science in any real configuration; sanitized errors; no credentials in logs; auth surface untouched (mock-token acceptance unchanged, still local/dry-run only); no deployment performed.
+- **Remaining blockers**: no measured public reference library is bundled — curating one (with verified licenses) is the prerequisite for any scientific use beyond owner-curated data; `PHYTO_HSQC_REFERENCE_LIBRARY` has no default. Engine remains synchronous/in-memory (no cancellation API); acceptable for a bounded local workflow, documented.
+- **Next bounded task**: curate a licensed measured HSQC reference library for one species and run the workflow end-to-end against it as a real-data acceptance pass (requires data rights the software cannot supply).
+
 ## Milestone: Phase 0 evidence baseline + Phase 1A fail-closed runtime
 
 - **Milestone/status**: Phase 0 + Phase 1A — **complete, tests passing, pending commit**.

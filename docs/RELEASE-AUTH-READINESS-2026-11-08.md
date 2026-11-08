@@ -234,3 +234,37 @@ gcloud run services update-traffic phyto-frontend --project=phyto-companion-prod
 - [ ] Expert-reviewed rights-cleared benchmark expanded; no unsupported accuracy/training claims.
 
 Until these gates are satisfied, keep any release **draft alpha/prerelease**, not stable or production-ready.
+
+## 10. Current source-only orchestrator update — 2026-11-08
+
+This note is based on inspection of the current checkout, not a deployment or a new validation result. Configuration and behavior remain subject to final integration on `main`. The exact request, schema, library, provenance, health, audit, and checkpoint contract is in [ORCHESTRATOR_EXECUTION.md](ORCHESTRATOR_EXECUTION.md). No status/ADR document is updated by this note, and no commit, push, deploy, paid inference, download, or training is claimed.
+
+### What changed in the inspected source
+
+- Scientific mode is selected by `PHYTO_SCIENTIFIC_EXECUTION=mock|real`, independently of authentication `PHYTO_DRY_RUN`. The mode is explicitly required in every environment; missing or invalid configuration fails closed locally and in cloud. Explicit cloud mock also requires auth dry-run.
+- Real mode requires `PHYTO_STRUCTURE_DB_PATH` and `PHYTO_HSQC_REFERENCE_LIBRARY`, with local CSV and JSON files loaded once at startup. Missing or malformed configuration fails rather than invoking mock science.
+- The real executor supports only `reference_hsqc_identify` and `reference_hsqc.rank`. It uses local `FileStructureDB` candidate retrieval and `match_hsqc` against supplied references. It does not invoke a mock predictor or LLM and does not make the other workflows, registry tools, MS providers, or LLM providers real.
+- The plan is one ranking task followed by a mandatory `before_confirmed_claim` checkpoint. Tool output is schema-validated and hash-audited, the API returns ranked results with `awaiting_review`, and checkpoint approval records a human decision without recomputing or scientifically validating the result.
+- Reference `candidate_id` is the normalized structure name, not an arbitrary name or InChIKey. Reference JSON requires source, solvent, explicit license, peaks, and `provenance:"experimental"`; the last is curator-asserted, not independently verified. Public reference provenance and reuse rights remain release responsibilities.
+- Files are limited to 8 MiB each, structures to 1000 rows, references to 256 records with 256 peaks each and 8192 total, and real observed peaks to 256. Execution is synchronous and offline with no provider network timeout, retry, or nested ledger. Bounds are not wall-clock deadlines.
+- Health distinguishes process/configuration/dependency availability from science. Both modes report `scientific_ready:false`; neither a healthy process nor a `dry_run:false` request establishes scientific readiness.
+
+This supersedes only the source-level mock-only description in the earlier orchestrator discussion above. It does not supersede the observed live-service evidence: no claim is made that this source or these health fields are deployed.
+
+### Acceptance and release position
+
+The designated local acceptance command is:
+
+```sh
+make stage-auth
+PYTHONDONTWRITEBYTECODE=1 \
+PYTHONPATH=shared:build/auth-path:services:. \
+  .venv/bin/python -m pytest -p no:cacheprovider \
+  tests/test_real_orchestrator.py -q
+```
+
+Its expected state is **pending** until run on the integrated source; no result or pass count is asserted here. Tests inject offline authentication and temporary local libraries, so even a future pass would not establish cloud auth, deployment, dataset licensing, or scientific validity. No paid provider is needed by this real executor.
+
+The initial real `awaiting_review` path does not mint a citation. Current `_mint_citation` raises HTTP 503, `No real DOI registrar is configured`, in non-mock mode, so approval/completion suppresses a fake citation but does not return clean citation-free completion. Existing mock runs can mint placeholder `10.0000/phyto...` identifiers; they are not registered DOIs. Final `main` integration is expected to suppress automatic mock citations without failing real approval; verify rather than assume this.
+
+The release decision remains **NO-GO for public production/scientific release** and draft prerelease preparation only. Real local reference retrieval is a bounded capability, not validated identification, not general real-tool execution, and not deployment readiness.

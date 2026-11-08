@@ -10,11 +10,13 @@ and deliberately invalid-token requests to `/tools` both return 401. This does
 not verify valid-user login, accounting, or scientific execution.
 
 Use [the readiness report](RELEASE-AUTH-READINESS-2026-11-08.md) for the recorded
-configuration, staging gates and rollback requirements. The source orchestrator
-still uses `MockToolExecutor`; its new health fields explicitly report
-`scientific_execution: mock` and `scientific_ready: false`, independently of auth
-`dry_run`. These new fields require deployment of the updated source; the observed
-live service still returns the older health payload.
+configuration, staging gates and rollback requirements. This earlier readiness
+snapshot described the source orchestrator as mock-only; the dated source-only
+appendix below supersedes that statement with an explicitly selected, single
+real HSQC workflow. Its health reports the selected `scientific_execution` and
+`scientific_ready: false`, independently of auth `dry_run`. These source changes
+require deployment before they can affect a live service; the observed live
+service still returns the older health payload.
 
 ## Historical infrastructure inventory (2026-10-25; not re-certified)
 
@@ -143,3 +145,47 @@ redirect to the .com. Superseded 2026-10-26 (ADR-0077): the .org serves the
 same web app directly — see "Public domains" above. No redirect rule is
 needed; the Cloudflare Redirect Rules for the .org (if any were created)
 can be deleted once the domain mappings are live.
+
+## Source-only orchestrator execution update — 2026-11-08 (supersedes broad real-executor statements)
+
+This section describes configuration and code in the current checkout only, subject to final integration on `main`. It does not describe the observed live Cloud Run revision and is not authorization to deploy. No deployment, paid inference, model download, or training was performed for this update. The earlier readiness note saying that source still uses only `MockToolExecutor`, and any broader implication elsewhere that cloud mode delegates all workflows to real providers, are superseded for this source checkout by the narrower contract below.
+
+- `PHYTO_SCIENTIFIC_EXECUTION` explicitly selects `mock` or `real` in every environment, independently of auth `PHYTO_DRY_RUN`. Missing or invalid configuration fails closed, including locally. Cloud mock additionally requires `PHYTO_DRY_RUN=1`.
+- Real mode requires `PHYTO_STRUCTURE_DB_PATH` and `PHYTO_HSQC_REFERENCE_LIBRARY`. Missing/invalid paths or provider dependencies fail closed. There is no bundled reference library and no fallback to a mock predictor or LLM.
+- The only supported real workflow/tool is `reference_hsqc_identify` / `reference_hsqc.rank`, using local `FileStructureDB` and `match_hsqc`. Other API workflow names and registry entries are not real capabilities of this executor. No real LLM, MS, or general multimodal workflow is claimed.
+- Real execution is synchronous, local, offline, and bounded: at most 8 MiB per library file, 1000 structure rows, 256 reference records and 256 peaks per record (8192 reference peaks total), and 256 observed peaks. There are no provider network timeouts to configure, no retries, and no nested ledger. The bounds are not wall-clock deadlines.
+- Reference JSON requires normalized `candidate_id`, source, solvent, explicit reuse license, and `provenance: "experimental"`. That provenance is curator-asserted, not verified by the software. Library provenance and licensing require separate review. See [the exact execution contract](ORCHESTRATOR_EXECUTION.md) for schemas, limits, request example, output, and audit/checkpoint behavior.
+- The tool returns ranked measured-reference distances and then awaits the `before_confirmed_claim` human checkpoint. Lower distance is better, not a probability or identification verdict. Approval does not rerun or validate the science. `scientific_ready` remains `false` in both modes; process health, configuration validity, and dependency availability are not scientific readiness.
+- Initial real `awaiting_review` responses skip citation minting. Current `_mint_citation` raises HTTP 503, `No real DOI registrar is configured`, in non-mock mode, so approval/completion suppresses a fake citation but does not return clean citation-free completion. Existing mock runs can mint placeholder `10.0000/phyto...` identifiers that are not registered DOIs. Final `main` integration is expected to suppress automatic mock citations without failing real approval; verify this before any release.
+
+### Source configuration checklist; no deployment performed
+
+For a future isolated staging review, start with an explicit real configuration and locally curated, license-cleared files. Mount or package them read-only and verify their hashes without publishing their paths or contents:
+
+```sh
+PHYTO_ENV=cloud
+PHYTO_SCIENTIFIC_EXECUTION=real
+PHYTO_STRUCTURE_DB_PATH=/path/to/reviewed-structures.csv
+PHYTO_HSQC_REFERENCE_LIBRARY=/path/to/reviewed-references.json
+# PHYTO_DRY_RUN=1 only for the independent auth dry-run test configuration.
+```
+
+These are configuration examples, not instructions to apply changes to production. Do not use the Cloud Run service env editor described in the historical procedure as a substitute for reviewed configuration management. Keep auth dry-run and scientific mode explicit in release evidence. A real scientific API request must have `dry_run:false`; real workflows reject request-level dry-run.
+
+Before making any readiness claim, require all of the following on a reviewed, immutable source revision in an isolated staging target:
+
+1. Run the source acceptance target without claiming its currently pending result:
+
+   ```sh
+   make stage-auth
+   PYTHONDONTWRITEBYTECODE=1 \
+   PYTHONPATH=shared:build/auth-path:services:. \
+     .venv/bin/python -m pytest -p no:cacheprovider \
+     tests/test_real_orchestrator.py -q
+   ```
+
+   Tests inject offline auth and temporary libraries; they do not establish valid-user cloud auth, deployment, or scientific validity.
+2. Verify real health reports only `reference_hsqc.rank` and `reference_hsqc_identify`, correct dependency/library counts, no network requirement, and `scientific_ready:false`. Process liveness alone is insufficient.
+3. Run authenticated staging checks with curated non-sensitive evidence. Verify unsupported workflows return 422, malformed inputs fail closed, no mock/LLM predictor is invoked, output validates against the registry schema, and the run ends `awaiting_review` with audit hashes and the human checkpoint.
+4. Verify reference provenance and licenses independently, suppress the real-run mock citation on final `main`, and conduct scientific validation separately. Do not infer those properties from tests or health.
+5. Preserve a rollback target and require separate approval for any deployment. This document does not record a staging execution, successful acceptance test, or production release.
