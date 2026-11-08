@@ -14,6 +14,7 @@ from pathlib import Path
 
 from docx import Document
 from docx.oxml import OxmlElement
+from docx.shared import Pt
 
 ROOT = Path(__file__).resolve().parents[1]  # phyto-companion
 WORKSPACE = ROOT.parent
@@ -47,14 +48,47 @@ def _row_properties(row, header: bool) -> None:
         properties.append(repeat)
 
 
-def _render_table(doc: Document, rows: list[list[str]]) -> None:
-    table = doc.add_table(rows=len(rows), cols=len(rows[0]))
-    table.style = "Light Grid Accent 1"
-    for row_index, cells in enumerate(rows):
-        _row_properties(table.rows[row_index], header=(row_index == 0))
-        for col_index, cell in enumerate(cells):
-            add_runs(table.cell(row_index, col_index).paragraphs[0], cell)
-    doc.add_paragraph()
+def _render_table(doc: Document, rows: list[list[str]], caption: str | None = None) -> None:
+    """Render as one table per page-sized chunk with a repeated header.
+
+    The review renderer cannot repeat a table header across pages and
+    splits tall tables arbitrarily, so large tables are emitted as several
+    smaller tables (header repeated), each small enough to fit a page.
+    A caption travels inside the first chunk's merged top row so it can
+    never be separated from its table.
+    """
+    header, body = rows[:1], rows[1:]
+    chunks = [header + body[start:start + 6] for start in range(0, len(body), 6)]
+    for chunk_index, chunk in enumerate(chunks):
+        if chunk_index == 0 and caption:
+            chunk = [[""] * len(header[0]), *chunk]
+        if chunk_index == 0:
+            doc.add_page_break()
+        table = doc.add_table(rows=len(chunk), cols=len(chunk[0]))
+        table.style = "Light Grid Accent 1"
+        caption_row_offset = 1 if (caption and chunk_index == 0) else 0
+        if caption and chunk_index == 0:
+            merged = table.cell(0, 0).merge(table.cell(0, len(chunk[0]) - 1))
+            paragraph = merged.paragraphs[0]
+            run = paragraph.add_run(caption.replace("*", ""))
+            run.italic = True
+            run.font.size = Pt(9)
+        for row_index, cells in enumerate(chunk):
+            _row_properties(
+                table.rows[row_index],
+                header=(row_index == caption_row_offset),
+            )
+            for col_index, cell in enumerate(cells):
+                paragraph = table.cell(row_index, col_index).paragraphs[0]
+                if row_index == 0 and caption and chunk_index == 0:
+                    continue
+                add_runs(paragraph, cell)
+                for run in paragraph.runs:
+                    run.font.size = Pt(8)  # compact tables must fit one page
+                if row_index < len(chunk) - 1:
+                    properties = paragraph._p.get_or_add_pPr()
+                    properties.append(OxmlElement("w:keepNext"))
+        doc.add_paragraph()
 
 
 def is_table_separator(line: str) -> bool:
@@ -81,6 +115,7 @@ def build() -> Path:
     ).bold = True
 
     pending_table: list[list[str]] = []
+    pending_caption: str | None = None
     in_references = False
     lines = SOURCE.read_text().splitlines()
     index = 0
@@ -92,16 +127,24 @@ def build() -> Path:
             continue
         if stripped.startswith("## ") and "References" in stripped:
             in_references = True
+        if re.match(r"^\*Table:", stripped):
+            pending_caption = stripped
+            index += 1
+            continue
         if is_table_row(stripped):
             pending_table.append(
                 [cell.strip() for cell in stripped.strip("|").split("|")]
             )
             index += 1
             continue
+        if is_table_separator(stripped):
+            index += 1
+            continue
         if pending_table:
             rows = pending_table
             pending_table = []
-            _render_table(doc, rows)
+            _render_table(doc, rows, caption=pending_caption)
+            pending_caption = None
         if in_references and re.match(r"^\s*\d+\. ", stripped):
             # Preserve literal citation numbers: reference lists are not
             # renumbered by the document editor.
