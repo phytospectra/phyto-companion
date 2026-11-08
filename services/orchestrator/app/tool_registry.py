@@ -156,6 +156,27 @@ class NMRPeakSearchOutput(_Contract):
     query_peak_count: int = Field(ge=1)
 
 
+class ReferenceHSQCInput(_Contract):
+    """Observed HSQC and an independently established molecular formula."""
+
+    formula: str = Field(..., min_length=1, max_length=100)
+    peaks: list[Peak2D] = Field(..., min_length=1, max_length=2000)
+    h_tolerance_ppm: float = Field(default=0.05, gt=0, le=1)
+    c_tolerance_ppm: float = Field(default=0.5, gt=0, le=20)
+    max_results: int = Field(default=10, ge=1, le=100)
+
+
+class ReferenceHSQCOutput(_Contract):
+    """Measured-reference hits; no hit means no usable reference evidence."""
+
+    hits: list[dict[str, Any]] = Field(default_factory=list)
+    query_peak_count: int = Field(ge=1)
+    formula: str
+    unavailable_references: list[str] = Field(default_factory=list)
+    limitations: list[str]
+    provenance: dict[str, Any]
+
+
 # --- Tier 1: taxonomy and taxon prior (ADR-0052/0053/0054) ----------------
 
 
@@ -662,6 +683,11 @@ def build_default_registry() -> ToolRegistry:
             "stats.fdr_correction",
             "Benjamini-Hochberg FDR correction",
             0.1, False, FDRCorrectionInput, FDRCorrectionOutput,
+        ),
+        (
+            "reference_hsqc.rank",
+            "Rank formula-compatible structures against configured measured HSQC references",
+            1.0, False, ReferenceHSQCInput, ReferenceHSQCOutput,
         ),
         (
             "io.parse_peak_csv",
@@ -1371,7 +1397,7 @@ def _mock_apply_chromatography_layers(
     over the ranks -- the layers are the deliverable, so the local plane
     executes them for real, exactly like the taxon reranker."""
     try:
-        from layer_chain import apply_chromatography_layers
+        from .layer_chain import apply_chromatography_layers
     except ImportError:
         try:
             from services.orchestrator.app.layer_chain import (
@@ -1834,15 +1860,41 @@ _MOCK_IMPLEMENTATIONS: dict[str, Callable[[Any], Any]] = {
 
 
 class MockToolExecutor:
-    """Deterministic in-process executor for ``--dry-run`` and local tests.
+    """Explicit offline synthetic workflow support; never a real-mode fallback."""
 
-    Validates inputs against each tool's input schema and returns canned
-    (or genuinely computed, for trivial Tier 1 arithmetic) outputs --
-    always validated against the output schema.  No network, no GPU.
-    """
+    mode = "mock"
+    supported_workflows: frozenset[str] | None = None
 
     def __init__(self, registry: ToolRegistry) -> None:
         self.registry = registry
+
+    def preflight(self, tool_names: list[str]) -> None:
+        for tool_name in tool_names:
+            if tool_name not in _MOCK_IMPLEMENTATIONS:
+                raise InvalidInputError(
+                    "No offline mock implementation for this workflow",
+                    context={"tool": tool_name},
+                )
+
+    def provenance(self, tool_name: str) -> dict[str, Any]:
+        self.registry.get_tool(tool_name)
+        return {
+            "execution_mode": "mock",
+            "executor": type(self).__name__,
+            "synthetic_scientific_results": True,
+            "scientific_validation": "not_validated",
+        }
+
+    def health(self) -> dict[str, Any]:
+        return {
+            "mode": "mock",
+            "configuration_valid": True,
+            "dependencies_available": True,
+            "supported_workflows": "offline mock templates",
+            "requires_network": False,
+            "scientific_ready": False,
+            "scientific_validation": "not_validated",
+        }
 
     def execute(self, tool_name: str, inputs: dict[str, Any]) -> BaseModel:
         spec = self.registry.get_tool(tool_name)

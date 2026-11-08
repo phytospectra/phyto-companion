@@ -15,7 +15,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -27,7 +27,7 @@ from phyto_shared.schemas import SampleMetadata
 
 from .audit_logger import ChainedAuditLogger
 from .qa_critic_agent import QACriticAgent
-from .tool_registry import MockToolExecutor, ToolRegistry
+from .tool_registry import ToolRegistry
 from .tool_tiering import (
     ExecutionContext,
     HumanCheckpoint,
@@ -55,7 +55,20 @@ WorkflowName = Literal[
     "build_network",
     "mechanism_hypothesis",
     "identify",
+    "reference_hsqc_identify",
 ]
+
+
+class ToolExecutor(Protocol):
+    """Execution boundary; implementations choose real or synthetic science."""
+
+    mode: Literal["mock", "real"]
+
+    def execute(self, tool_name: str, inputs: dict[str, Any]) -> BaseModel: ...
+
+    def preflight(self, tool_names: list[str]) -> None: ...
+
+    def provenance(self, tool_name: str) -> dict[str, Any]: ...
 
 
 class TaskStatus:
@@ -803,6 +816,7 @@ WORKFLOW_MODALITY_REQUIREMENTS: dict[WorkflowName, frozenset[ObservationModality
         {ObservationModality.H_1D, ObservationModality.C_1D,
          ObservationModality.HSQC, ObservationModality.MS2}
     ),
+    "reference_hsqc_identify": frozenset({ObservationModality.HSQC}),
 }
 
 
@@ -994,6 +1008,7 @@ class PlannerAgent:
         dry_run: bool,
         modalities: frozenset[ObservationModality] | None = None,
         sample_metadata: SampleMetadata | None = None,
+        parameters: dict[str, Any] | None = None,
     ) -> TaskGraph:
         """Build the task graph for one workflow.
 
@@ -1015,7 +1030,26 @@ class PlannerAgent:
         logged -- an unknown organism is not an error, but a fabricated
         lineage would be.
         """
-        if workflow == "identify":
+        if workflow == "reference_hsqc_identify":
+            spec = self.registry.get_tool("reference_hsqc.rank")
+            validated = spec.input_schema.model_validate(parameters or {})
+            tasks = [
+                Task(
+                    id="rank-reference-hsqc",
+                    description="Rank formula-compatible structures against measured HSQC references",
+                    tool="reference_hsqc.rank",
+                    inputs=validated.model_dump(mode="json"),
+                    requires_modalities=frozenset({ObservationModality.HSQC}),
+                ),
+                Task(
+                    id="review-reference-hsqc",
+                    description="HUMAN CHECKPOINT: review reference ranking; no confirmed identity",
+                    depends_on=["rank-reference-hsqc"],
+                    consumes=["rank-reference-hsqc"],
+                    requires_checkpoint=HumanCheckpoint.BEFORE_CONFIRMED_CLAIM,
+                ),
+            ]
+        elif workflow == "identify":
             tasks = _identify_tasks(sample_metadata)
         else:
             tasks = _TEMPLATES[workflow]()
@@ -1143,7 +1177,7 @@ class WorkflowEngine:
     def __init__(
         self,
         registry: ToolRegistry,
-        executor: MockToolExecutor,
+        executor: ToolExecutor,
         audit: ChainedAuditLogger,
         qa_critic: QACriticAgent | None = None,
     ) -> None:
@@ -1179,6 +1213,7 @@ class WorkflowEngine:
         graph: TaskGraph,
         context: ExecutionContext,
     ) -> EngineResult:
+        self.executor.preflight([t.tool for t in graph.tasks if t.tool is not None])
         started = time.monotonic()
         self.audit.log_event(
             run_id=graph.run_id,
@@ -1332,7 +1367,11 @@ class WorkflowEngine:
                 input_hash=input_hash,
                 output_hash=output_hash,
                 verified=verified,
-                metadata={"task_id": task.id, "dry_run": graph.dry_run},
+                metadata={
+                    "task_id": task.id,
+                    "dry_run": graph.dry_run,
+                    **self.executor.provenance(task.tool),
+                },
             )
             task.status = TaskStatus.COMPLETE
             task.verified = verified

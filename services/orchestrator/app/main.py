@@ -1,9 +1,8 @@
 """FastAPI entrypoint for the orchestrator service.
 
-Local plane: every tool runs through the deterministic mock executor and
-``--dry-run`` semantics; no Docker, no GCP credentials, no network.
-Cloud plane: the same endpoints delegate to the real tool services
-(integrated in Steps 4-6) -- the API surface does not change.
+Scientific execution is explicitly configured independently of auth dry-run.
+Offline mock templates and bounded measured-reference HSQC ranking are separate
+capabilities; cloud mode never silently selects synthetic scientific results.
 
 Growth features hosted here (the auth service hosts the account surface):
 
@@ -59,11 +58,12 @@ from auth.install import install_auth
 from . import __version__
 from .audit_logger import ChainedAuditLogger
 from .cohort_analytics import InMemoryCohortStore, run_cohort_job
+from .execution_config import ScientificExecutionConfig, build_tool_executor
 from .onboarding import first_story_summary
 from .planner_agent import EngineResult, PlannerAgent, TaskGraph, TaskStatus, WorkflowEngine
 from .qa_critic_agent import QACriticAgent
 from .rate_limit import DEFAULT_SHARE_RATE_LIMIT, SlidingWindowRateLimiter
-from .tool_registry import DEFAULT_REGISTRY, MockToolExecutor
+from .tool_registry import DEFAULT_REGISTRY
 from .tool_tiering import ExecutionContext, HumanCheckpoint
 
 router = APIRouter()
@@ -89,9 +89,11 @@ class _Runtime:
         self.registry = DEFAULT_REGISTRY
         self.audit = ChainedAuditLogger(audit_path)
         self.planner = PlannerAgent(self.registry)
+        self.scientific_config = ScientificExecutionConfig.from_env()
+        self.executor = build_tool_executor(self.registry, self.scientific_config)
         self.engine = WorkflowEngine(
             registry=self.registry,
-            executor=MockToolExecutor(self.registry),
+            executor=self.executor,
             audit=self.audit,
             qa_critic=QACriticAgent(),  # rule-based verification, no LLM needed
         )
@@ -113,7 +115,11 @@ class _Runtime:
         self.cohort_store = InMemoryCohortStore()
         # DOI registration is deferred and gated (ADR-0043): without
         # ZENODO_TOKEN the canonical id is used and this stays None.
-        self.doi_registrar = MockDOIRegistrar() if os.environ.get("PHYTO_DRY_RUN", "1") == "1" else None
+        self.doi_registrar = (
+            MockDOIRegistrar()
+            if self.executor.mode == "mock" and os.environ.get("PHYTO_DRY_RUN", "1") == "1"
+            else None
+        )
 
 
 @lru_cache(maxsize=1)
@@ -333,6 +339,8 @@ def _mint_citation(
     request: Request | None,
 ) -> CitationRecord:
     """Mint (once per run) the citable identifier (ADR-0043)."""
+    if runtime.executor.mode != "mock":
+        raise HTTPException(status_code=503, detail="No real DOI registrar is configured")
     entry = runtime.runs[run_id]
     if entry.get("citation") is not None:
         return entry["citation"]
@@ -623,13 +631,20 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
             dry_run=request.dry_run,
             modalities=modalities,
             sample_metadata=request.sample_metadata,
+            parameters=request.parameters,
         )
+        if runtime.executor.mode == "real":
+            if request.dry_run:
+                raise InvalidInputError("Real scientific workflows do not accept request dry_run=true")
+            if request.workflow not in runtime.executor.supported_workflows:
+                raise InvalidInputError("Workflow unsupported by the configured real executor")
+        runtime.executor.preflight([t.tool for t in graph.tasks if t.tool is not None])
     except KeyError:
         raise HTTPException(
             status_code=422, detail=f"unknown workflow '{request.workflow}'"
         ) from None
-    except InvalidInputError as exc:
-        # Every step of this workflow needs a modality the user did not
+    except (InvalidInputError, ValueError) as exc:
+        # Unsupported real workflows and invalid observation contracts are rejected before execution. of this workflow needs a modality the user did not
         # supply: refuse rather than return a run that did nothing (ADR-0050).
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -653,7 +668,7 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
     }
 
     _record_run_events(runtime, request=http_request, run_id=run_id, analysis=request, result=result)
-    if result.status == "complete":
+    if result.status == "complete" and runtime.executor.mode == "mock":
         # Minted for its stored side effect; GET /runs/{id}/citation reads it
         # back from the run entry (the create response carries no citation).
         _mint_citation(
@@ -668,6 +683,14 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
         summary={
             "workflow": request.workflow,
             "dry_run": request.dry_run,
+            "scientific_execution": runtime.executor.mode,
+            "tool_executor": type(runtime.executor).__name__,
+            "scientific_validation": "not_validated",
+            "scientific_results": [
+                {"task_id": t.id, "tool": t.tool, "output": t.output}
+                for t in graph.tasks
+                if t.tool == "reference_hsqc.rank" and t.output is not None
+            ],
             "task_counts": graph.counts(),
             "awaiting_task_id": awaiting,
             "cost_estimate_usd": result.cost_estimate_usd,
@@ -729,7 +752,7 @@ def approve_checkpoint(
     }
     entry = runtime.runs[run_id]
     citation = None
-    if new_result.status == "complete":
+    if new_result.status == "complete" and runtime.executor.mode == "mock":
         _record_run_events(
             runtime,
             request=http_request,
@@ -740,6 +763,8 @@ def approve_checkpoint(
         citation = _mint_citation(
             runtime, run_id=run_id, analysis=entry["request"], request=http_request
         )
+    else:
+        citation = None
     return ApproveResponse(
         run_id=run_id,
         approved=request.checkpoint,
@@ -762,6 +787,11 @@ def get_citation(run_id: str, http_request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
     entry = runtime.runs[run_id]
     if entry.get("citation") is None:
+        if runtime.executor.mode != "mock":
+            raise HTTPException(
+                status_code=503,
+                detail="No real DOI registrar is configured; no synthetic DOI was minted",
+            )
         raise HTTPException(
             status_code=409,
             detail="run has not completed; citations are minted on completion",
@@ -984,11 +1014,11 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
             "registry_size": len(runtime.registry),
             "audit_records": len(runtime.audit.records()),
             "dry_run": cfg.dry_run,
-            # Auth dry-run does not select the scientific executor. Keep
-            # this explicit until a real executor has its own readiness gate.
-            "tool_executor": type(runtime.engine.executor).__name__,
-            "scientific_execution": "mock",
+            "tool_executor": type(runtime.executor).__name__,
+            "scientific_execution": runtime.executor.mode,
             "scientific_ready": False,
+            "scientific_validation": "not_validated",
+            "execution_readiness": runtime.executor.health(),
         }
 
     return application

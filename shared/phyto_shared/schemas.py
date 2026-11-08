@@ -220,6 +220,7 @@ class AnalysisRequest(StrictModel):
         "build_network",
         "mechanism_hypothesis",
         "identify",
+        "reference_hsqc_identify",
     ]
     parameters: dict[str, Any] = Field(default_factory=dict)
     modalities: list[str] = Field(

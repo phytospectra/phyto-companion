@@ -32,9 +32,13 @@ for _var in (
     "FIREBASE_CREDENTIALS_PATH",
     "PHYTO_AUTH_ENABLED",
     "PHYTO_DRY_RUN",
+    "PHYTO_SCIENTIFIC_EXECUTION",
+    "PHYTO_STRUCTURE_DB_PATH",
+    "PHYTO_HSQC_REFERENCE_LIBRARY",
     "PHYTO_FREE_TOKENS",
 ):
     os.environ.pop(_var, None)
+os.environ["PHYTO_SCIENTIFIC_EXECUTION"] = "mock"
 
 
 @pytest.fixture(autouse=True)
