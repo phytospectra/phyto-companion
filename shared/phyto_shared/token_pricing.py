@@ -66,6 +66,7 @@ class RoutePrice(NamedTuple):
 # Placeholder prices -- PROVISIONAL until the owner's pricing table lands.
 ROUTE_PRICING: Mapping[tuple[str, str], RoutePrice] = MappingProxyType(
     {
+        ("GET", "/capabilities"): RoutePrice(0, "Read configured workflow capabilities"),
         # Ingestion (cheap: deterministic parsing)
         ("POST", "/ingest/peak_csv"): RoutePrice(1, "Parse a peak-list CSV"),
         # Networking (moderate: database lookups + alignment)

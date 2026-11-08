@@ -41,7 +41,7 @@ Live login, revocation, authoritative billing and multi-instance persistence
 remain unverified. Runs/shares are process-local; cloud restart/cross-instance
 persistence and revocation semantics are a separate production design decision.
 
-See docs/ACCOUNTING-GUARANTEE.md for the precise guarantee (at-most-once admission, exactly-once settlement) and failure/recovery matrix.
+See docs/ACCOUNTING-GUARANTEE.md for the precise guarantee (at-most-once admission, at-most-once terminal settlement (eventual settlement not guaranteed)) and failure/recovery matrix.
 
 ## Read-only cloud observation (2026-11-09)
 

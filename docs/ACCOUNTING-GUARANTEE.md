@@ -3,8 +3,8 @@
 ## Concise guarantee (verified by tests)
 
 Per (user, idempotency key), within one durable ledger instance, the request
-path provides **at-most-once handler admission** and **exactly-once accounting
-settlement**:
+path provides **at-most-once handler admission** and **at-most-once terminal accounting
+settlement** (no guarantee that settlement eventually occurs after a crash):
 
 1. The first request claims the key in the shared ledger before budget
    selection; every later request with the same key is refused HTTP 409
@@ -23,9 +23,9 @@ What is **NOT** guaranteed:
 - **Not exactly-once external effects.** If the process dies after a handler's
   external effect but before settlement, the effect happened once and the
   charge stays held: recovery is operator reconciliation, not replay.
-- **No key expiry or clearing.** A consumed key stays consumed. Recovery for
-  the client is a NEW key; operators must never clear keys to "retry", which
-  could repeat a non-idempotent effect.
+- **No key expiry or clearing.** A consumed key stays consumed. After an uncertain outcome, the client must not use a new key or retry
+  until the original operation has been reconciled. Operators must never clear
+  keys to "retry", which could repeat a non-idempotent effect.
 - **Mock (dry-run) ledger is process-local.** A process restart forgets all
   claims/charges; this is a test/offline boundary only. The production
   Firestore path persists claims and balances and serializes concurrent
@@ -39,14 +39,14 @@ What is **NOT** guaranteed:
 
 | Failure point | Observed behavior | Client recovery | Operator action |
 |---|---|---|---|
-| Duplicate key, same or different content | 409 before handler; no state change | new key | none |
-| Parallel same key | exactly one admitted; others 409 | new key | none |
-| Handler exception / HTTP failure / cache hit | charge refunded once; key stays consumed | new key | none |
+| Duplicate key, same or different content | 409 before handler; no state change | inspect/reconcile original outcome; no automatic new-key retry | investigate uncertain original outcomes |
+| Parallel same key | exactly one admitted; others 409 | await/reconcile original outcome | none for known successful outcome |
+| Handler exception / HTTP failure / cache hit | refund is idempotent; key stays consumed | reconcile any possible external effect before a new operation | refund does not prove absence of an external effect |
 | Crash after claim, before charge | key claimed, zero tokens held | new key | none |
-| Crash after external effect, before settle | effect done once; charge held (Firestore) | new key | reconcile held reservation: confirm if effect verifiable, refund if not |
-| Crash during settle | Firestore transaction atomic; mock single-threaded | new key | none (settle state consistent) |
+| Crash after external effect, before settle | effect may have occurred; charge may remain held (Firestore) | do not resubmit with any key until reconciled | establish external outcome before accounting settlement; a refund does not undo an effect |
+| Crash during settle | commit outcome may be unknown to caller | inspect original outcome; no new-key replay | read reservation state and reconcile; storage atomicity does not ensure eventual settlement |
 | Process restart with mock ledger | all claims/charges forgotten; replays admitted | n/a (test plane) | never use mock ledger across restarts for real accounting |
-| Workspace pool exhausted mid-retry | duplicate refused before pool selection | new key | none |
+| Workspace pool exhausted mid-retry | duplicate refused before pool selection | inspect original request outcome | do not bypass the duplicate guard with a new key |
 
 ## Test evidence
 
@@ -61,6 +61,6 @@ What is **NOT** guaranteed:
 ## Documentation corrections applied
 
 Earlier wording describing "exactly-once idempotency" has been narrowed to
-"at-most-once handler admission with exactly-once accounting settlement".
+"at-most-once handler admission with at-most-once terminal accounting settlement".
 See `docs/FRONTEND-AUTH-ACCOUNTING-2026-11-09.md`,
 `docs/STAGING-ACCEPTANCE-2026-11-09.md`, and the middleware docstring.

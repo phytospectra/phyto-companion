@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import threading
 import uuid
 from functools import lru_cache
 from pathlib import Path
@@ -100,6 +101,8 @@ class _Runtime:
         # run_id -> {"graph", "context", "result", "request", "citation",
         #            "share_token"}
         self.runs: dict[str, dict[str, Any]] = {}
+        # Serializes review/resume in this process; not a distributed lock.
+        self.review_lock = threading.RLock()
         self.manifests: dict[str, str] = {}
         # Share tokens: HMAC-signed read-only links (ADR-0044).  The dev
         # HMAC key is fine only in dry-run; from_env refuses to mint with
@@ -155,6 +158,9 @@ class RunStatusResponse(BaseModel):
     tasks: list[TaskSummary]
     provenance_manifest_id: str
     citation: CitationRecord | None = None
+    scientific_execution: Literal["mock", "real"]
+    scientific_validation: Literal["not_validated"] = "not_validated"
+    scientific_results: list[dict[str, Any]] = Field(default_factory=list)
     modalities: list[str] = Field(
         default_factory=list,
         description="Observation modalities this run was planned for; empty "
@@ -236,6 +242,12 @@ def _run_status_payload(run_id: str, runtime: _Runtime) -> RunStatusResponse:
         ],
         provenance_manifest_id=runtime.manifests[run_id],
         citation=entry.get("citation"),
+        scientific_execution=runtime.executor.mode,
+        scientific_results=[
+            {"task_id": task.id, "tool": task.tool, "output": task.output}
+            for task in graph.tasks
+            if task.tool == "reference_hsqc.rank" and task.output is not None
+        ],
         modalities=graph.modalities,
         pruned_tasks=[
             {"id": pruned.id, "description": pruned.description, "reason": pruned.reason}
@@ -539,6 +551,31 @@ def _require_plan(request: Request, minimum: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+@router.get("/capabilities")
+def capabilities() -> dict[str, Any]:
+    """Free authenticated discovery; configuration readiness is not validation."""
+    runtime = get_runtime()
+    health = runtime.executor.health()
+    price = cost_for_route("POST", "/analysis")
+    return {
+        "schema_version": 1,
+        "scientific_execution": runtime.executor.mode,
+        "scientific_validation": "not_validated",
+        "configuration_valid": health.get("configuration_valid", False),
+        "dependencies_available": health.get("dependencies_available", False),
+        "supported_workflows": sorted(runtime.executor.supported_workflows or []),
+        "analysis_tokens": price.tokens if price is not None else None,
+        "pricing_provisional": True,
+        "run_storage": "process_local",
+        "production_ready": False,
+        "limitations": [
+            "Reference ranking has not been independently scientifically validated.",
+            "Run state is process-local; restarts lose runs and multi-worker routing is unsupported.",
+            "Configured libraries do not establish measured-data rights or independent validation.",
+        ],
+    }
+
+
 @router.get("/tools")
 def list_tools(
     tier: int | None = None,
@@ -740,6 +777,13 @@ def approve_checkpoint(
     run_id: str, request: ApproveRequest, http_request: Request
 ) -> ApproveResponse:
     runtime = get_runtime()
+    with runtime.review_lock:
+        return _approve_owned_checkpoint(runtime, run_id, request, http_request)
+
+
+def _approve_owned_checkpoint(
+    runtime: _Runtime, run_id: str, request: ApproveRequest, http_request: Request
+) -> ApproveResponse:
     entry = _owned_run(runtime, run_id, http_request)
     graph: TaskGraph = entry["graph"]
     context: ExecutionContext = entry["context"]
@@ -760,7 +804,12 @@ def approve_checkpoint(
             ),
         )
 
-    new_context = context.with_approval(request.checkpoint, actor=request.actor)
+    # The authenticated principal is authoritative; a client must not attribute
+    # a review to another scientist by supplying a display name or UID.
+    principal = _run_principal(http_request)
+    new_context = context.with_approval(
+        request.checkpoint, actor=principal if principal is not None else request.actor
+    )
     new_result = runtime.engine.run(graph, new_context)
     runtime.runs[run_id] = {
         "owner_uid": entry["owner_uid"],
@@ -1019,6 +1068,16 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
     )
     cfg = install_auth(application, config)
     application.include_router(router)
+
+    @application.middleware("http")
+    async def private_response_headers(request: Request, call_next):
+        # Run evidence, authorization failures and revocable shares must not
+        # survive sign-out/revocation in browser or intermediary caches.
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        return response
 
     @application.get("/health")
     def health() -> dict[str, Any]:

@@ -90,4 +90,4 @@ Before any release claim:
 5. Integrate actual supported workflow request/result/status contract and spectrum transfer before enabling launch; preserve unavailable labels meanwhile.
 6. Connect authoritative balance/transactions/checkout and mocked/emulator accounting settlement tests before offering real purchase or automatic retries. No billing/identity/secrets change is authorized by this report.
 
-Precise server-side guarantee statement: docs/ACCOUNTING-GUARANTEE.md (at-most-once handler admission, exactly-once settlement; keys never cleared or expired; crash recovery is new-key plus operator reconciliation).
+Precise server-side guarantee statement: docs/ACCOUNTING-GUARANTEE.md (at-most-once handler admission, at-most-once terminal settlement (eventual settlement not guaranteed); keys never cleared or expired; uncertain outcomes require operator reconciliation before any new-key submission).

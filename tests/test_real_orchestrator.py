@@ -735,3 +735,78 @@ class TestRealAnalysisAPI:
     def test_malformed_json_is_422(self, api):
         response = api().post("/analysis", headers=AUTH | {"Content-Type": "application/json"}, content="{")
         assert response.status_code == 422
+
+
+class TestResearchWorkspaceContract:
+    def test_capabilities_are_authenticated_free_and_truthful(self, api):
+        client = api()
+        assert client.get('/capabilities').status_code == 401
+        response = client.get('/capabilities', headers=AUTH)
+        assert response.status_code == 200
+        data = response.json()
+        assert data['schema_version'] == 1
+        assert data['supported_workflows'] == [WORKFLOW]
+        assert data['scientific_execution'] == 'real'
+        assert data['production_ready'] is False
+        assert data['scientific_validation'] == 'not_validated'
+        assert data['run_storage'] == 'process_local'
+        assert data['analysis_tokens'] == 20
+
+    def test_mock_backend_does_not_advertise_real_workflow(self, api):
+        data = api(mode='mock').get('/capabilities', headers=AUTH).json()
+        assert data['scientific_execution'] == 'mock'
+        assert WORKFLOW not in data['supported_workflows']
+
+    def test_reload_preserves_evidence_and_review_uses_verified_actor(self, api):
+        from orchestrator import main
+        client = api()
+        created = client.post('/analysis', json=_request(), headers=AUTH)
+        assert created.status_code == 200, created.text
+        body = created.json()
+        run_id = body['run_id']
+        refreshed = client.get(f'/runs/{run_id}', headers=AUTH)
+        assert refreshed.status_code == 200
+        assert refreshed.json()['scientific_results'] == body['summary']['scientific_results']
+        assert refreshed.json()['scientific_execution'] == 'real'
+        assert client.get(f'/runs/{run_id}', headers={'Authorization': 'Bearer mock:bob'}).status_code == 404
+        approval = client.post(f'/runs/{run_id}/approve', headers=AUTH, json={
+            'checkpoint': 'before_confirmed_claim', 'actor': 'impersonated-scientist',
+        })
+        assert approval.status_code == 200, approval.text
+        assert main.get_runtime().runs[run_id]['context'].actor == 'alice'
+        after = client.get(f'/runs/{run_id}', headers=AUTH).json()
+        assert after['scientific_results'] == refreshed.json()['scientific_results']
+        assert after['scientific_validation'] == 'not_validated'
+
+    def test_private_responses_cannot_be_cached(self, api):
+        client = api()
+        for path, headers in [('/capabilities', AUTH), ('/runs/missing', AUTH), ('/capabilities', {})]:
+            response = client.get(path, headers=headers)
+            assert response.headers['cache-control'] == 'no-store'
+            assert response.headers['x-content-type-options'] == 'nosniff'
+
+    def test_parallel_reviews_resume_only_once(self, api, monkeypatch):
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+        from orchestrator import main
+        client = api()
+        created = client.post('/analysis', json=_request(), headers=AUTH)
+        run_id = created.json()['run_id']
+        engine = main.get_runtime().engine
+        original = engine.run
+        calls = []
+
+        def slow_resume(*args, **kwargs):
+            calls.append(1)
+            time.sleep(0.05)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(engine, 'run', slow_resume)
+        def approve(_):
+            return client.post(f'/runs/{run_id}/approve', headers=AUTH, json={
+                'checkpoint': 'before_confirmed_claim', 'actor': 'reviewer',
+            }).status_code
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            statuses = list(pool.map(approve, range(2)))
+        assert sorted(statuses) == [200, 409]
+        assert len(calls) == 1
