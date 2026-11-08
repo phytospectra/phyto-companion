@@ -675,24 +675,25 @@ class TestRealAnalysisAPI:
         assert artifact["output"]["provenance"]["c_tolerance_ppm"] == 0.4
         execute.assert_called_once_with(TOOL, parameters)
         run_id = body["run_id"]
-        # Approval routes are not currently priced. Bypass auth enforcement only
-        # for checkpoint semantics; don't invent metering coverage or alter pricing.
+        # Isolate checkpoint semantics from the unpriced-route gate while
+        # retaining authentication and run ownership enforcement.
         runtime_before = runtime.runs[run_id]["graph"].task_by_id("rank-reference-hsqc").output
         with monkeypatch.context() as patch:
-            from auth.middleware import AuthMiddleware
+            from types import SimpleNamespace
+            import auth.middleware as auth_middleware
 
-            patch.setattr(AuthMiddleware, "_is_public", lambda self, path: True)
-            wrong = client.post(f"/runs/{run_id}/approve", json={
+            patch.setattr(auth_middleware, "cost_for_route", lambda method, path: SimpleNamespace(tokens=0))
+            wrong = client.post(f"/runs/{run_id}/approve", headers=AUTH, json={
                 "checkpoint": "before_mechanism_hypothesis", "actor": "reviewer",
             })
             assert wrong.status_code == 409
-            approved = client.post(f"/runs/{run_id}/approve", json={
+            approved = client.post(f"/runs/{run_id}/approve", headers=AUTH, json={
                 "checkpoint": "before_confirmed_claim", "actor": "reviewer",
             })
             assert approved.status_code == 200, approved.text
             assert approved.json()["status"] == "complete"
             assert approved.json()["citation"] is None
-            repeated = client.post(f"/runs/{run_id}/approve", json={
+            repeated = client.post(f"/runs/{run_id}/approve", headers=AUTH, json={
                 "checkpoint": "before_confirmed_claim", "actor": "reviewer",
             })
             assert repeated.status_code == 409
