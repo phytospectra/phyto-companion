@@ -855,10 +855,9 @@ def create_share(run_id: str, request: ShareCreateRequest, http_request: Request
 
 
 @router.delete("/runs/{run_id}/share")
-def revoke_shares(run_id: str) -> dict[str, Any]:
+def revoke_shares(run_id: str, http_request: Request) -> dict[str, Any]:
     runtime = get_runtime()
-    if run_id not in runtime.runs:
-        raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
+    _owned_run(runtime, run_id, http_request)
     registry = runtime.share_manager.registry
     revoked = registry.revoke_all(run_id) if registry is not None else 0
     runtime.runs[run_id]["share_token"] = None

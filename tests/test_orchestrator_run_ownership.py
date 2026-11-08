@@ -50,6 +50,7 @@ def test_other_user_cannot_read_approve_cite_or_share(client):
             ("GET", "", None), ("GET", "/citation", None),
             ("POST", "/approve", {"checkpoint": "before_confirmed_claim", "actor": "alice"}),
             ("POST", "/share", {}),
+            ("DELETE", "/share", None),
         ]:
             path = f"/runs/{run_id}{suffix}"
             response = client.request(method, path, headers=headers, **({"json": body} if body is not None else {}))
@@ -58,6 +59,30 @@ def test_other_user_cannot_read_approve_cite_or_share(client):
             assert response.json()["detail"].startswith("unknown run")
     assert get_runtime().runs[run_id] == before
     assert client.get(f"/runs/{run_id}", headers={"X-Test-UID": "alice"}).status_code == 200
+
+
+def test_only_owner_can_revoke_existing_share(client):
+    from unittest.mock import Mock
+
+    from orchestrator.main import get_runtime
+
+    run_id = start(client, "alice")
+    runtime = get_runtime()
+    registry = Mock()
+    registry.revoke_all.return_value = 1
+    runtime.share_manager.registry = registry
+    runtime.runs[run_id]["share_token"] = "existing-signed-capability"
+    for uid in ("bob", None):
+        headers = {"X-Test-UID": uid} if uid else {}
+        response = client.delete(f"/runs/{run_id}/share", headers=headers)
+        assert response.status_code == 404
+        registry.revoke_all.assert_not_called()
+        assert runtime.runs[run_id]["share_token"] == "existing-signed-capability"
+    response = client.delete(f"/runs/{run_id}/share", headers={"X-Test-UID": "alice"})
+    assert response.status_code == 200
+    assert response.json() == {"run_id": run_id, "revoked": 1}
+    registry.revoke_all.assert_called_once_with(run_id)
+    assert runtime.runs[run_id]["share_token"] is None
 
 
 def test_anonymous_local_runs_are_not_claimed_by_authenticated_user(client):
