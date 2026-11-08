@@ -1,0 +1,6 @@
+{
+  "status": "quarantined_not_distributable",
+  "records": ["Quercetin", "Kaempferol", "Luteolin", "Andrographolide"],
+  "reason": "Original record-specific accessions and redistribution rights have not been verified; the broad preexisting fixture README is not clearance. Quercetin's former structure also disagrees with PubChem CID 5280343. No peak data or runnable library is supplied here.",
+  "release_requirements": "Obtain record-specific primary sources, verified identity and explicit rights for intended redistribution; review independently before curator import. No validation or measurement is established by importing."
+}

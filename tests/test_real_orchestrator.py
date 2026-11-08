@@ -1,8 +1,7 @@
 """Bounded offline acceptance tests for reference-HSQC orchestration.
 
 Temporary CSV/JSON libraries below are SYNTHETIC algorithm fixtures, not
-scientific validation. The attributed public quercetin table is only a curated
-reference regression/self-match, not independent measurement or identification
+scientific validation. All shifts used here are invented, not independent measurement or identification
 accuracy evidence. No downloads, paid providers, Firebase, or Firestore are used.
 Accounting settlement/idempotency remains covered in tests/test_auth/.
 """
@@ -354,6 +353,16 @@ class TestLocalProviders:
             top = assessment["top_hit"]
             assert top["matched_peak_count"] == 2 and top["query_coverage"] == pytest.approx(1 / 3)
 
+        def test_match_count_agrees_with_matcher_and_matched_distinctness(self, real):
+            peaks = [_peak(1.2, 18.0), _peak(3.6, 58.0), _peak(9.0, 100.0)]
+            output = real.execute(TOOL, _parameters(peaks=peaks))
+            top = output.evidence_assessment["top_hit"]
+            matcher = output.hits[0]["matcher_result"]
+            assert top["matched_peak_count"] == sum(a["cost"] < 4.0 for a in matcher["assignments"])
+            assert top["query_coverage"] == pytest.approx(matcher["coverage"], abs=1e-6)
+            assert top["matched_peak_count"] == 2
+            assert output.evidence_assessment["disposition"] == "insufficient_evidence"
+
         def test_near_tie_between_candidates_is_ambiguous(self, registry, tmp_path):
             # Two formula-compatible candidates whose references sit at the
             # same distance from the query: no ranking can separate them.
@@ -374,6 +383,8 @@ class TestLocalProviders:
                  "provenance": "experimental", "peaks": [{"h_ppm": h, "c_ppm": c} for h, c in shared]}
                 for name, cid in (("alcohol", "ethyl-alcohol"), ("ether", "dimethyl-ether"))
             ]
+            duplicate = dict(references[1], reference_id="synthetic-ether-second")
+            references.append(duplicate)
             structures, reference_path = _write_libraries(tmp_path, rows, references)
             executor = RealToolExecutor(registry, structures, reference_path)
             output = executor.execute(TOOL, _parameters(
@@ -385,6 +396,17 @@ class TestLocalProviders:
             assert assessment["near_tie"] is True and assessment["score_gap"] == pytest.approx(0)
             assert assessment["top_hit"]["candidate_id"] != assessment["runner_up_hit"]["candidate_id"]
             assert any("does not support a unique preference" in text for text in assessment["reasons"])
+            limited = executor.execute(TOOL, _parameters(
+                peaks=[_peak(h, c) for h, c in shared], max_results=1,
+            ))
+            assert len(limited.hits) == 1
+            assert limited.evidence_assessment["disposition"] == "ambiguous"
+            assert limited.evidence_assessment["runner_up_hit"] is not None
+            limited_two = executor.execute(TOOL, _parameters(
+                peaks=[_peak(h, c) for h, c in shared], max_results=2,
+            ))
+            assert {hit["candidate"]["id"] for hit in limited_two.hits} == {"dimethyl-ether"}
+            assert limited_two.evidence_assessment["disposition"] == "ambiguous"
 
         def test_separated_rich_query_is_ranked_not_identification(self, registry, tmp_path):
             rows = [
@@ -446,43 +468,11 @@ class TestLocalProviders:
         assert output.unavailable_references == ["dimethyl-ether"]
         assert {hit["candidate"]["id"] for hit in output.hits} == {"ethyl-alcohol"}
         assert output.provenance["incomplete"] is True
-
-    def test_curated_public_csv_reference_self_match_not_scientific_validation(self, registry, tmp_path):
-        """Local provenance statements only: no independently verified measured accession.
-
-        README permits noncommercial research attribution. The individual table
-        explicitly says hand-curated, rounded, and not authoritative. The loader
-        accepts a curator assertion of experimental provenance, not proof of it.
-        """
-        readme = (PUBLIC_FIXTURES / "README.md").read_text()
-        table = (PUBLIC_FIXTURES / "quercetin_hsqc.csv").read_text()
-        assert "CC-BY-NC" in readme and "https://np-mrd.org" in readme
-        assert "not an authoritative database record" in table
-        assert "Hand-curated" in table and "DMSO-d6" in table
-        peaks = [{"h_ppm": float(row["dH"]), "c_ppm": float(row["dC"])} for row in
-                 csv.DictReader(line for line in table.splitlines() if line and not line.startswith("#"))]
-        # Explicit structure only; no MockStructureDB/predictor is involved.
-        structures, references = _write_libraries(tmp_path, [{
-            "name": "Quercetin", "smiles": "O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12",
-            "provenance": "structure_only", "source": "Local quercetin reference-regression structure",
-        }], [{
-            "reference_id": "local-curated-quercetin-regression", "candidate_id": "quercetin",
-            "inchikey": _inchikey("O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12"),
-            "source": "NP-MRD/SUMMIT fixture README; hand-curated published assignments, rounded; "
-                      "quercetin_hsqc.csv is not an authoritative database record",
-            "solvent": "DMSO-d6", "license": "CC-BY-NC per local README; noncommercial attributed research",
-            "provenance": "experimental", "peaks": peaks,
-        }])
-        output = RealToolExecutor(registry, structures, references).execute(TOOL, _parameters(
-            formula="C15H10O7", peaks=[_peak(p["h_ppm"], p["c_ppm"]) for p in peaks],
+        rich = RealToolExecutor(registry, structures, references).execute(TOOL, _parameters(
+            peaks=[_peak(1.2, 18.0), _peak(3.6, 58.0), _peak(5.0, 100.0)]
         ))
-        assert len(output.hits) == 1 and output.query_peak_count == 5
-        assert output.hits[0]["candidate"]["formula"]["counts"] == {"C": 15, "H": 10, "O": 7}
-        assert output.hits[0]["matcher_result"]["score"] == pytest.approx(0)
-        assert output.hits[0]["matcher_result"]["coverage"] == 1
-        assert "not an authoritative" in output.hits[0]["source"]
-        assert output.provenance["scientific_ready"] is False
-        assert output.provenance["scientific_validation"] == "not_validated"
+        assert rich.evidence_assessment["disposition"] == "insufficient_evidence"
+        assert any("lack references" in reason for reason in rich.evidence_assessment["reasons"])
 
     def test_library_and_provider_hashes_versions_and_audit(self, real, registry, synthetic_libraries, tmp_path):
         output = real.execute(TOOL, _parameters())

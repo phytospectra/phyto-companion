@@ -1,0 +1,33 @@
+{
+  "settings": {
+    "temperature": 0,
+    "top_p": 1,
+    "max_tokens": 512,
+    "seed": 20261109,
+    "context_tokens": 4096,
+    "threads": 1
+  },
+  "repeats": 2,
+  "arms": [
+    {
+      "id": "offline_replay_a",
+      "provider": "replace-with-actual-provider",
+      "provider_version": "replace-with-provider-runtime-version",
+      "model": "replace-with-model-name",
+      "model_version": "replace-with-immutable-version",
+      "adapter": "replay",
+      "artifact_path": null,
+      "artifact_sha256": null
+    },
+    {
+      "id": "offline_replay_b",
+      "provider": "replace-with-actual-provider",
+      "provider_version": "replace-with-provider-runtime-version",
+      "model": "replace-with-model-name",
+      "model_version": "replace-with-immutable-version",
+      "adapter": "replay",
+      "artifact_path": null,
+      "artifact_sha256": null
+    }
+  ]
+}

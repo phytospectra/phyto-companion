@@ -1,202 +1,95 @@
-"""Reference-library builder + built-library regression tests.
-
-The committed starter library is assembled from hand-curated LITERATURE
-tables (rounded values; evidence_nature literature_hand_curated_rounded).
-Self-match and isomer-ambiguity checks below are regression coverage of the
-builder + executor wiring on real RDKit/SciPy providers. They are NOT
-independent measured validation and support no accuracy claim.
-"""
-
+"""Synthetic-only builder contract tests; no measured or rights-validated data."""
 from __future__ import annotations
 
+import csv
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-
-from orchestrator.real_executor import RealToolExecutor
-from orchestrator.tool_registry import build_default_registry
-from phyto_shared.models import Peak2D
+from rdkit import Chem
 
 REPO = Path(__file__).resolve().parents[1]
-LIBRARY = REPO / "data" / "reference_libraries" / "literature_flavonoids_v1"
-SOURCE = LIBRARY / "source"
-TOOL = "reference_hsqc.rank"
+LIBRARY = REPO / "data/reference_libraries/literature_flavonoids_v1"
+COLUMNS = (LIBRARY / "source/manifest.template.csv").read_text().strip().split(",")
 
 
-def _peaks_from_table(path: Path) -> list[dict]:
-    rows = [
-        line for line in path.read_text().splitlines()
-        if line.strip() and not line.startswith("#")
-    ]
-    import csv as _csv
-
-    return [
-        {
-            "peak_type": "2d",
-            "h_ppm": float(row["dH"]),
-            "c_ppm": float(row["dC"]),
-            "intensity": 1.0,
-            "experiment_type": "HSQC",
-        }
-        for row in _csv.DictReader(rows)
-    ]
-
-
-@pytest.fixture(scope="module")
-def built_library(tmp_path_factory):
-    out = tmp_path_factory.mktemp("built") / "literature_flavonoids_v1"
-    result = subprocess.run(
-        [sys.executable, str(REPO / "scripts" / "build_reference_library.py"),
-         "--source", str(SOURCE), "--output", str(out)],
-        capture_output=True, text=True, check=True,
-    )
-    return out, result.stdout
+def _input(tmp_path, **overrides):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "invented.csv").write_text("position,dH,dC\nA,1.2,18\nB,3.6,58\n")
+    row = dict(name="Synthetic ethanol", smiles="CCO", solvent="invented",
+               source="Invented fixture; not measured", license="synthetic test data",
+               table="invented.csv", expected_inchikey=Chem.MolToInchiKey(Chem.MolFromSmiles("CCO")),
+               declared_formula="C2H6O", evidence_nature="synthetic_contract_test",
+               source_accession_url="https://example.org/synthetic-record",
+               identity_source_url="https://example.org/synthetic-identity",
+               rights_evidence_url="https://example.org/synthetic-rights",
+               redistribution_assertion="cleared") | overrides
+    with (source / "manifest.csv").open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=COLUMNS)
+        writer.writeheader()
+        writer.writerow(row)
+    return source
 
 
-@pytest.fixture(scope="module")
-def executor(built_library):
-    out, _ = built_library
-    return RealToolExecutor(
-        build_default_registry(),
-        out / "structures.csv",
-        out / "references.json",
-    )
+def _run(source, output, *args):
+    return subprocess.run([sys.executable, str(REPO / "scripts/build_reference_library.py"),
+                           "--source", str(source), "--output", str(output), *args],
+                          capture_output=True, text=True)
 
 
-class TestBuilder:
-    def test_rebuild_is_byte_identical(self, built_library, tmp_path):
-        out, _ = built_library
-        rerun = tmp_path / "rerun"
-        subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "build_reference_library.py"),
-             "--source", str(SOURCE), "--output", str(rerun)],
-            capture_output=True, text=True, check=True,
-        )
-        for name in ("structures.csv", "references.json", "MANIFEST.json"):
-            assert (out / name).read_bytes() == (rerun / name).read_bytes(), name
-
-    def test_committed_outputs_match_rebuild(self, built_library):
-        out, _ = built_library
-        for name in ("structures.csv", "references.json", "MANIFEST.json"):
-            assert (out / name).read_bytes() == (LIBRARY / name).read_bytes(), name
-
-    def test_andrographolide_is_quarantined_with_reason(self, built_library):
-        _, stdout = built_library
-        assert "quarantined  Andrographolide" in stdout
-        assert "no verified structure" in stdout
-        manifest = json.loads((LIBRARY / "MANIFEST.json").read_text())
-        assert manifest["records_imported"] == 3
-        assert manifest["records_quarantined"] == 1
-        assert manifest["evidence_nature"]["quercetin"] == "literature_hand_curated_rounded"
-
-    def test_strict_flag_fails_on_quarantine(self, tmp_path):
-        result = subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "build_reference_library.py"),
-             "--source", str(SOURCE), "--output", str(tmp_path / "o"), "--strict"],
-            capture_output=True, text=True,
-        )
-        assert result.returncode == 1
-
-    def test_damaged_peak_table_is_quarantined_not_repaired(self, tmp_path):
-        source = tmp_path / "source"
-        shutil.copytree(SOURCE, source)
-        table = source / "quercetin_hsqc.csv"
-        table.write_text(table.read_text().replace("6.19,98.3", "99.19,98.3"))
-        result = subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "build_reference_library.py"),
-             "--source", str(source), "--output", str(tmp_path / "o")],
-            capture_output=True, text=True, check=True,
-        )
-        assert "quarantined  Quercetin" in result.stdout
-        assert "outside" in result.stdout
-        names = {
-            row["name"]
-            for row in json.loads((tmp_path / "o" / "MANIFEST.json").read_text())["per_record"]
-            if row["status"] == "imported"
-        }
-        assert names == {"Kaempferol", "Luteolin"}
-
-    def test_duplicate_coordinates_are_refused(self, tmp_path):
-        source = tmp_path / "source"
-        source.mkdir()
-        (source / "t.csv").write_text("position,dH,dC\nA,6.19,98.3\nB,6.19,98.3\n")
-        (source / "manifest.csv").write_text(
-            "name,smiles,solvent,source,license,table,expected_inchikey,declared_formula,evidence_nature\n"
-            "Quercetin,O=c1cc(-c2c(O)cc(O)cc2O)oc2cc(O)cc(O)c12,DMSO-d6,x,CC-BY-NC,t.csv,,,\n"
-        )
-        result = subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "build_reference_library.py"),
-             "--source", str(source), "--output", str(tmp_path / "o")],
-            capture_output=True, text=True, check=True,
-        )
-        assert "duplicate cross-peak coordinates" in result.stdout
+def test_no_bundled_spectra_or_usable_library():
+    assert json.loads((LIBRARY / "QUARANTINE.json").read_text())["status"] == "quarantined_not_distributable"
+    assert not (LIBRARY / "references.json").exists()
+    assert not list((LIBRARY / "source").glob("*_hsqc*.csv"))
 
 
-class TestBuiltLibraryRegression:
-    """Regression only: literature self-match + designed isomer ambiguity."""
+def test_synthetic_build_is_deterministic_and_records_assertions(tmp_path):
+    source = _input(tmp_path)
+    one, two = tmp_path / "one", tmp_path / "two"
+    assert _run(source, one, "--strict").returncode == 0
+    assert _run(source, two, "--strict").returncode == 0
+    for name in ("structures.csv", "references.json", "MANIFEST.json"):
+        assert (one / name).read_bytes() == (two / name).read_bytes()
+    manifest = json.loads((one / "MANIFEST.json").read_text())
+    assert manifest["records_imported"] == 1
+    assert manifest["record_evidence"]["synthetic-ethanol"]["redistribution_assertion"] == "cleared"
+    assert "not verified" in manifest["notes"]
 
-    def test_quercetin_literature_self_match(self, executor):
-        peaks = _peaks_from_table(SOURCE / "quercetin_hsqc.csv")
-        output = executor.execute(TOOL, {
-            "formula": "C15H10O7",
-            "peaks": peaks,
-            "h_tolerance_ppm": 0.05,
-            "c_tolerance_ppm": 0.5,
-            "max_results": 10,
-        })
-        assert output.query_peak_count == len(peaks)
-        top = output.hits[0]
-        assert top["candidate"]["id"] == "quercetin"
-        assert top["matcher_result"]["score"] == pytest.approx(0)
-        assert top["matcher_result"]["coverage"] == 1
-        assert output.evidence_assessment["disposition"] == "ranked"
-        assert output.evidence_assessment["score_gap"] is None  # formula excludes isomers
 
-    def test_kaempferol_luteolin_isomer_pair_ranks_self_match_first(self, executor):
-        # Both are C15H10O6. The fixture comments describe 1D assignment
-        # overlap, but their HSQC cross-peak tables genuinely differ: only
-        # H-6/H-8 overlap within tolerance. The honest outcome is therefore
-        # a SEPARATED ranking with the self-match first -- not a near-tie.
-        # (Machine-flagged ambiguity on near-identical references is covered
-        # by the synthetic near-tie test in tests/test_real_orchestrator.py.)
-        peaks = _peaks_from_table(SOURCE / "luteolin_hsqc.csv")
-        output = executor.execute(TOOL, {
-            "formula": "C15H10O6",
-            "peaks": peaks,
-            "h_tolerance_ppm": 0.05,
-            "c_tolerance_ppm": 0.5,
-            "max_results": 10,
-        })
-        candidates = [hit["candidate"]["id"] for hit in output.hits]
-        assert set(candidates) == {"kaempferol", "luteolin"}
-        assert candidates[0] == "luteolin"
-        assert output.hits[0]["matcher_result"]["score"] == pytest.approx(0)
-        assessment = output.evidence_assessment
-        assert assessment["disposition"] == "ranked"
-        assert assessment["top_hit"]["candidate_id"] == "luteolin"
-        assert assessment["runner_up_hit"]["candidate_id"] == "kaempferol"
-        assert assessment["score_gap"] is not None and assessment["score_gap"] >= 0.25
+@pytest.mark.parametrize("changes,reason", [
+    ({"redistribution_assertion": ""}, "redistribution not explicitly cleared"),
+    ({"redistribution_assertion": "yes"}, "redistribution not explicitly cleared"),
+    ({"source_accession_url": ""}, "stable HTTPS"),
+    ({"identity_source_url": "file:///tmp/identity"}, "stable HTTPS"),
+    ({"rights_evidence_url": ""}, "stable HTTPS"),
+    ({"expected_inchikey": ""}, "expected InChIKey"),
+    ({"expected_inchikey": "REFJWTPEDVJJIY-UHFFFAOYSA-N"}, "expected_inchikey"),
+    ({"declared_formula": "C15H10O7"}, "declared formula"),
+    ({"table": "../outside.csv"}, "within source directory"),
+])
+def test_missing_or_conflicting_evidence_quarantines(tmp_path, changes, reason):
+    source = _input(tmp_path, **changes)
+    out = tmp_path / "out"
+    result = _run(source, out, "--strict")
+    assert result.returncode == 1
+    assert reason in result.stdout
+    assert json.loads((out / "references.json").read_text()) == []
 
-    def test_reference_metadata_travels_to_hits(self, executor):
-        peaks = _peaks_from_table(SOURCE / "quercetin_hsqc.csv")
-        output = executor.execute(TOOL, {
-            "formula": "C15H10O7", "peaks": peaks,
-            "h_tolerance_ppm": 0.05, "c_tolerance_ppm": 0.5, "max_results": 1,
-        })
-        hit = output.hits[0]
-        assert hit["solvent"] == "DMSO-d6"
-        assert "CC-BY-NC" in hit["license"]
-        assert "not an authoritative database record" in hit["source"]
-        assert hit["reference_provenance"] == "experimental"
 
-    def test_schema_objects_reject_non_hsqc_peaks(self, executor):
-        with pytest.raises(Exception):
-            executor.execute(TOOL, {
-                "formula": "C15H10O7",
-                "peaks": [Peak2D(h_ppm=6.19, c_ppm=98.3, intensity=1.0,
-                                 experiment_type="HMBC").model_dump()],
-            })
+def test_legacy_blanket_license_schema_fails_closed(tmp_path):
+    source = _input(tmp_path)
+    (source / "manifest.csv").write_text("name,smiles,solvent,source,license,table\nA,CCO,x,x,CC-BY-NC,invented.csv\n")
+    result = _run(source, tmp_path / "out")
+    assert result.returncode != 0
+    assert "missing columns" in result.stderr
+
+
+def test_damaged_peak_table_quarantined(tmp_path):
+    source = _input(tmp_path)
+    (source / "invented.csv").write_text("position,dH,dC\nA,1.2,18\nB,1.2,18\n")
+    result = _run(source, tmp_path / "out", "--strict")
+    assert result.returncode == 1
+    assert "duplicate cross-peak coordinates" in result.stdout

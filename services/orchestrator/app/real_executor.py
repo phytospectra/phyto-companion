@@ -80,7 +80,8 @@ _ASSESSMENT_RULE_SOURCE = (
 )
 _NEAR_TIE_SCORE_GAP = 0.25  # distance units on the matcher's 0..cap scale
 _MIN_QUERY_COVERAGE = 0.5  # fraction of observed query peaks the top hit matches
-_MIN_DISTINCT_QUERY_PEAKS = 3  # distinct observed cross-peaks needed to rank
+_MIN_DISTINCT_QUERY_PEAKS = 3  # distinct matched cross-peaks needed to rank
+_MATCHER_CAP = 4.0
 
 
 class _Contract(BaseModel):
@@ -265,7 +266,7 @@ def _versions() -> dict[str, str]:
 
 def _assessment_hit(hit: ReferenceHSQCHit, query_peak_count: int) -> AssessmentHit:
     matcher = hit.matcher_result
-    matched = sum(1 for assignment in matcher.assignments if assignment.cost < 4.0)
+    matched = sum(1 for assignment in matcher.assignments if assignment.cost < _MATCHER_CAP)
     return AssessmentHit(
         candidate_id=hit.candidate.id,
         reference_id=hit.reference_id,
@@ -324,17 +325,24 @@ def _assess(
         reasons.append("absence of hits is incomplete evidence, not a negative identification")
     else:
         assert top is not None
-        if distinct < _MIN_DISTINCT_QUERY_PEAKS or top.query_coverage < _MIN_QUERY_COVERAGE:
+        matched_distinct = len({
+            query_peaks[a.observed_index]
+            for a in hits[0].matcher_result.assignments if a.cost < _MATCHER_CAP
+        })
+        if (matched_distinct < _MIN_DISTINCT_QUERY_PEAKS
+                or top.query_coverage < _MIN_QUERY_COVERAGE or unavailable_count):
             disposition = "insufficient_evidence"
             reasons.append(
-                f"only {distinct} distinct observed cross-peak(s) (rule minimum "
-                f"{_MIN_DISTINCT_QUERY_PEAKS})"
+                f"{matched_distinct} distinct matched observed cross-peak(s) "
+                f"(rule minimum {_MIN_DISTINCT_QUERY_PEAKS})"
             )
             reasons.append(
                 f"top hit matches {top.matched_peak_count}/{query_peak_count} "
                 f"observed peaks (coverage {top.query_coverage:.0%}, rule "
                 f"minimum {int(_MIN_QUERY_COVERAGE * 100)}%)"
             )
+            if unavailable_count:
+                reasons.append(f"{unavailable_count} formula-compatible candidate(s) lack references; their ranking is unknown")
             reasons.append(
                 "ranking is returned for transparency only; the evidence does "
                 "not support distinguishing the candidates"
@@ -465,7 +473,7 @@ class RealToolExecutor:
                 },
                 "versions": _versions(),
                 "ranking_convention": "lower_is_better",
-                "matcher_cap": 4.0,
+                "matcher_cap": _MATCHER_CAP,
                 "multiplicity_mode": "none",
                 "requires_network": False,
                 "api_cost_usd": 0.0,
@@ -535,7 +543,7 @@ class RealToolExecutor:
                     observed,
                     tol_h=query.h_tolerance_ppm,
                     tol_c=query.c_tolerance_ppm,
-                    cap=4.0,
+                    cap=_MATCHER_CAP,
                     multiplicity_mode="none",
                 )
                 hits.append(
@@ -578,7 +586,7 @@ class RealToolExecutor:
             unavailable_references=unavailable,
             limitations=limitations,
             evidence_assessment=_assess(
-                hits[: query.max_results],
+                hits,
                 observed,
                 len(candidates),
                 len(unavailable),

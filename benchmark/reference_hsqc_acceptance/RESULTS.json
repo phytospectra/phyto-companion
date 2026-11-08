@@ -1,0 +1,1115 @@
+{
+  "case_count": 6,
+  "code_revision": "424fdda0a51d628cfdc363743d059472678bfa13",
+  "contract_pass_count": 6,
+  "evidence_class": "SYNTHETIC SOFTWARE CONTRACT ONLY",
+  "independent_validation_count": 0,
+  "limitations": [
+    "Invented coordinates, not plausible ethanol/ether spectra.",
+    "experimental runtime literal is schema-required curator assertion, not a measurement claim.",
+    "No accuracy, sensitivity or scientific decision-rule validation follows."
+  ],
+  "measured_query_count": 0,
+  "per_case": [
+    {
+      "actual": "ranked",
+      "case_id": "clean",
+      "contract_pass": true,
+      "expected": "ranked",
+      "input_sha256": "b362534279255076c525a67e8fef6d04e6209ce32f8adc77d9a53bbbc8183b34",
+      "output": {
+        "evidence_assessment": {
+          "disposition": "ranked",
+          "distinct_query_peaks": 4,
+          "near_tie": false,
+          "query_peak_count": 4,
+          "reasons": [
+            "top hit 'ethanol' (SYNTHETIC-ethanol) at distance 0.0 with query coverage 100%",
+            "runner-up 'dimethyl-ether' at distance 4.0 (gap 4.0)",
+            "a separated ranking is not an identification; every hit still requires human review"
+          ],
+          "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification",
+          "runner_up_hit": {
+            "candidate_id": "dimethyl-ether",
+            "distance": 4.0,
+            "matched_peak_count": 0,
+            "query_coverage": 0.0,
+            "reference_coverage": 0.0,
+            "reference_id": "SYNTHETIC-dimethyl-ether",
+            "unmatched_query_count": 4,
+            "unmatched_reference_count": 4
+          },
+          "score_gap": 4.0,
+          "solvent_compatibility_checked": false,
+          "top_hit": {
+            "candidate_id": "ethanol",
+            "distance": 0.0,
+            "matched_peak_count": 4,
+            "query_coverage": 1.0,
+            "reference_coverage": 1.0,
+            "reference_id": "SYNTHETIC-ethanol",
+            "unmatched_query_count": 0,
+            "unmatched_reference_count": 0
+          }
+        },
+        "formula": "C2H6O",
+        "hits": [
+          {
+            "candidate": {
+              "evidence_graph": null,
+              "exact_mass": 46.04186481295,
+              "formula": {
+                "counts": {
+                  "C": 2,
+                  "H": 6,
+                  "O": 1
+                }
+              },
+              "id": "ethanol",
+              "name": "ethanol",
+              "provenance": "synthetic",
+              "smiles": "CCO",
+              "source": "SYNTHETIC fixture"
+            },
+            "license": "Test-generated numeric values; no source dataset",
+            "matcher_result": {
+              "assignments": [
+                {
+                  "cost": 0.0,
+                  "observed_index": 0,
+                  "predicted_index": 0
+                },
+                {
+                  "cost": 0.0,
+                  "observed_index": 1,
+                  "predicted_index": 1
+                },
+                {
+                  "cost": 0.0,
+                  "observed_index": 2,
+                  "predicted_index": 2
+                },
+                {
+                  "cost": 0.0,
+                  "observed_index": 3,
+                  "predicted_index": 3
+                }
+              ],
+              "coverage": 1.0,
+              "n_observed": 4,
+              "n_predicted": 4,
+              "ranking_convention": "lower_is_better",
+              "score": 0.0,
+              "unmatched_observed_indices": [],
+              "unmatched_predicted_indices": []
+            },
+            "reference_id": "SYNTHETIC-ethanol",
+            "reference_provenance": "experimental",
+            "solvent": "SYNTHETIC/no acquisition",
+            "source": "Invented numeric algorithm fixture; not measured chemistry"
+          },
+          {
+            "candidate": {
+              "evidence_graph": null,
+              "exact_mass": 46.04186481295,
+              "formula": {
+                "counts": {
+                  "C": 2,
+                  "H": 6,
+                  "O": 1
+                }
+              },
+              "id": "dimethyl-ether",
+              "name": "dimethyl ether",
+              "provenance": "synthetic",
+              "smiles": "COC",
+              "source": "SYNTHETIC fixture"
+            },
+            "license": "Test-generated numeric values; no source dataset",
+            "matcher_result": {
+              "assignments": [
+                {
+                  "cost": 4.0,
+                  "observed_index": 0,
+                  "predicted_index": 0
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 1,
+                  "predicted_index": 1
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 2,
+                  "predicted_index": 2
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 3,
+                  "predicted_index": 3
+                }
+              ],
+              "coverage": 0.0,
+              "n_observed": 4,
+              "n_predicted": 4,
+              "ranking_convention": "lower_is_better",
+              "score": 4.0,
+              "unmatched_observed_indices": [],
+              "unmatched_predicted_indices": []
+            },
+            "reference_id": "SYNTHETIC-dimethyl-ether",
+            "reference_provenance": "experimental",
+            "solvent": "SYNTHETIC/no acquisition",
+            "source": "Invented numeric algorithm fixture; not measured chemistry"
+          }
+        ],
+        "limitations": [
+          "Not scientifically validated; human review is required, not an identification verdict.",
+          "Only the configured local structure and curator-declared measured-reference libraries were searched.",
+          "Missing reference evidence is unknown, not a negative match; empty hits are incomplete evidence.",
+          "Distances are not probabilities or calibrated confidence; lower is better.",
+          "Solvent, temperature, pH, field strength, stereochemistry and mixtures are not corrected or resolved.",
+          "Intensity, multiplicity and solvent flags are not used; all supplied HSQC coordinates are matched.",
+          "Inherited matcher uses rectangular assignments: excess peaks are not explicitly penalized; inspect counts and unmatched indices.",
+          "evidence_assessment dispositions use engineering defaults, not scientifically evaluated rules; they never constitute an identification."
+        ],
+        "provenance": {
+          "adapter_sha256": "6b4fae2290630a11bc6bfcf6ee73292514255c165ddbd5b926ee46444a2b35f1",
+          "algorithm": "scipy.optimize.linear_sum_assignment via match_hsqc",
+          "algorithm_sha256": "c65ed043adb294d25affc504f05551e67b004b5f5302eae7ba52875b9456c05d",
+          "api_cost_usd": 0.0,
+          "assessment_rules": {
+            "min_distinct_query_peaks": 3,
+            "min_query_coverage": 0.5,
+            "near_tie_score_gap": 0.25,
+            "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification"
+          },
+          "c_tolerance_ppm": 0.5,
+          "candidate_count": 2,
+          "h_tolerance_ppm": 0.05,
+          "human_review_required": true,
+          "incomplete": false,
+          "library_checksums": {
+            "reference_sha256": "898f4eb78a0005bf5766ab1ba23fe25d83628d2bb2d353fc778b8f05dd2b15bc",
+            "structure_sha256": "cf064f2f1fe6bfa9074da45fd21d52b3b79a3e70ba2fc3ce70887e2fd73ccce7"
+          },
+          "matched_reference_count": 2,
+          "matcher_cap": 4.0,
+          "mode": "real",
+          "multiplicity_mode": "none",
+          "provider": "FileStructureDB + match_hsqc (local measured-reference JSON)",
+          "ranking_convention": "lower_is_better",
+          "reference_provenance": "curator_asserted_experimental",
+          "requires_network": false,
+          "results_truncated": false,
+          "scientific_ready": false,
+          "scientific_validation": "not_validated",
+          "structure_provider_sha256": "dc138675274dd70bc08e56981e9a0bd58ba4320715eda6d862dba8ed962ac5a8",
+          "tool": "reference_hsqc.rank",
+          "versions": {
+            "numpy": "2.5.4",
+            "phyto-companion-shared": "0.1.0",
+            "pydantic": "2.14.1",
+            "rdkit": "2026.9.1",
+            "scipy": "1.18.1"
+          }
+        },
+        "query_peak_count": 4,
+        "unavailable_references": []
+      },
+      "output_sha256": "8cc373e7261f8af33f7db7b01c01498aebf2fe0e130dbefea6aae381ec439515",
+      "status": "ok"
+    },
+    {
+      "actual": "ranked",
+      "case_id": "small_shift",
+      "contract_pass": true,
+      "expected": "ranked",
+      "input_sha256": "a12ca4ecc5b921386bb97df94d1f927d6e44510b17e4b8861fdcd43db41d9f27",
+      "output": {
+        "evidence_assessment": {
+          "disposition": "ranked",
+          "distinct_query_peaks": 4,
+          "near_tie": false,
+          "query_peak_count": 4,
+          "reasons": [
+            "top hit 'ethanol' (SYNTHETIC-ethanol) at distance 0.7999999999999923 with query coverage 100%",
+            "runner-up 'dimethyl-ether' at distance 4.0 (gap 3.2)",
+            "a separated ranking is not an identification; every hit still requires human review"
+          ],
+          "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification",
+          "runner_up_hit": {
+            "candidate_id": "dimethyl-ether",
+            "distance": 4.0,
+            "matched_peak_count": 0,
+            "query_coverage": 0.0,
+            "reference_coverage": 0.0,
+            "reference_id": "SYNTHETIC-dimethyl-ether",
+            "unmatched_query_count": 4,
+            "unmatched_reference_count": 4
+          },
+          "score_gap": 3.2,
+          "solvent_compatibility_checked": false,
+          "top_hit": {
+            "candidate_id": "ethanol",
+            "distance": 0.7999999999999923,
+            "matched_peak_count": 4,
+            "query_coverage": 1.0,
+            "reference_coverage": 1.0,
+            "reference_id": "SYNTHETIC-ethanol",
+            "unmatched_query_count": 0,
+            "unmatched_reference_count": 0
+          }
+        },
+        "formula": "C2H6O",
+        "hits": [
+          {
+            "candidate": {
+              "evidence_graph": null,
+              "exact_mass": 46.04186481295,
+              "formula": {
+                "counts": {
+                  "C": 2,
+                  "H": 6,
+                  "O": 1
+                }
+              },
+              "id": "ethanol",
+              "name": "ethanol",
+              "provenance": "synthetic",
+              "smiles": "CCO",
+              "source": "SYNTHETIC fixture"
+            },
+            "license": "Test-generated numeric values; no source dataset",
+            "matcher_result": {
+              "assignments": [
+                {
+                  "cost": 0.800000000000006,
+                  "observed_index": 0,
+                  "predicted_index": 0
+                },
+                {
+                  "cost": 0.7999999999999972,
+                  "observed_index": 1,
+                  "predicted_index": 1
+                },
+                {
+                  "cost": 0.7999999999999972,
+                  "observed_index": 2,
+                  "predicted_index": 2
+                },
+                {
+                  "cost": 0.7999999999999687,
+                  "observed_index": 3,
+                  "predicted_index": 3
+                }
+              ],
+              "coverage": 1.0,
+              "n_observed": 4,
+              "n_predicted": 4,
+              "ranking_convention": "lower_is_better",
+              "score": 0.7999999999999923,
+              "unmatched_observed_indices": [],
+              "unmatched_predicted_indices": []
+            },
+            "reference_id": "SYNTHETIC-ethanol",
+            "reference_provenance": "experimental",
+            "solvent": "SYNTHETIC/no acquisition",
+            "source": "Invented numeric algorithm fixture; not measured chemistry"
+          },
+          {
+            "candidate": {
+              "evidence_graph": null,
+              "exact_mass": 46.04186481295,
+              "formula": {
+                "counts": {
+                  "C": 2,
+                  "H": 6,
+                  "O": 1
+                }
+              },
+              "id": "dimethyl-ether",
+              "name": "dimethyl ether",
+              "provenance": "synthetic",
+              "smiles": "COC",
+              "source": "SYNTHETIC fixture"
+            },
+            "license": "Test-generated numeric values; no source dataset",
+            "matcher_result": {
+              "assignments": [
+                {
+                  "cost": 4.0,
+                  "observed_index": 0,
+                  "predicted_index": 0
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 1,
+                  "predicted_index": 1
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 2,
+                  "predicted_index": 2
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 3,
+                  "predicted_index": 3
+                }
+              ],
+              "coverage": 0.0,
+              "n_observed": 4,
+              "n_predicted": 4,
+              "ranking_convention": "lower_is_better",
+              "score": 4.0,
+              "unmatched_observed_indices": [],
+              "unmatched_predicted_indices": []
+            },
+            "reference_id": "SYNTHETIC-dimethyl-ether",
+            "reference_provenance": "experimental",
+            "solvent": "SYNTHETIC/no acquisition",
+            "source": "Invented numeric algorithm fixture; not measured chemistry"
+          }
+        ],
+        "limitations": [
+          "Not scientifically validated; human review is required, not an identification verdict.",
+          "Only the configured local structure and curator-declared measured-reference libraries were searched.",
+          "Missing reference evidence is unknown, not a negative match; empty hits are incomplete evidence.",
+          "Distances are not probabilities or calibrated confidence; lower is better.",
+          "Solvent, temperature, pH, field strength, stereochemistry and mixtures are not corrected or resolved.",
+          "Intensity, multiplicity and solvent flags are not used; all supplied HSQC coordinates are matched.",
+          "Inherited matcher uses rectangular assignments: excess peaks are not explicitly penalized; inspect counts and unmatched indices.",
+          "evidence_assessment dispositions use engineering defaults, not scientifically evaluated rules; they never constitute an identification."
+        ],
+        "provenance": {
+          "adapter_sha256": "6b4fae2290630a11bc6bfcf6ee73292514255c165ddbd5b926ee46444a2b35f1",
+          "algorithm": "scipy.optimize.linear_sum_assignment via match_hsqc",
+          "algorithm_sha256": "c65ed043adb294d25affc504f05551e67b004b5f5302eae7ba52875b9456c05d",
+          "api_cost_usd": 0.0,
+          "assessment_rules": {
+            "min_distinct_query_peaks": 3,
+            "min_query_coverage": 0.5,
+            "near_tie_score_gap": 0.25,
+            "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification"
+          },
+          "c_tolerance_ppm": 0.5,
+          "candidate_count": 2,
+          "h_tolerance_ppm": 0.05,
+          "human_review_required": true,
+          "incomplete": false,
+          "library_checksums": {
+            "reference_sha256": "898f4eb78a0005bf5766ab1ba23fe25d83628d2bb2d353fc778b8f05dd2b15bc",
+            "structure_sha256": "cf064f2f1fe6bfa9074da45fd21d52b3b79a3e70ba2fc3ce70887e2fd73ccce7"
+          },
+          "matched_reference_count": 2,
+          "matcher_cap": 4.0,
+          "mode": "real",
+          "multiplicity_mode": "none",
+          "provider": "FileStructureDB + match_hsqc (local measured-reference JSON)",
+          "ranking_convention": "lower_is_better",
+          "reference_provenance": "curator_asserted_experimental",
+          "requires_network": false,
+          "results_truncated": false,
+          "scientific_ready": false,
+          "scientific_validation": "not_validated",
+          "structure_provider_sha256": "dc138675274dd70bc08e56981e9a0bd58ba4320715eda6d862dba8ed962ac5a8",
+          "tool": "reference_hsqc.rank",
+          "versions": {
+            "numpy": "2.5.4",
+            "phyto-companion-shared": "0.1.0",
+            "pydantic": "2.14.1",
+            "rdkit": "2026.9.1",
+            "scipy": "1.18.1"
+          }
+        },
+        "query_peak_count": 4,
+        "unavailable_references": []
+      },
+      "output_sha256": "85fe568771724f7fd4221cb521e45e356867194a1428c585f52d9aeb5d3105d5",
+      "status": "ok"
+    },
+    {
+      "actual": "insufficient_evidence",
+      "case_id": "sparse",
+      "contract_pass": true,
+      "expected": "insufficient_evidence",
+      "input_sha256": "7cb33ed581c7a5fad45a61c68c8700925a65d697552241659e3c05cdb8e47fdb",
+      "output": {
+        "evidence_assessment": {
+          "disposition": "insufficient_evidence",
+          "distinct_query_peaks": 1,
+          "near_tie": false,
+          "query_peak_count": 1,
+          "reasons": [
+            "1 distinct matched observed cross-peak(s) (rule minimum 3)",
+            "top hit matches 1/1 observed peaks (coverage 100%, rule minimum 50%)",
+            "ranking is returned for transparency only; the evidence does not support distinguishing the candidates"
+          ],
+          "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification",
+          "runner_up_hit": {
+            "candidate_id": "dimethyl-ether",
+            "distance": 1.0,
+            "matched_peak_count": 0,
+            "query_coverage": 0.0,
+            "reference_coverage": 0.0,
+            "reference_id": "SYNTHETIC-dimethyl-ether",
+            "unmatched_query_count": 1,
+            "unmatched_reference_count": 4
+          },
+          "score_gap": 1.0,
+          "solvent_compatibility_checked": false,
+          "top_hit": {
+            "candidate_id": "ethanol",
+            "distance": 0.0,
+            "matched_peak_count": 1,
+            "query_coverage": 1.0,
+            "reference_coverage": 0.25,
+            "reference_id": "SYNTHETIC-ethanol",
+            "unmatched_query_count": 0,
+            "unmatched_reference_count": 3
+          }
+        },
+        "formula": "C2H6O",
+        "hits": [
+          {
+            "candidate": {
+              "evidence_graph": null,
+              "exact_mass": 46.04186481295,
+              "formula": {
+                "counts": {
+                  "C": 2,
+                  "H": 6,
+                  "O": 1
+                }
+              },
+              "id": "ethanol",
+              "name": "ethanol",
+              "provenance": "synthetic",
+              "smiles": "CCO",
+              "source": "SYNTHETIC fixture"
+            },
+            "license": "Test-generated numeric values; no source dataset",
+            "matcher_result": {
+              "assignments": [
+                {
+                  "cost": 0.0,
+                  "observed_index": 0,
+                  "predicted_index": 0
+                }
+              ],
+              "coverage": 1.0,
+              "n_observed": 1,
+              "n_predicted": 4,
+              "ranking_convention": "lower_is_better",
+              "score": 0.0,
+              "unmatched_observed_indices": [],
+              "unmatched_predicted_indices": [
+                1,
+                2,
+                3
+              ]
+            },
+            "reference_id": "SYNTHETIC-ethanol",
+            "reference_provenance": "experimental",
+            "solvent": "SYNTHETIC/no acquisition",
+            "source": "Invented numeric algorithm fixture; not measured chemistry"
+          },
+          {
+            "candidate": {
+              "evidence_graph": null,
+              "exact_mass": 46.04186481295,
+              "formula": {
+                "counts": {
+                  "C": 2,
+                  "H": 6,
+                  "O": 1
+                }
+              },
+              "id": "dimethyl-ether",
+              "name": "dimethyl ether",
+              "provenance": "synthetic",
+              "smiles": "COC",
+              "source": "SYNTHETIC fixture"
+            },
+            "license": "Test-generated numeric values; no source dataset",
+            "matcher_result": {
+              "assignments": [
+                {
+                  "cost": 4.0,
+                  "observed_index": 0,
+                  "predicted_index": 0
+                }
+              ],
+              "coverage": 0.0,
+              "n_observed": 1,
+              "n_predicted": 4,
+              "ranking_convention": "lower_is_better",
+              "score": 1.0,
+              "unmatched_observed_indices": [],
+              "unmatched_predicted_indices": [
+                1,
+                2,
+                3
+              ]
+            },
+            "reference_id": "SYNTHETIC-dimethyl-ether",
+            "reference_provenance": "experimental",
+            "solvent": "SYNTHETIC/no acquisition",
+            "source": "Invented numeric algorithm fixture; not measured chemistry"
+          }
+        ],
+        "limitations": [
+          "Not scientifically validated; human review is required, not an identification verdict.",
+          "Only the configured local structure and curator-declared measured-reference libraries were searched.",
+          "Missing reference evidence is unknown, not a negative match; empty hits are incomplete evidence.",
+          "Distances are not probabilities or calibrated confidence; lower is better.",
+          "Solvent, temperature, pH, field strength, stereochemistry and mixtures are not corrected or resolved.",
+          "Intensity, multiplicity and solvent flags are not used; all supplied HSQC coordinates are matched.",
+          "Inherited matcher uses rectangular assignments: excess peaks are not explicitly penalized; inspect counts and unmatched indices.",
+          "evidence_assessment dispositions use engineering defaults, not scientifically evaluated rules; they never constitute an identification."
+        ],
+        "provenance": {
+          "adapter_sha256": "6b4fae2290630a11bc6bfcf6ee73292514255c165ddbd5b926ee46444a2b35f1",
+          "algorithm": "scipy.optimize.linear_sum_assignment via match_hsqc",
+          "algorithm_sha256": "c65ed043adb294d25affc504f05551e67b004b5f5302eae7ba52875b9456c05d",
+          "api_cost_usd": 0.0,
+          "assessment_rules": {
+            "min_distinct_query_peaks": 3,
+            "min_query_coverage": 0.5,
+            "near_tie_score_gap": 0.25,
+            "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification"
+          },
+          "c_tolerance_ppm": 0.5,
+          "candidate_count": 2,
+          "h_tolerance_ppm": 0.05,
+          "human_review_required": true,
+          "incomplete": false,
+          "library_checksums": {
+            "reference_sha256": "898f4eb78a0005bf5766ab1ba23fe25d83628d2bb2d353fc778b8f05dd2b15bc",
+            "structure_sha256": "cf064f2f1fe6bfa9074da45fd21d52b3b79a3e70ba2fc3ce70887e2fd73ccce7"
+          },
+          "matched_reference_count": 2,
+          "matcher_cap": 4.0,
+          "mode": "real",
+          "multiplicity_mode": "none",
+          "provider": "FileStructureDB + match_hsqc (local measured-reference JSON)",
+          "ranking_convention": "lower_is_better",
+          "reference_provenance": "curator_asserted_experimental",
+          "requires_network": false,
+          "results_truncated": false,
+          "scientific_ready": false,
+          "scientific_validation": "not_validated",
+          "structure_provider_sha256": "dc138675274dd70bc08e56981e9a0bd58ba4320715eda6d862dba8ed962ac5a8",
+          "tool": "reference_hsqc.rank",
+          "versions": {
+            "numpy": "2.5.4",
+            "phyto-companion-shared": "0.1.0",
+            "pydantic": "2.14.1",
+            "rdkit": "2026.9.1",
+            "scipy": "1.18.1"
+          }
+        },
+        "query_peak_count": 1,
+        "unavailable_references": []
+      },
+      "output_sha256": "10237502c371faf56193ba87725648cbde63ff7848a471d01ca140473282267d",
+      "status": "ok"
+    },
+    {
+      "actual": "insufficient_evidence",
+      "case_id": "duplicates",
+      "contract_pass": true,
+      "expected": "insufficient_evidence",
+      "input_sha256": "51b40b300d37b140fdbcab93ef1d248818ec6d5c5d277f1a9864a81af175ab3a",
+      "output": {
+        "evidence_assessment": {
+          "disposition": "insufficient_evidence",
+          "distinct_query_peaks": 1,
+          "near_tie": false,
+          "query_peak_count": 4,
+          "reasons": [
+            "1 distinct matched observed cross-peak(s) (rule minimum 3)",
+            "top hit matches 1/4 observed peaks (coverage 25%, rule minimum 50%)",
+            "ranking is returned for transparency only; the evidence does not support distinguishing the candidates"
+          ],
+          "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification",
+          "runner_up_hit": {
+            "candidate_id": "dimethyl-ether",
+            "distance": 4.0,
+            "matched_peak_count": 0,
+            "query_coverage": 0.0,
+            "reference_coverage": 0.0,
+            "reference_id": "SYNTHETIC-dimethyl-ether",
+            "unmatched_query_count": 4,
+            "unmatched_reference_count": 4
+          },
+          "score_gap": 1.0,
+          "solvent_compatibility_checked": false,
+          "top_hit": {
+            "candidate_id": "ethanol",
+            "distance": 3.0,
+            "matched_peak_count": 1,
+            "query_coverage": 0.25,
+            "reference_coverage": 0.25,
+            "reference_id": "SYNTHETIC-ethanol",
+            "unmatched_query_count": 3,
+            "unmatched_reference_count": 3
+          }
+        },
+        "formula": "C2H6O",
+        "hits": [
+          {
+            "candidate": {
+              "evidence_graph": null,
+              "exact_mass": 46.04186481295,
+              "formula": {
+                "counts": {
+                  "C": 2,
+                  "H": 6,
+                  "O": 1
+                }
+              },
+              "id": "ethanol",
+              "name": "ethanol",
+              "provenance": "synthetic",
+              "smiles": "CCO",
+              "source": "SYNTHETIC fixture"
+            },
+            "license": "Test-generated numeric values; no source dataset",
+            "matcher_result": {
+              "assignments": [
+                {
+                  "cost": 0.0,
+                  "observed_index": 0,
+                  "predicted_index": 0
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 1,
+                  "predicted_index": 1
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 2,
+                  "predicted_index": 2
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 3,
+                  "predicted_index": 3
+                }
+              ],
+              "coverage": 0.25,
+              "n_observed": 4,
+              "n_predicted": 4,
+              "ranking_convention": "lower_is_better",
+              "score": 3.0,
+              "unmatched_observed_indices": [],
+              "unmatched_predicted_indices": []
+            },
+            "reference_id": "SYNTHETIC-ethanol",
+            "reference_provenance": "experimental",
+            "solvent": "SYNTHETIC/no acquisition",
+            "source": "Invented numeric algorithm fixture; not measured chemistry"
+          },
+          {
+            "candidate": {
+              "evidence_graph": null,
+              "exact_mass": 46.04186481295,
+              "formula": {
+                "counts": {
+                  "C": 2,
+                  "H": 6,
+                  "O": 1
+                }
+              },
+              "id": "dimethyl-ether",
+              "name": "dimethyl ether",
+              "provenance": "synthetic",
+              "smiles": "COC",
+              "source": "SYNTHETIC fixture"
+            },
+            "license": "Test-generated numeric values; no source dataset",
+            "matcher_result": {
+              "assignments": [
+                {
+                  "cost": 4.0,
+                  "observed_index": 0,
+                  "predicted_index": 0
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 1,
+                  "predicted_index": 1
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 2,
+                  "predicted_index": 2
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 3,
+                  "predicted_index": 3
+                }
+              ],
+              "coverage": 0.0,
+              "n_observed": 4,
+              "n_predicted": 4,
+              "ranking_convention": "lower_is_better",
+              "score": 4.0,
+              "unmatched_observed_indices": [],
+              "unmatched_predicted_indices": []
+            },
+            "reference_id": "SYNTHETIC-dimethyl-ether",
+            "reference_provenance": "experimental",
+            "solvent": "SYNTHETIC/no acquisition",
+            "source": "Invented numeric algorithm fixture; not measured chemistry"
+          }
+        ],
+        "limitations": [
+          "Not scientifically validated; human review is required, not an identification verdict.",
+          "Only the configured local structure and curator-declared measured-reference libraries were searched.",
+          "Missing reference evidence is unknown, not a negative match; empty hits are incomplete evidence.",
+          "Distances are not probabilities or calibrated confidence; lower is better.",
+          "Solvent, temperature, pH, field strength, stereochemistry and mixtures are not corrected or resolved.",
+          "Intensity, multiplicity and solvent flags are not used; all supplied HSQC coordinates are matched.",
+          "Inherited matcher uses rectangular assignments: excess peaks are not explicitly penalized; inspect counts and unmatched indices.",
+          "evidence_assessment dispositions use engineering defaults, not scientifically evaluated rules; they never constitute an identification."
+        ],
+        "provenance": {
+          "adapter_sha256": "6b4fae2290630a11bc6bfcf6ee73292514255c165ddbd5b926ee46444a2b35f1",
+          "algorithm": "scipy.optimize.linear_sum_assignment via match_hsqc",
+          "algorithm_sha256": "c65ed043adb294d25affc504f05551e67b004b5f5302eae7ba52875b9456c05d",
+          "api_cost_usd": 0.0,
+          "assessment_rules": {
+            "min_distinct_query_peaks": 3,
+            "min_query_coverage": 0.5,
+            "near_tie_score_gap": 0.25,
+            "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification"
+          },
+          "c_tolerance_ppm": 0.5,
+          "candidate_count": 2,
+          "h_tolerance_ppm": 0.05,
+          "human_review_required": true,
+          "incomplete": false,
+          "library_checksums": {
+            "reference_sha256": "898f4eb78a0005bf5766ab1ba23fe25d83628d2bb2d353fc778b8f05dd2b15bc",
+            "structure_sha256": "cf064f2f1fe6bfa9074da45fd21d52b3b79a3e70ba2fc3ce70887e2fd73ccce7"
+          },
+          "matched_reference_count": 2,
+          "matcher_cap": 4.0,
+          "mode": "real",
+          "multiplicity_mode": "none",
+          "provider": "FileStructureDB + match_hsqc (local measured-reference JSON)",
+          "ranking_convention": "lower_is_better",
+          "reference_provenance": "curator_asserted_experimental",
+          "requires_network": false,
+          "results_truncated": false,
+          "scientific_ready": false,
+          "scientific_validation": "not_validated",
+          "structure_provider_sha256": "dc138675274dd70bc08e56981e9a0bd58ba4320715eda6d862dba8ed962ac5a8",
+          "tool": "reference_hsqc.rank",
+          "versions": {
+            "numpy": "2.5.4",
+            "phyto-companion-shared": "0.1.0",
+            "pydantic": "2.14.1",
+            "rdkit": "2026.9.1",
+            "scipy": "1.18.1"
+          }
+        },
+        "query_peak_count": 4,
+        "unavailable_references": []
+      },
+      "output_sha256": "e104be7dd7f74323b1fca0657c82ed06132fe1e2bce1d1c2ae0042c0bef69529",
+      "status": "ok"
+    },
+    {
+      "actual": "no_hits",
+      "case_id": "absent_formula",
+      "contract_pass": true,
+      "expected": "no_hits",
+      "input_sha256": "a7997a57ee1975aa8e9af8a0f235b485bdcbb8c48c69357aa50c1780dea81a5a",
+      "output": {
+        "evidence_assessment": {
+          "disposition": "no_hits",
+          "distinct_query_peaks": 4,
+          "near_tie": false,
+          "query_peak_count": 4,
+          "reasons": [
+            "no formula-compatible candidates exist in the configured structure library",
+            "absence of hits is incomplete evidence, not a negative identification"
+          ],
+          "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification",
+          "runner_up_hit": null,
+          "score_gap": null,
+          "solvent_compatibility_checked": false,
+          "top_hit": null
+        },
+        "formula": "C99H100",
+        "hits": [],
+        "limitations": [
+          "Not scientifically validated; human review is required, not an identification verdict.",
+          "Only the configured local structure and curator-declared measured-reference libraries were searched.",
+          "Missing reference evidence is unknown, not a negative match; empty hits are incomplete evidence.",
+          "Distances are not probabilities or calibrated confidence; lower is better.",
+          "Solvent, temperature, pH, field strength, stereochemistry and mixtures are not corrected or resolved.",
+          "Intensity, multiplicity and solvent flags are not used; all supplied HSQC coordinates are matched.",
+          "Inherited matcher uses rectangular assignments: excess peaks are not explicitly penalized; inspect counts and unmatched indices.",
+          "evidence_assessment dispositions use engineering defaults, not scientifically evaluated rules; they never constitute an identification."
+        ],
+        "provenance": {
+          "adapter_sha256": "6b4fae2290630a11bc6bfcf6ee73292514255c165ddbd5b926ee46444a2b35f1",
+          "algorithm": "scipy.optimize.linear_sum_assignment via match_hsqc",
+          "algorithm_sha256": "c65ed043adb294d25affc504f05551e67b004b5f5302eae7ba52875b9456c05d",
+          "api_cost_usd": 0.0,
+          "assessment_rules": {
+            "min_distinct_query_peaks": 3,
+            "min_query_coverage": 0.5,
+            "near_tie_score_gap": 0.25,
+            "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification"
+          },
+          "c_tolerance_ppm": 0.5,
+          "candidate_count": 0,
+          "h_tolerance_ppm": 0.05,
+          "human_review_required": true,
+          "incomplete": true,
+          "library_checksums": {
+            "reference_sha256": "898f4eb78a0005bf5766ab1ba23fe25d83628d2bb2d353fc778b8f05dd2b15bc",
+            "structure_sha256": "cf064f2f1fe6bfa9074da45fd21d52b3b79a3e70ba2fc3ce70887e2fd73ccce7"
+          },
+          "matched_reference_count": 0,
+          "matcher_cap": 4.0,
+          "mode": "real",
+          "multiplicity_mode": "none",
+          "provider": "FileStructureDB + match_hsqc (local measured-reference JSON)",
+          "ranking_convention": "lower_is_better",
+          "reference_provenance": "curator_asserted_experimental",
+          "requires_network": false,
+          "results_truncated": false,
+          "scientific_ready": false,
+          "scientific_validation": "not_validated",
+          "structure_provider_sha256": "dc138675274dd70bc08e56981e9a0bd58ba4320715eda6d862dba8ed962ac5a8",
+          "tool": "reference_hsqc.rank",
+          "versions": {
+            "numpy": "2.5.4",
+            "phyto-companion-shared": "0.1.0",
+            "pydantic": "2.14.1",
+            "rdkit": "2026.9.1",
+            "scipy": "1.18.1"
+          }
+        },
+        "query_peak_count": 4,
+        "unavailable_references": []
+      },
+      "output_sha256": "be3b496a3abdae95c1617425a5b087b27639a10f9e0a99c7bbb951235ccdec2a",
+      "status": "ok"
+    },
+    {
+      "actual": "insufficient_evidence",
+      "case_id": "no_overlap",
+      "contract_pass": true,
+      "expected": "insufficient_evidence",
+      "input_sha256": "860a0c0b56fff51c3b6c93a0434d877790bf0494a746acecd28297216d0e3961",
+      "output": {
+        "evidence_assessment": {
+          "disposition": "insufficient_evidence",
+          "distinct_query_peaks": 3,
+          "near_tie": true,
+          "query_peak_count": 3,
+          "reasons": [
+            "0 distinct matched observed cross-peak(s) (rule minimum 3)",
+            "top hit matches 0/3 observed peaks (coverage 0%, rule minimum 50%)",
+            "ranking is returned for transparency only; the evidence does not support distinguishing the candidates"
+          ],
+          "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification",
+          "runner_up_hit": {
+            "candidate_id": "ethanol",
+            "distance": 3.0,
+            "matched_peak_count": 0,
+            "query_coverage": 0.0,
+            "reference_coverage": 0.0,
+            "reference_id": "SYNTHETIC-ethanol",
+            "unmatched_query_count": 3,
+            "unmatched_reference_count": 4
+          },
+          "score_gap": 0.0,
+          "solvent_compatibility_checked": false,
+          "top_hit": {
+            "candidate_id": "dimethyl-ether",
+            "distance": 3.0,
+            "matched_peak_count": 0,
+            "query_coverage": 0.0,
+            "reference_coverage": 0.0,
+            "reference_id": "SYNTHETIC-dimethyl-ether",
+            "unmatched_query_count": 3,
+            "unmatched_reference_count": 4
+          }
+        },
+        "formula": "C2H6O",
+        "hits": [
+          {
+            "candidate": {
+              "evidence_graph": null,
+              "exact_mass": 46.04186481295,
+              "formula": {
+                "counts": {
+                  "C": 2,
+                  "H": 6,
+                  "O": 1
+                }
+              },
+              "id": "dimethyl-ether",
+              "name": "dimethyl ether",
+              "provenance": "synthetic",
+              "smiles": "COC",
+              "source": "SYNTHETIC fixture"
+            },
+            "license": "Test-generated numeric values; no source dataset",
+            "matcher_result": {
+              "assignments": [
+                {
+                  "cost": 4.0,
+                  "observed_index": 0,
+                  "predicted_index": 0
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 1,
+                  "predicted_index": 1
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 2,
+                  "predicted_index": 2
+                }
+              ],
+              "coverage": 0.0,
+              "n_observed": 3,
+              "n_predicted": 4,
+              "ranking_convention": "lower_is_better",
+              "score": 3.0,
+              "unmatched_observed_indices": [],
+              "unmatched_predicted_indices": [
+                3
+              ]
+            },
+            "reference_id": "SYNTHETIC-dimethyl-ether",
+            "reference_provenance": "experimental",
+            "solvent": "SYNTHETIC/no acquisition",
+            "source": "Invented numeric algorithm fixture; not measured chemistry"
+          },
+          {
+            "candidate": {
+              "evidence_graph": null,
+              "exact_mass": 46.04186481295,
+              "formula": {
+                "counts": {
+                  "C": 2,
+                  "H": 6,
+                  "O": 1
+                }
+              },
+              "id": "ethanol",
+              "name": "ethanol",
+              "provenance": "synthetic",
+              "smiles": "CCO",
+              "source": "SYNTHETIC fixture"
+            },
+            "license": "Test-generated numeric values; no source dataset",
+            "matcher_result": {
+              "assignments": [
+                {
+                  "cost": 4.0,
+                  "observed_index": 0,
+                  "predicted_index": 0
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 1,
+                  "predicted_index": 1
+                },
+                {
+                  "cost": 4.0,
+                  "observed_index": 2,
+                  "predicted_index": 2
+                }
+              ],
+              "coverage": 0.0,
+              "n_observed": 3,
+              "n_predicted": 4,
+              "ranking_convention": "lower_is_better",
+              "score": 3.0,
+              "unmatched_observed_indices": [],
+              "unmatched_predicted_indices": [
+                3
+              ]
+            },
+            "reference_id": "SYNTHETIC-ethanol",
+            "reference_provenance": "experimental",
+            "solvent": "SYNTHETIC/no acquisition",
+            "source": "Invented numeric algorithm fixture; not measured chemistry"
+          }
+        ],
+        "limitations": [
+          "Not scientifically validated; human review is required, not an identification verdict.",
+          "Only the configured local structure and curator-declared measured-reference libraries were searched.",
+          "Missing reference evidence is unknown, not a negative match; empty hits are incomplete evidence.",
+          "Distances are not probabilities or calibrated confidence; lower is better.",
+          "Solvent, temperature, pH, field strength, stereochemistry and mixtures are not corrected or resolved.",
+          "Intensity, multiplicity and solvent flags are not used; all supplied HSQC coordinates are matched.",
+          "Inherited matcher uses rectangular assignments: excess peaks are not explicitly penalized; inspect counts and unmatched indices.",
+          "evidence_assessment dispositions use engineering defaults, not scientifically evaluated rules; they never constitute an identification."
+        ],
+        "provenance": {
+          "adapter_sha256": "6b4fae2290630a11bc6bfcf6ee73292514255c165ddbd5b926ee46444a2b35f1",
+          "algorithm": "scipy.optimize.linear_sum_assignment via match_hsqc",
+          "algorithm_sha256": "c65ed043adb294d25affc504f05551e67b004b5f5302eae7ba52875b9456c05d",
+          "api_cost_usd": 0.0,
+          "assessment_rules": {
+            "min_distinct_query_peaks": 3,
+            "min_query_coverage": 0.5,
+            "near_tie_score_gap": 0.25,
+            "rule_source": "engineering defaults; not scientifically evaluated decision rules; human review remains mandatory and no disposition is an identification"
+          },
+          "c_tolerance_ppm": 0.5,
+          "candidate_count": 2,
+          "h_tolerance_ppm": 0.05,
+          "human_review_required": true,
+          "incomplete": false,
+          "library_checksums": {
+            "reference_sha256": "898f4eb78a0005bf5766ab1ba23fe25d83628d2bb2d353fc778b8f05dd2b15bc",
+            "structure_sha256": "cf064f2f1fe6bfa9074da45fd21d52b3b79a3e70ba2fc3ce70887e2fd73ccce7"
+          },
+          "matched_reference_count": 2,
+          "matcher_cap": 4.0,
+          "mode": "real",
+          "multiplicity_mode": "none",
+          "provider": "FileStructureDB + match_hsqc (local measured-reference JSON)",
+          "ranking_convention": "lower_is_better",
+          "reference_provenance": "curator_asserted_experimental",
+          "requires_network": false,
+          "results_truncated": false,
+          "scientific_ready": false,
+          "scientific_validation": "not_validated",
+          "structure_provider_sha256": "dc138675274dd70bc08e56981e9a0bd58ba4320715eda6d862dba8ed962ac5a8",
+          "tool": "reference_hsqc.rank",
+          "versions": {
+            "numpy": "2.5.4",
+            "phyto-companion-shared": "0.1.0",
+            "pydantic": "2.14.1",
+            "rdkit": "2026.9.1",
+            "scipy": "1.18.1"
+          }
+        },
+        "query_peak_count": 3,
+        "unavailable_references": []
+      },
+      "output_sha256": "b51b110b640f480f38f73b1f570faf75041c6a4a36c0d6fc3eb26d9e20898c40",
+      "status": "ok"
+    }
+  ],
+  "protocol_sha256": "7cc6b4d77ff1a1540755b4c25afa1e1a1a6db6718a3cba635215d6a932fcb436",
+  "runner_sha256": "8dbeeb315b0ec3f734ccd49dee63095fbbe6a720fc97e2509c9096341a7c70aa"
+}

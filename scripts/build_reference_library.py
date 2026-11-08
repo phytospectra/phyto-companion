@@ -34,6 +34,7 @@ import json
 import math
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 from rdkit import Chem, rdBase
 from rdkit.Chem import rdMolDescriptors
@@ -51,8 +52,17 @@ MANIFEST_COLUMNS = (
     "expected_inchikey",
     "declared_formula",
     "evidence_nature",
+    "source_accession_url",
+    "identity_source_url",
+    "rights_evidence_url",
+    "redistribution_assertion",
 )
-BUILDER_VERSION = "1"
+BUILDER_VERSION = "2"
+
+
+def _https_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return parsed.scheme == "https" and bool(parsed.hostname) and not parsed.username and not parsed.password
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -131,7 +141,7 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
     with manifest_path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         missing = set(MANIFEST_COLUMNS) - set(reader.fieldnames or [])
-        if {"name", "smiles", "solvent", "source", "license", "table"} & missing:
+        if missing:
             raise SystemExit(f"manifest.csv missing columns: {sorted(missing)}")
         rows = list(reader)
 
@@ -157,6 +167,21 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
         candidate_id = _candidate_id(name)
         if any(r["candidate_id"] == candidate_id for r in records):
             quarantine(f"duplicate normalized candidate id {candidate_id!r}")
+            continue
+        if (row.get("redistribution_assertion") or "").strip() != "cleared":
+            quarantine("redistribution not explicitly cleared for this record")
+            continue
+        urls = {key: (row.get(key) or "").strip() for key in
+                ("source_accession_url", "identity_source_url", "rights_evidence_url")}
+        if not all(_https_url(value) for value in urls.values()):
+            quarantine("stable HTTPS source accession, identity source, and record-specific rights evidence are required")
+            continue
+        if not all((row.get(key) or "").strip() for key in
+                   ("expected_inchikey", "declared_formula", "evidence_nature")):
+            quarantine("expected InChIKey, declared formula and evidence nature are required")
+            continue
+        if table_path is not None and not table_path.resolve().is_relative_to(source.resolve()):
+            quarantine("peak table must be within source directory")
             continue
         if table_path is None or not table_path.is_file():
             quarantine(f"peak table {table_name!r} not found")
@@ -198,9 +223,10 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
             quarantine(str(exc))
             continue
         formula = rdMolDescriptors.CalcMolFormula(mol)
-        if declared_formula and declared_formula != formula:
+        manifest_formula = row["declared_formula"].strip()
+        if manifest_formula != formula or (declared_formula and declared_formula != formula):
             quarantine(
-                f"table declares formula {declared_formula} but structure is {formula}"
+                f"declared formula disagrees with structure formula {formula}"
             )
             continue
         solvent = (row.get("solvent") or "").strip()
@@ -208,6 +234,12 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
         license_text = (row.get("license") or "").strip()
         if not (solvent and source_text and license_text):
             quarantine("solvent, source and license are all required")
+            continue
+        combined_source = f"{source_text} | accession: {urls['source_accession_url']} | identity: {urls['identity_source_url']}"
+        combined_license = f"{license_text} | rights evidence: {urls['rights_evidence_url']}"
+        if (len(candidate_id) > 200 or len(solvent) > 200 or len(combined_source) > 2000
+                or len(combined_license) > 1000 or len(candidate_id) + 13 > 200):
+            quarantine("record metadata exceeds executor schema limits")
             continue
         table_digest = _sha256_bytes(table_path.read_bytes())
         reference_id = f"{candidate_id}-{table_digest[:12]}"
@@ -224,7 +256,11 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
                 "source": source_text,
                 "license": license_text,
                 "peaks": peaks,
-                "evidence_nature": (row.get("evidence_nature") or "").strip(),
+                "evidence_nature": row["evidence_nature"].strip(),
+                "source_accession_url": urls["source_accession_url"],
+                "identity_source_url": urls["identity_source_url"],
+                "rights_evidence_url": urls["rights_evidence_url"],
+                "redistribution_assertion": "cleared",
                 "table_sha256": table_digest,
             }
         )
@@ -260,9 +296,9 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
             "reference_id": record["reference_id"],
             "candidate_id": record["candidate_id"],
             "inchikey": record["inchikey"],
-            "source": record["source"],
+            "source": f"{record['source']} | accession: {record['source_accession_url']} | identity: {record['identity_source_url']}",
             "solvent": record["solvent"],
-            "license": record["license"],
+            "license": f"{record['license']} | rights evidence: {record['rights_evidence_url']}",
             "provenance": "experimental",  # curator assertion; see MANIFEST
             "peaks": record["peaks"],
         }
@@ -280,11 +316,16 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
             record["candidate_id"]: record["evidence_nature"] or "unspecified"
             for record in records
         },
-        "input_hashes": {
-            row["table"]: _sha256_bytes((source / row["table"]).read_bytes())
-            for row in rows
-            if row.get("table") and (source / row["table"]).is_file()
+        "record_evidence": {
+            record["candidate_id"]: {
+                key: record[key] for key in (
+                    "source_accession_url", "identity_source_url", "rights_evidence_url",
+                    "redistribution_assertion", "table_sha256"
+                )
+            }
+            for record in records
         },
+        "input_hashes": {record["table"]: record["table_sha256"] for record in records},
         "manifest_sha256": _sha256_bytes(manifest_path.read_bytes()),
         "output_hashes": {
             "structures.csv": _sha256_bytes(structures_path.read_bytes()),
@@ -292,7 +333,8 @@ def build(source: Path, output: Path, strict: bool = False) -> int:
         },
         "notes": (
             "reference provenance 'experimental' is a curator assertion, not "
-            "software-verified measurement; see evidence_nature per record"
+            "software-verified measurement; rights and identity evidence URLs and "
+            "redistribution clearance are curator assertions, not verified by software"
         ),
     }
     (output / "MANIFEST.json").write_text(
