@@ -10,7 +10,11 @@ access route refuses startup, and ``/health`` reports the actual mode.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
+
+from auth.config import AuthConfig
 
 from networking.gnps_client import MockGNPSClient
 from networking.main import create_app, get_runtime
@@ -118,5 +122,8 @@ class TestRuntime:
         monkeypatch.delenv("PHYTO_DRY_RUN", raising=False)
         monkeypatch.delenv("GNPS_API_KEY", raising=False)
         monkeypatch.delenv("PHYTO_ALLOW_PUBLIC_GNPS", raising=False)
+        # Keep auth collaborators offline while the scientific runtime still
+        # reads the real-mode environment above. No cloud SDK/ADC is needed.
+        auth_config = replace(AuthConfig.from_env(), dry_run=True, enabled=True)
         with pytest.raises(NetworkingConfigError):
-            create_app()
+            create_app(auth_config)

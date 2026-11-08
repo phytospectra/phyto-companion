@@ -11,7 +11,11 @@ and ``/health`` reports the actual detector mode.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
+
+from auth.config import AuthConfig
 from fastapi.testclient import TestClient
 
 from metabolomics.feature_detection import MockDetector
@@ -110,5 +114,8 @@ class TestRuntime:
         monkeypatch.setenv("PHYTO_ENV", "cloud")
         monkeypatch.delenv("PHYTO_DRY_RUN", raising=False)
         monkeypatch.delenv("MZMINE_HOME", raising=False)
+        # Keep auth collaborators offline while the scientific runtime still
+        # reads the real-mode environment above. No cloud SDK/ADC is needed.
+        auth_config = replace(AuthConfig.from_env(), dry_run=True, enabled=True)
         with pytest.raises(MetabolomicsConfigError):
-            create_app()
+            create_app(auth_config)
