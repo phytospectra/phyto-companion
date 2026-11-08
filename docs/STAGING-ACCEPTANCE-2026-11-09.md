@@ -40,3 +40,5 @@ See `test_orchestrator_run_ownership.py` for the ownership contract.
 Live login, revocation, authoritative billing and multi-instance persistence
 remain unverified. Runs/shares are process-local; cloud restart/cross-instance
 persistence and revocation semantics are a separate production design decision.
+
+See docs/ACCOUNTING-GUARANTEE.md for the precise guarantee (at-most-once admission, exactly-once settlement) and failure/recovery matrix.
