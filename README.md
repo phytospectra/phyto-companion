@@ -2,13 +2,31 @@
 
 **An agentic AI companion for academic natural product drug discovery.**
 
-Phytospectra unifies NMR spectroscopy, mass spectrometry, and
-metabolomics into a single agentic workflow: a complex plant extract goes in; ranked,
-evidence-graded structural and biological hypotheses come out.
+Phytospectra is research software for organizing NMR, mass-spectrometry and
+metabolomics evidence. The broader integrated workflow below is a project vision,
+not a claim of completed or scientifically validated structure elucidation.
 
-> The platform is **not an oracle. It is a companion.** It never claims identification it
-> cannot support, always reports uncertainty and evidence gaps, and requires
-> human-in-the-loop review at every critical decision.
+## Current verified scope
+
+The real orchestrator supports **known-formula local HSQC reference ranking**
+(`reference_hsqc_identify`) with an explicit human-review checkpoint. Other
+orchestrated workflows are offline demonstrations and are rejected in real mode.
+This is not de novo elucidation or validated combined NMR–MS identification.
+
+No rights-cleared measured reference library is bundled. The attempted literature
+starter is quarantined; synthetic fixtures and self-matches are software tests,
+not independent accuracy evidence. The separately versioned frontend is not yet
+verified as a live client for the real workflow. Deployment and publication
+require separate approval.
+
+See the [capability matrix](WORKFLOW_CAPABILITY_MATRIX.md),
+[execution contract](docs/ORCHESTRATOR_EXECUTION.md),
+[reference-data gate](docs/REFERENCE_LIBRARY.md), and
+[release approval packet](docs/RELEASE-APPROVAL-PACKET-2026-11-09.md)
+for supported boundaries and unresolved gates.
+
+> Rankings and engineering ambiguity signals are not calibrated confidence or
+> confirmed identities. Human review does not substitute for independent validation.
 
 ---
 

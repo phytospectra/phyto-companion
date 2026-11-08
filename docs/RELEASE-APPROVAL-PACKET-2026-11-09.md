@@ -2,7 +2,11 @@
 
 ## Decision requested, not authorization granted
 
-**Hold public production/scientific release.** Offline software checks permit continued source-alpha preparation only. No deployment, author contact, release/tag publication, DOI registration, external inference, training, download, paid operation, credential deletion/rotation, commit or push was performed by this release-check task.
+**Hold public production/scientific release.**
+
+Continuation evidence: share-revocation ownership fixed in `f9d4ed4`, CI 42512862375 passed 1,771 tests (four skipped, 14 warnings). Quercetin/kaempferol mock isomer identities and reference provenance assertions corrected in `b3bee2e`; no shift assignments transferred and no measured data cleared. Frontend application source `9632bb1` now passes a clean temporary checkout typecheck, 28 unit tests and production build; verification report pushed as `e8bdbe6`. Previous frontend timeouts correlated with `dataless` dependency files in the cloud-managed Documents tree. Setup used networked `npm ci`, not air-gapped installation. These results supersede the earlier frontend-unverified status, but do not certify live login/billing/workflow integration. Full backend clean-environment quickstart and independent scientific validation remain separate outstanding gates.
+
+The remaining historical snapshot gates below describe the prior audit and are not a claim that the continuation completed them. Offline software checks permit continued source-alpha preparation only. No deployment, author contact, release/tag publication, DOI registration, external inference, training, download, paid operation, credential deletion/rotation, commit or push was performed by this release-check task.
 
 This packet is advisory. Approval must identify a named accountable operator, exact action, target, source SHA, data scope, budget where relevant, and rollback/abort criteria. There is no blanket approval implied by a passing test or by this document. Final integrated HEAD and final-tree CI evidence must be pinned by the parent release report after concurrent edits settle; the working snapshot below is not that release revision.
 
