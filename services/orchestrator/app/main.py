@@ -1309,12 +1309,19 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
 
     @application.middleware("http")
     async def private_response_headers(request: Request, call_next):
+        # Correlation ID: echo a client-supplied uuid or mint one. The value
+        # is a random/echoed identifier only — never derived from tokens or
+        # payloads — so it is safe to correlate logs and responses.
+        correlation = request.headers.get("X-Request-ID", "").strip()
+        if not (1 <= len(correlation) <= 64 and all(c.isalnum() or c in "-._" for c in correlation)):
+            correlation = uuid.uuid4().hex
+        response = await call_next(request)
         # Run evidence, authorization failures and revocable shares must not
         # survive sign-out/revocation in browser or intermediary caches.
-        response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Request-ID"] = correlation
         return response
 
     @application.get("/health")
@@ -1328,6 +1335,7 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
             "registry_size": len(runtime.registry),
             "audit_records": len(runtime.audit.records()),
             "dry_run": cfg.dry_run,
+            "run_storage": runtime.run_store.mode,
             "tool_executor": type(runtime.executor).__name__,
             "scientific_execution": runtime.executor.mode,
             "scientific_ready": False,

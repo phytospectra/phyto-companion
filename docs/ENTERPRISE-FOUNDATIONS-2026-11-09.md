@@ -10,7 +10,7 @@ certification or independent scientific validation.
   versioned capability metadata. Real mode advertises only its configured
   supported workflows; mock mode never advertises the real workflow.
 - Configuration/dependency availability is separate from scientific validation.
-  `production_ready` remains false and `run_storage` is `process_local`.
+  `production_ready` remains false. `run_storage` now truthfully reports `memory` (local default) or `sqlite` (durable store; cloud fails closed without it).
 - `GET /runs/{id}` returns the original ranked outputs, assessment and provenance
   behind the existing ownership check. Reloading does not rerun scientific tools.
 - Authenticated checkpoint attribution uses the verified principal, not the
@@ -93,3 +93,32 @@ called a model. Budget/account preflight findings and proposed scientific design
 are recorded separately in `COLAB-CLI-PREFLIGHT-2026-11-09.md` and
 `../benchmark/agent_comparison/RESEARCH-PLAN.md`. These preparations do not close
 the scientific or enterprise acceptance gates above.
+
+
+## Durability increment — 2026-11-09 (second)
+
+- Durable SQLite run store (WAL, BEGIN IMMEDIATE, migrations, backup API):
+  runs, task state, checkpoints, approvals, artifact/response metadata.
+  Ownership and tenant boundaries enforced on every access path, including
+  after restart hydration. Idempotency keys bound to canonical request
+  content: same content replays the stored response byte-for-byte; different
+  content is 409; keys are never cleared. Interrupted runs reconcile to
+  `uncertain` (never re-executed) via scripts/reconcile_runs.py.
+- NOT provided: exactly-once external execution; multi-replica routing;
+  process-local share/revocation registries remain (documented).
+- Tests: 11 store-level + 11 API-level (restart recovery, concurrent
+  transitions/admissions, conflicts, reconciliation, backup/restore,
+  12-writer concurrency smoke, correlation IDs, readiness).
+- Frontend: durable owner-scoped run history with explicit outcome states
+  (in progress/review required/completed/failed/needs operator
+  reconciliation); storage-truthful persistence copy; 64 unit tests,
+  TypeScript and production build verified in a hydrated checkout.
+- Operational additions: X-Request-ID correlation on every response
+  (validated echo or minted uuid); /health reports the actual run-storage
+  mode; tracked-file scan found no high-specificity credential patterns.
+- OpenRouter preflight: no OPENROUTER_API_KEY exists in this environment;
+  the pilot runner enforces a dedicated non-resetting key cap ≤ US$50
+  including BYOK usage and fails closed when the key is absent. No paid
+  call was made; the ceiling recheck remains blocked on key presence.
+  Colab CLI remains at 0.00 compute units per the earlier preflight; no
+  compute was allocated.

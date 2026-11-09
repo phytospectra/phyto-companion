@@ -152,3 +152,43 @@ def test_cloud_accepts_explicit_sqlite_store(monkeypatch, tmp_path):
     runtime = main.get_runtime()
     assert runtime.run_store.mode == "sqlite"
     main.get_runtime.cache_clear()
+
+
+def test_correlation_id_echo_and_mint(sqlite_app):
+    client, _ = sqlite_app
+    echoed = client.get("/health", headers={"X-Request-ID": "trace-abc-123"})
+    assert echoed.headers["X-Request-ID"] == "trace-abc-123"
+    minted = client.get("/health")
+    assert len(minted.headers["X-Request-ID"]) == 32  # minted uuid hex
+    # Unusable client values (too long / wrong charset) are replaced, not trusted.
+    replaced = client.get("/health", headers={"X-Request-ID": "x" * 65})
+    assert replaced.headers["X-Request-ID"] != "x" * 65
+
+
+def test_health_reports_actual_run_storage_mode(sqlite_app):
+    client, _ = sqlite_app
+    assert client.get("/health").json()["run_storage"] == "sqlite"
+
+
+def test_bounded_concurrent_submissions_all_persist_distinctly(sqlite_app):
+    """Representative concurrency smoke (12 writers, unique keys), not a load
+    certification: it documents that the single SQLite writer serializes
+    concurrent admissions without loss; capacity limits remain unmeasured."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    client, path = sqlite_app
+    def submit(index: int):
+        response = client.post(
+            "/analysis",
+            headers={"X-Test-UID": "alice", "Idempotency-Key": f"durable-load-key-{index:04d}"},
+            json={**WORKFLOW_REQUEST, "sample_id": f"load-{index}"},
+        )
+        return response.status_code, response.json().get("run_id")
+
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        results = list(pool.map(submit, range(12)))
+    assert all(status == 200 for status, _ in results)
+    run_ids = {run_id for _, run_id in results}
+    assert len(run_ids) == 12  # no admission lost, no aliasing
+    history = client.get("/runs", headers=AUTH).json()
+    assert {row["run_id"] for row in history} == run_ids
