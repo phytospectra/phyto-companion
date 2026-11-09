@@ -79,3 +79,17 @@ handling, duplicate-key refusal and direct-navigation safeguards.
 No production deployment, release, DOI, paid inference, or training is part of
 this source increment. The research preview is useful for controlled review;
 scientific and production readiness remain unverified.
+
+## Verification update
+
+Backend application increment `4127b3e` passed GitHub CI (run 42523780897).
+Frontend application increment `f327754` passed GitHub CI (run 42523787108).
+Follow-up frontend `0d361bf` preserves same-account token refresh, rejects missing
+CSV fields and recovers a known run after a result-fetch failure. Its isolated
+local TypeScript check, 62 tests across 15 files and production build pass.
+
+The synthetic model pilot adds offline tests and a plan-only command. It has not
+called a model. Budget/account preflight findings and proposed scientific design
+are recorded separately in `COLAB-CLI-PREFLIGHT-2026-11-09.md` and
+`../benchmark/agent_comparison/RESEARCH-PLAN.md`. These preparations do not close
+the scientific or enterprise acceptance gates above.

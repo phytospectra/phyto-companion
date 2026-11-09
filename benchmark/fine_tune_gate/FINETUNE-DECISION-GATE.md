@@ -6,7 +6,17 @@ This memo defines the gate; the benchmark pilot (§`benchmark/blinded_pilot/PROT
 produces the evidence the gate reads. Until the pilot completes, fine-tuning
 stays at planning level.
 
-## 1. The gate (pre-registered before any run)
+## 2026-11-09 planning update
+
+The user approved a USD 50 OpenRouter pilot ceiling and proposed Colab Pro+.
+See `../agent_comparison/RESEARCH-PLAN.md` for controlled model/skill ablations
+and the distinct Antigravity-with-Science-plugin comparator. This authorizes
+bounded inference preparation, not a claim that adapter training is justified.
+Historical source/model choices below must be rechecked against actual rights,
+availability and the final frozen protocol before any training. Non-commercial
+licenses do not automatically authorize commercial-platform training or reuse.
+
+## 1. Proposed gate (no external preregistration receipt verified)
 
 Fine-tuning an open-weight model is **justified only if the pilot shows the
 error pattern that fine-tuning can fix** — the model receives the correct
