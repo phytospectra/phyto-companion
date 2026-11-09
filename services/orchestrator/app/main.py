@@ -64,6 +64,7 @@ from .onboarding import first_story_summary
 from .planner_agent import EngineResult, PlannerAgent, TaskGraph, TaskStatus, WorkflowEngine
 from .qa_critic_agent import QACriticAgent
 from .rate_limit import DEFAULT_SHARE_RATE_LIMIT, SlidingWindowRateLimiter
+from .run_store import open_run_store
 from .tool_registry import DEFAULT_REGISTRY
 from .tool_tiering import ExecutionContext, HumanCheckpoint
 
@@ -78,7 +79,14 @@ logger = logging.getLogger(__name__)
 
 
 class _Runtime:
-    """Everything the API needs, wired for the local plane."""
+    """Everything the API needs, wired for the local plane.
+
+    Run state is layered: live objects in ``self.runs`` for the executing
+    process, with write-through persistence and read-through hydration via
+    ``self.run_store``. With ``PHYTO_RUN_STORE=sqlite`` state survives
+    restarts and is serialized across processes; the in-memory store keeps
+    the offline/local-mock plane behavior and never survives a restart.
+    """
 
     def __init__(self) -> None:
         self.environment: Literal["local", "cloud"] = (
@@ -99,9 +107,13 @@ class _Runtime:
             qa_critic=QACriticAgent(),  # rule-based verification, no LLM needed
         )
         # run_id -> {"graph", "context", "result", "request", "citation",
-        #            "share_token"}
+        #            "share_token"} (live-object cache over run_store)
         self.runs: dict[str, dict[str, Any]] = {}
-        # Serializes review/resume in this process; not a distributed lock.
+        # Durable run/task/approval persistence (memory or sqlite; cloud
+        # fails closed without sqlite — see run_store.open_run_store).
+        self.run_store = open_run_store()
+        # Serializes review/resume in this process; cross-process safety comes
+        # from the durable store's transactional transitions where applicable.
         self.review_lock = threading.RLock()
         self.manifests: dict[str, str] = {}
         # Share tokens: HMAC-signed read-only links (ADR-0044).  The dev
@@ -123,6 +135,87 @@ class _Runtime:
             if self.executor.mode == "mock" and os.environ.get("PHYTO_DRY_RUN", "1") == "1"
             else None
         )
+
+    # -- durable run state ----------------------------------------------
+
+    def _persist_entry(
+        self,
+        run_id: str,
+        entry: dict[str, Any],
+        *,
+        manifest_id: str,
+        outcome: Literal["executing", "completed", "failed", "uncertain"],
+        response: dict[str, Any] | None = None,
+        create: bool = False,
+    ) -> None:
+        from dataclasses import asdict
+
+        from .run_store import RunRecord, _utcnow
+
+        citation = entry.get("citation")
+        # Anonymous local runs persist under a sentinel owner; hydration maps
+        # it back so ownership comparisons keep working on the local plane.
+        persisted_owner = entry["owner_uid"] or "anonymous-local"
+        state = {
+            "graph": entry["graph"].model_dump(mode="json"),
+            "context": entry["context"].model_dump(mode="json"),
+            "result": asdict(entry["result"]),
+            "request": entry["request"].model_dump(mode="json"),
+            "citation": citation.model_dump(mode="json") if citation else None,
+            "share_token": entry.get("share_token"),
+            "owner_uid": entry["owner_uid"],
+            "response": response,
+        }
+        now = _utcnow()
+        record = RunRecord(
+            run_id=run_id,
+            owner_uid=persisted_owner,
+            workflow=entry["request"].workflow,
+            status=entry["result"].status,
+            outcome=outcome,
+            manifest_id=manifest_id,
+            state=state,
+            created_at=now,
+            updated_at=now,
+        )
+        if create:
+            self.run_store.create_run(record)
+        else:
+            self.run_store.save_run(record)
+
+    def get_entry(self, run_id: str) -> dict[str, Any] | None:
+        """Live entry, hydrated from the durable store after a restart."""
+        entry = self.runs.get(run_id)
+        if entry is not None:
+            return entry
+        record = self.run_store.load_run(run_id)
+        if record is None:
+            return None
+        state = record.state
+        citation = state.get("citation")
+        owner = None if record.owner_uid == "anonymous-local" else record.owner_uid
+        entry = {
+            "owner_uid": owner,
+            "graph": TaskGraph.model_validate(state["graph"]),
+            "context": ExecutionContext.model_validate(state["context"]),
+            "result": EngineResult(**state["result"]),
+            "request": AnalysisRequest.model_validate(state["request"]),
+            "citation": CitationRecord.model_validate(citation) if citation else None,
+            "share_token": state.get("share_token"),
+        }
+        self.manifests[run_id] = record.manifest_id
+        self.runs[run_id] = entry
+        return entry
+
+    def store_manifest(self, run_id: str, manifest_id: str) -> None:
+        self.manifests[run_id] = manifest_id
+
+    def manifest_for(self, run_id: str) -> str | None:
+        manifest = self.manifests.get(run_id)
+        if manifest is not None:
+            return manifest
+        record = self.run_store.load_run(run_id)
+        return None if record is None else record.manifest_id
 
 
 @lru_cache(maxsize=1)
@@ -303,8 +396,8 @@ def _run_principal(request: Request) -> str | None:
 
 def _owned_run(runtime: _Runtime, run_id: str, request: Request) -> dict[str, Any]:
     principal = _run_principal(request)
-    entry = runtime.runs.get(run_id)
-    # Missing legacy owner metadata is denied, never implicitly public.
+    entry = runtime.get_entry(run_id)  # hydrates from the durable store
+    # Missing owner metadata is denied, never implicitly public.
     if entry is None or "owner_uid" not in entry or entry["owner_uid"] != principal:
         raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
     return entry
@@ -566,11 +659,13 @@ def capabilities() -> dict[str, Any]:
         "supported_workflows": sorted(runtime.executor.supported_workflows or []),
         "analysis_tokens": price.tokens if price is not None else None,
         "pricing_provisional": True,
-        "run_storage": "process_local",
+        "run_storage": runtime.run_store.mode,
         "production_ready": False,
         "limitations": [
             "Reference ranking has not been independently scientifically validated.",
-            "Run state is process-local; restarts lose runs and multi-worker routing is unsupported.",
+            "SQLite run storage is durable but single-instance; shares/audit "
+            "revocation registries remain process-local and multi-replica "
+            "routing is unsupported.",
             "Configured libraries do not establish measured-data rights or independent validation.",
         ],
     }
@@ -669,11 +764,70 @@ def _chromatography_layers_status(graph: TaskGraph) -> dict[str, Any]:
 
 @router.post("/analysis", response_model=AnalysisResponse, status_code=200)
 def submit_analysis(request: AnalysisRequest, http_request: Request) -> AnalysisResponse:
+    from .run_store import KeyConflictError, new_run_id, request_content_hash
+
     runtime = get_runtime()
     owner_uid = _run_principal(http_request)
-    run_id = f"run-{uuid.uuid4().hex[:12]}"
+
+    # Content-bound idempotency at the run layer: the same key with the same
+    # canonical request replays the stored response; the same key with
+    # different content is rejected. Keys are never cleared automatically.
+    idem_key = http_request.headers.get("Idempotency-Key") or f"auto-{uuid.uuid4().hex}"
+    if len(idem_key) < 16:
+        raise HTTPException(
+            status_code=400,
+            detail="Idempotency-Key must be at least 16 characters",
+        )
+    content_hash = request_content_hash(request.model_dump(mode="json"))
+    run_id = new_run_id()
+    try:
+        bound_run = runtime.run_store.admit(
+            user_uid=owner_uid or "anonymous-local",
+            idem_key=idem_key,
+            request_hash=content_hash,
+            run_id=run_id,
+        )
+    except KeyConflictError as exc:
+        raise HTTPException(
+            status_code=409, detail=str(exc)
+        ) from exc
+    if bound_run != run_id:
+        record = runtime.run_store.load_run(bound_run)
+        if record is None:
+            # The key was claimed but no run was persisted (crash between
+            # admission and persistence). Fail closed: the operator must
+            # reconcile; the key is never silently cleared.
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "key claims a run that was never persisted; "
+                    "operator reconciliation required",
+                    "run_id": bound_run,
+                },
+            )
+        if record.status == "executing":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "a request with this key is already in flight",
+                    "run_id": bound_run,
+                    "outcome": record.outcome,
+                },
+            )
+        replayed = (record.state or {}).get("response")
+        if replayed is None:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "duplicate key; original response unavailable",
+                    "run_id": bound_run,
+                    "outcome": record.outcome,
+                },
+            )
+        return AnalysisResponse.model_validate(replayed)
+
     manifest_id = _build_manifest(run_id, request)
-    runtime.manifests[run_id] = manifest_id
+    runtime.store_manifest(run_id, manifest_id)
 
     try:
         modalities = parse_observation_modalities(request.modalities)
@@ -737,7 +891,7 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
         )
 
     awaiting = result.awaiting_task_id
-    return AnalysisResponse(
+    response = AnalysisResponse(
         run_id=run_id,
         status=_status_literal(result),
         provenance_manifest_id=manifest_id,
@@ -763,6 +917,24 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
             **_chromatography_layers_status(graph),
         },
     )
+    # Persist terminal state (graph/context/result/request + the exact
+    # response payload for idempotent replay). An interruption before this
+    # point leaves the durable record in outcome=executing for operator
+    # reconciliation — it is never automatically re-executed.
+    outcome = (
+        "completed" if result.status == "complete"
+        else "failed" if result.status == "failed"
+        else "executing"  # awaiting_review is not terminal
+    )
+    runtime._persist_entry(
+        run_id,
+        runtime.runs[run_id],
+        manifest_id=manifest_id,
+        outcome=outcome,
+        response=response.model_dump(mode="json"),
+        create=True,
+    )
+    return response
 
 
 @router.get("/runs/{run_id}", response_model=RunStatusResponse)
@@ -807,9 +979,17 @@ def _approve_owned_checkpoint(
     # The authenticated principal is authoritative; a client must not attribute
     # a review to another scientist by supplying a display name or UID.
     principal = _run_principal(http_request)
-    new_context = context.with_approval(
-        request.checkpoint, actor=principal if principal is not None else request.actor
-    )
+    attribution = principal if principal is not None else request.actor
+    # Durable approval record: exactly one approval per (run, checkpoint);
+    # a duplicate approval from any process is refused before re-execution.
+    if not runtime.run_store.record_approval(
+        run_id, str(request.checkpoint), attribution
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=f"checkpoint '{request.checkpoint}' already approved for this run",
+        )
+    new_context = context.with_approval(request.checkpoint, actor=attribution)
     new_result = runtime.engine.run(graph, new_context)
     runtime.runs[run_id] = {
         "owner_uid": entry["owner_uid"],
@@ -835,14 +1015,53 @@ def _approve_owned_checkpoint(
         )
     else:
         citation = None
+    outcome = (
+        "completed" if new_result.status == "complete"
+        else "failed" if new_result.status == "failed"
+        else "executing"
+    )
+    runtime._persist_entry(
+        run_id, entry,
+        manifest_id=runtime.manifest_for(run_id) or "",
+        outcome=outcome,
+    )
     return ApproveResponse(
         run_id=run_id,
         approved=request.checkpoint,
         status=new_result.status,
         awaiting_task_id=new_result.awaiting_task_id,
-        provenance_manifest_id=runtime.manifests[run_id],
+        provenance_manifest_id=runtime.manifest_for(run_id) or "",
         citation=citation,
     )
+
+
+class RunSummaryRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    workflow: str
+    status: str
+    outcome: str
+    updated_at: str
+
+
+@router.get("/runs", response_model=list[RunSummaryRow])
+def list_own_runs(http_request: Request, limit: int = 50) -> list[RunSummaryRow]:
+    """Owner-scoped durable run history (newest first)."""
+    runtime = get_runtime()
+    principal = _run_principal(http_request)
+    if principal is None:
+        return []
+    return [
+        RunSummaryRow(
+            run_id=record.run_id,
+            workflow=record.workflow,
+            status=record.status,
+            outcome=record.outcome,
+            updated_at=record.updated_at,
+        )
+        for record in runtime.run_store.list_runs(principal, limit=min(limit, 200))
+    ]
 
 
 # -- citations (ADR-0043) ----------------------------------------------------
@@ -896,11 +1115,25 @@ def create_share(run_id: str, request: ShareCreateRequest, http_request: Request
         run_id, expires_in_days=request.expires_in_days
     )
     runtime.runs[run_id]["share_token"] = token
+    runtime._persist_entry(
+        run_id, runtime.runs[run_id],
+        manifest_id=runtime.manifest_for(run_id) or "",
+        outcome=_outcome_for_entry(runtime.runs[run_id]),
+    )
     return ShareCreateResponse(
         share_url=share_url_for(token),
         expires_at=claims.expires_at.isoformat(),
         scope=claims.scope,
     )
+
+
+def _outcome_for_entry(entry: dict[str, Any]) -> Literal["executing", "completed", "failed", "uncertain"]:
+    status = entry["result"].status
+    if status == "complete":
+        return "completed"
+    if status == "failed":
+        return "failed"
+    return "executing"
 
 
 @router.delete("/runs/{run_id}/share")
@@ -910,6 +1143,11 @@ def revoke_shares(run_id: str, http_request: Request) -> dict[str, Any]:
     registry = runtime.share_manager.registry
     revoked = registry.revoke_all(run_id) if registry is not None else 0
     runtime.runs[run_id]["share_token"] = None
+    runtime._persist_entry(
+        run_id, runtime.runs[run_id],
+        manifest_id=runtime.manifest_for(run_id) or "",
+        outcome=_outcome_for_entry(runtime.runs[run_id]),
+    )
     return {"run_id": run_id, "revoked": revoked}
 
 

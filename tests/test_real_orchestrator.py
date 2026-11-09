@@ -749,7 +749,9 @@ class TestResearchWorkspaceContract:
         assert data['scientific_execution'] == 'real'
         assert data['production_ready'] is False
         assert data['scientific_validation'] == 'not_validated'
-        assert data['run_storage'] == 'process_local'
+        # Local default is the truthful process-local in-memory store; the
+        # durable sqlite store is selected via PHYTO_RUN_STORE=sqlite.
+        assert data['run_storage'] == 'memory'
         assert data['analysis_tokens'] == 20
 
     def test_mock_backend_does_not_advertise_real_workflow(self, api):
