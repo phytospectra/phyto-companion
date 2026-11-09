@@ -213,3 +213,53 @@ publication, paid inference/training or third-party contact occurred.
 Readiness split unchanged: preview GO-with-caveats; scientific evaluation,
 production service, and manuscript submission NO-GO pending the exact
 inputs listed in the three request documents.
+
+## Enterprise increment — 2026-11-09 (durability)
+
+Implemented and verified:
+- Durable SQLite run store (WAL, BEGIN IMMEDIATE, versioned migrations,
+  backup API): runs, checkpoints, approvals, response metadata; ownership
+  enforced on every path incl. restart hydration; cloud fails closed
+  without durable storage. Content-bound idempotency: same content replays
+  the stored response; different content 409; keys never cleared; crash
+  between admission and persistence fails closed to operator
+  reconciliation (scripts/reconcile_runs.py marks uncertain, never
+  re-executes). Backend d68f287 (CI 42624312078 success), final 3b85b1b
+  (CI 42634113290 success: 1,891 passed, four skipped, 14 warnings; Ruff
+  clean). Local full suite on the same tree: 1,888 passed pre-correlation
+  tests; 11 store + 11 API durability tests incl. restart recovery,
+  concurrent transitions/admissions, conflict rejection, backup/restore
+  round-trip, 12-writer concurrency smoke, X-Request-ID echo/mint,
+  readiness run_storage reporting. docs/DURABLE-RUN-STORE.md documents
+  guarantees, non-goals (no exactly-once external execution; no
+  multi-replica), operator backup/restore/rollback/reconciliation.
+- Frontend 4ef2716 (CI 42624330119 success): durable owner-scoped run
+  history (GET /runs) with explicit outcome states incl. "needs operator
+  reconciliation"; storage-truthful persistence copy; 64 unit tests,
+  TypeScript and production build verified in a hydrated checkout outside
+  Documents. No browser-based visual check was performed this increment
+  (no browser tooling invoked); UI verification is component-test level.
+- Operations: correlation IDs on every response (validated echo or minted
+  uuid); tracked-file scan found no high-specificity credential patterns;
+  existing dependency snapshot retained.
+- Agent-comparison runner audited against the brief: distinct arms;
+  Antigravity explicitly not_run_not_available; key preflight enforces a
+  dedicated non-resetting cap <= US$50 INCLUDING BYOK and fails closed.
+
+Implemented but not verified here: live staging acceptance (no staging
+project exists; production project untouched), browser-based UI
+inspection, load/soak beyond the 12-writer smoke.
+
+Blocked on external inputs: OPENROUTER_API_KEY absent from this
+environment, so the live $50 ceiling recheck cannot run (runner fails
+closed without it); Colab compute units remain 0.00 (no allocation);
+rights-cleared measured data, scientific review/lock, and author
+declarations unchanged from prior packets.
+
+Spending this increment: US$0 inference, US$0 compute, no training, no
+deployment, no release/DOI/publication, no third-party contact.
+
+Readiness: software research preview GO with caveats (now with durable
+single-instance storage); scientifically evaluated workflow, production
+service, and manuscript submission remain NO-GO for the reasons in the
+prior packets.
