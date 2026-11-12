@@ -126,6 +126,15 @@ class _Runtime:
         self.lease_ttl_seconds = int(
             os.environ.get("PHYTO_RUN_LEASE_SECONDS", "600")
         )
+        # Cooperative per-pass execution budget (see ExecutionContext).
+        self.execution_budget_seconds = float(
+            os.environ.get("PHYTO_EXECUTION_BUDGET_SECONDS", "300")
+        )
+        # Ingress payload cap: requests with a Content-Length above this are
+        # refused 413 before any handler runs.
+        self.max_request_bytes = int(
+            os.environ.get("PHYTO_MAX_REQUEST_BYTES", str(1024 * 1024))
+        )
         if self.run_store.mode == "sqlite":
             self.run_store.register_worker(self.worker_id)
         # Serializes review/resume in this process; cross-process safety comes
@@ -1045,6 +1054,7 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
         verification_available=True,
         human_in_the_loop_approved=False,
         actor="api",
+        execution_budget_seconds=runtime.execution_budget_seconds,
     )
     # Durable admission BEFORE execution: an interruption anywhere after this
     # point leaves a discoverable run row (outcome=admitted -> reconciled to
@@ -1608,6 +1618,34 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
         correlation = request.headers.get("X-Request-ID", "").strip()
         if not (1 <= len(correlation) <= 64 and all(c.isalnum() or c in "-._" for c in correlation)):
             correlation = uuid.uuid4().hex
+        # Ingress payload cap: refuse oversized bodies before any handler or
+        # accounting effect. Chunked bodies without Content-Length are not
+        # covered by this header check (documented boundary; the API contract
+        # requires Content-Length on the JSON endpoints).
+        max_bytes = get_runtime().max_request_bytes
+        declared = request.headers.get("Content-Length")
+        if (
+            declared is not None
+            and declared.isdigit()
+            and int(declared) > max_bytes
+        ):
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "detail": (
+                        f"Request body exceeds the configured limit of "
+                        f"{max_bytes} bytes."
+                    )
+                },
+                headers={
+                    "Cache-Control": "no-store",
+                    "X-Content-Type-Options": "nosniff",
+                    "X-Frame-Options": "DENY",
+                    "X-Request-ID": correlation,
+                },
+            )
         response = await call_next(request)
         # Run evidence, authorization failures and revocable shares must not
         # survive sign-out/revocation in browser or intermediary caches.

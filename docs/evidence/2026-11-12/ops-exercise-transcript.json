@@ -1,0 +1,11 @@
+{
+  "machine": "macOS arm64 (darwin 25.5.0), local single host",
+  "python": "3.12.15",
+  "workload": "300 POST /analysis (unique keys) + restart/restore/approval/share flows",
+  "duration_seconds": 10.3,
+  "load_seconds": 4.6,
+  "checks_passed": 18,
+  "checks_total": 18,
+  "failed": [],
+  "boundary_note": "Local single-process-per-port exercise; the two servers never shared a store concurrently. This documents the single-instance supported topology, not multi-replica behavior."
+}

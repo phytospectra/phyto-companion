@@ -39,9 +39,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[1] / "services" / "orchestrator")
+)
 
-from orchestrator.run_store import SQLiteRunStore  # noqa: E402
+from app.run_store import SQLiteRunStore  # noqa: E402
 
 DEFAULT_HEARTBEAT_TTL_SECONDS = 60.0
 
@@ -75,6 +77,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--heartbeat-ttl-seconds", type=float,
                         default=DEFAULT_HEARTBEAT_TTL_SECONDS,
                         help="worker liveness window (default 60)")
+    parser.add_argument("--audit-restore", metavar="SNAPSHOT_ISO",
+                        help="audit the key/accounting implications of restoring "
+                        "a backup taken at this ISO timestamp: lists keys that "
+                        "would replay pre-restore responses (verify each against "
+                        "the accounting ledger) and, against the LIVE database, "
+                        "runs the restore would lose")
     args = parser.parse_args(argv)
     store = SQLiteRunStore(Path(args.store).expanduser())
 
@@ -104,6 +112,34 @@ def main(argv: list[str] | None = None) -> int:
                   "(already terminal or unknown run)")
         else:
             print(f"resolved: {run_id} -> failed (decision abandoned, recorded)")
+
+    # -- restore audit: key/accounting implications of a restore ----------
+    if args.audit_restore:
+        audit = store.restore_audit(snapshot=args.audit_restore)
+        replaying = [row for row in audit if row["kind"] == "replays_pre_restore_response"]
+        lost = [row for row in audit if row["kind"] == "run_created_after_snapshot"]
+        for row in lost:
+            print(
+                "restore would LOSE this run (created after snapshot): "
+                f"run_id={row['run_id']} created_at={row['created_at']} "
+                f"user_uid={row['user_uid']}"
+            )
+        for row in replaying:
+            print(
+                "key will REPLAY a pre-restore response: "
+                f"run_id={row['run_id']} user_uid={row['user_uid']} "
+                f"idem_key={row['idem_key']!r} — verify against the accounting "
+                "ledger and record a decision before accepting re-submissions"
+            )
+        if not audit:
+            print("restore audit: no key/run interactions found")
+        if lost:
+            print(
+                "restore would lose work: stop the service, re-backup, or accept "
+                "the loss explicitly before restoring."
+            )
+            exit_code = 3
+        return exit_code
 
     # -- read-only evidence: orphan claims and admitted approvals ----------
     for spec in args.complete_approval:

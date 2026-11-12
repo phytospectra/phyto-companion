@@ -129,7 +129,7 @@ Work branches and final revisions (2026-11-12):
 | No auto-retry / no fabricated fallback | PASS — 409 never unfreezes the form; no demo fallback in live mode (tests pin both) |
 | Sign-out/account isolation | PASS — existing generation/remount tests still green (68/68) |
 | TypeScript / unit tests / production build | PASS — typecheck clean; 68/68 vitest; build clean (CI 43139847866; 9c3d9f3) |
-| Browser interaction with integrated backend | PARTIAL — mock + live-signed-out surfaces verified in-browser; authenticated live workspace blocked on Firebase staging identity |
+| Browser interaction with integrated backend | PASS — live workspace exercised in a real browser against the real authenticated backend via the build-gated offline demo identity (submit → awaiting_review → SIGKILL/restart → history re-hydration → approve → completed); live multi-identity still needs Firebase staging |
 | Keyboard/labels/focus/error announcements | PASS — zero unnamed controls after FileDropZone fix; role=alert verified; drop zone keyboard wiring |
 | Desktop + narrow layout; loading/empty/failure/recovery | PASS — 1280px and 390px (no horizontal overflow); screenshots preserved |
 
@@ -139,21 +139,22 @@ Work branches and final revisions (2026-11-12):
 | Clean-env install + offline quickstart | PASS — clean venv outside Documents (Python 3.12.15) with the CI dependency set; suites re-run there |
 | Authenticated API contract checks | PASS — live uvicorn exercise with real middleware (mock verifier): replay/conflict/history/approval/share/revocation; 16/16 checks |
 | Worker interruption / restart exercises | PASS — API-boundary fault injection tests + real-process SIGKILL/restart cycles in the ops exercise |
-| Backup → restore into separate environment | PASS — hot backup API → restore → second server serves history + identical replay |
-| Concurrency + sustained load | PASS (bounded) — 300/300 submissions, 8 workers, ~156 req/s (macOS arm64, single host); not a capacity certification |
-| Resource bounds (request/payload/history/execution) | PASS — history cap 200 + offset verified on 300 rows; per-file/peak bounds client-side; server payload cap not added (documented) |
-| Timeout/cancellation semantics | Reviewed — client 120s timeout + abort wiring; no server-side executor timeout (documented limit) |
+| Backup → restore into separate environment | PASS — hot backup → restore → second server serves history + identical replay; **restore audit (`reconcile_runs.py --audit-restore`) lists keys replaying pre-restore responses and runs the restore would lose** (exercise + test) |
+| Concurrency + sustained load | PASS — burst: 300/300 at ~65 req/s; **10-minute soak: 7,480 requests, 0 errors, 12.5 req/s sustained, p95 1447 ms** with store growing to 43.7 MB (macOS arm64, single host); not a capacity certification |
+| Resource bounds (request/payload/history/execution) | PASS — history cap 200 + offset on 300 rows; **payload 413 guard (PHYTO_MAX_REQUEST_BYTES) + cooperative execution budget (PHYTO_EXECUTION_BUDGET_SECONDS)** implemented with tests (test_execution_limits.py) |
+| Timeout/cancellation semantics | PASS — server-side execution budget enforced between tasks (explicit failure, never silent partial success); single-tool overrun documented as a cooperative bound; client 120s timeout + abort wiring |
 | Readiness dependency reporting | PASS — /health + /capabilities report storage mode + executor health truthfully |
 | Correlation logs | PASS — X-Request-ID echo/mint + test |
 | Secret redaction checks | PASS — new regression test: audit chain never carries bearer tokens/HMAC key/share URL |
-| Dependency/secret scanning in CI | PASS — gitleaks (project allowlist; tree scan clean) + pip-audit (0 findings) blocking in backend CI; frontend npm audit advisory (17 transitive, documented) |
+| Evidence preservation (durable, sanitized) | **PASS — transcripts, soak summary and browser screenshots committed to docs/evidence/2026-11-12/ (README-indexed; no credentials)** |
+| Dependency/secret scanning in CI | PASS — gitleaks + pip-audit blocking in backend CI; frontend: 2 dead deps removed, 12 remaining findings (6 high accepted with reachability rationale in DEPENDENCY-SECURITY-2026-11-12.md) enforced by an npm-audit baseline gate (fails on new critical/high) |
 
 ## Phase 5 — research follow-through
 | Item | Status |
 |---|---|
 | Triage Nov-11 proposals (controlled vs exploratory vs future) | PASS — docs/MODEL-COMPARISON-FOLLOW-THROUGH-2026-11-12.md |
 | NaFM/NPCLM verification (models, licenses, deps, interface) | PASS (bounded) — arXiv metadata verified; weights/license/interface NOT verifiable → retrieval arm BLOCKED, status recorded |
-| No new arms added to the locked comparison | PASS — arms A–E + Antigravity track untouched; retrieval idea kept as a separate exploratory experiment |
+| No new arms added to the proposed comparison (protocol NOT LOCKED per benchmark/paired_hsqc/DECISION-SHEET.md) | PASS — arms A–E + Antigravity track untouched; retrieval idea kept as a separate exploratory experiment |
 | OpenRouter cap recheck (safe, no secrets) | Result: OPENROUTER_API_KEY absent from environment → live recheck impossible; no paid requests; ceiling unchanged |
 | Colab allowance recheck | Result: 0.00 compute units, 0.00/hr, 0 active assignments (`colab usage`); no allocation, no training |
 

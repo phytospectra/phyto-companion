@@ -295,6 +295,16 @@ class RunStore(Protocol):
         """Abandon a non-terminal run: terminal ``failed`` with a recorded
         decision. Never re-executes and never clears the idempotency key."""
     ...
+    def restore_audit(self, *, snapshot: str) -> list[dict[str, str]]:
+        """Key/run interactions of restoring a backup taken at ``snapshot``.
+
+        Returns two kinds of rows: bindings whose bound run predates the
+        snapshot (these keys will replay a PRE-restore response after the
+        restore — each must be verified against the accounting ledger) and
+        runs newer than the snapshot (work a restore to this snapshot would
+        LOSE — listed when run against the live database before restoring).
+        """
+    ...
 
 
 def _apply_staleness(
@@ -517,6 +527,27 @@ class InMemoryRunStore:
                             "recorded_at": moment,
                         }
                     )
+            return result
+
+    def restore_audit(self, *, snapshot: str) -> list[dict[str, str]]:
+        with self._lock:
+            result: list[dict[str, str]] = []
+            for (user_uid, idem_key), (_, bound_run) in self._keys.items():
+                record = self._runs.get(bound_run)
+                if record is None:
+                    continue
+                kind = (
+                    "replays_pre_restore_response"
+                    if record.created_at < snapshot
+                    else "run_created_after_snapshot"
+                )
+                result.append(
+                    {
+                        "kind": kind, "user_uid": user_uid,
+                        "idem_key": idem_key, "run_id": bound_run,
+                        "created_at": record.created_at,
+                    }
+                )
             return result
 
     def resolve_run(
@@ -899,6 +930,28 @@ class SQLiteRunStore:
             conn.execute("ROLLBACK")
             raise
 
+    def restore_audit(self, *, snapshot: str) -> list[dict[str, str]]:
+        """Key/run interactions of restoring a backup taken at ``snapshot``
+        (see the RunStore protocol docstring)."""
+        rows = self._conn.execute(
+            "SELECT i.user_uid, i.idem_key, i.run_id, r.created_at"
+            " FROM idempotency i JOIN runs r ON r.run_id = i.run_id"
+        ).fetchall()
+        return [
+            {
+                "kind": (
+                    "replays_pre_restore_response"
+                    if row["created_at"] < snapshot
+                    else "run_created_after_snapshot"
+                ),
+                "user_uid": row["user_uid"],
+                "idem_key": row["idem_key"],
+                "run_id": row["run_id"],
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+
     def resolve_run(
         self,
         run_id: str,
@@ -951,7 +1004,12 @@ class SQLiteShareRegistry:
 
     def __init__(self, store: SQLiteRunStore):
         self._store = store
-        self._conn = store._conn
+
+    @property
+    def _conn(self) -> sqlite3.Connection:
+        # Resolve per call: the store's connection is thread-local and must
+        # never be captured across threads.
+        return self._store._conn
 
     def register(self, run_id: str, token_id: str, expires_at: datetime) -> None:
         self._conn.execute(

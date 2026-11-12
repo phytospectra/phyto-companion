@@ -1233,8 +1233,23 @@ class WorkflowEngine:
         failed_task: str | None = None
         cost_usd = 0.0
         audit_start = len(self.audit.records())
+        budget = context.execution_budget_seconds
 
         for task in graph.tasks:
+            # Cooperative execution budget: stop between tasks when the
+            # wall-clock bound is exceeded. A single long tool call can
+            # overrun it; that remainder is documented, not silent.
+            if budget is not None and time.monotonic() - started > budget:
+                task.status = TaskStatus.FAILED
+                task.error = "execution budget exceeded"
+                task.verified = False
+                failed_task = task.id
+                self.audit.log_event(
+                    run_id=graph.run_id,
+                    event="execution_budget_exceeded",
+                    detail={"task_id": task.id, "budget_seconds": budget},
+                )
+                break
             if task.status == TaskStatus.COMPLETE:
                 continue
             if task.status in (TaskStatus.SKIPPED, TaskStatus.FAILED):

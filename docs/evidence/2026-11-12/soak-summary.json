@@ -1,0 +1,21 @@
+{
+  "kind": "soak",
+  "machine": "macOS arm64 (darwin 25.5.0), single host",
+  "scientific_execution": "mock",
+  "auth": "disabled (anonymous runs; metering exercised separately)",
+  "window_seconds": 600,
+  "workers": 8,
+  "total_requests": 7480,
+  "errors": 0,
+  "error_rate": 0.0,
+  "throughput_req_s": 12.5,
+  "latency_p50_ms": 583.6,
+  "latency_p90_ms": 1268.8,
+  "latency_p95_ms": 1447.2,
+  "latency_p99_ms": 1806.8,
+  "latency_max_ms": 4150.1,
+  "store_bytes_start": 4096,
+  "store_bytes_end": 43687936,
+  "wal_bytes_end": 4375472,
+  "boundary_note": "Soak documents sustained single-host behavior on this hardware with these fixtures; it is not a capacity or production certification."
+}

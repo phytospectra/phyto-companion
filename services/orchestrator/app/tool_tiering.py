@@ -91,6 +91,13 @@ class ExecutionContext(BaseModel):
     )
     approved_checkpoints: frozenset[HumanCheckpoint] = frozenset()
     actor: str = Field(default="system", description="Who triggered this context")
+    execution_budget_seconds: float | None = Field(
+        default=None,
+        gt=0,
+        description="Wall-clock budget for one engine pass; the engine stops "
+        "between tasks when it is exceeded and fails the remaining work. "
+        "A single long-running tool call can overrun it (cooperative bound).",
+    )
 
     def with_approval(
         self, checkpoint: HumanCheckpoint, actor: str

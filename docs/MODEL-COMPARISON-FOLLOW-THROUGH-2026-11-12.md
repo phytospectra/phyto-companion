@@ -2,9 +2,19 @@
 
 Scope: triage the November 11 literature proposals (LLM_SOTA_NMR_elucidation.md
 §8.2, phytospectra-paper/RELATED-WORK-PROPOSAL-2026-11-11.md) against the
-locked comparison plan, verify what can be verified without spending, and
+proposed comparison plan, verify what can be verified without spending, and
 record the current budget state. No downloads, no paid inference, no training
 were performed for this decision.
+
+## 0. Protocol status (recorded, not assumed)
+
+The comparison protocol is **NOT LOCKED and NOT PREREGISTERED**
+(`benchmark/paired_hsqc/DECISION-SHEET.md` status line; the agent_comparison
+plan is a proposed study with no scientific run). "Locked" appears only for
+the *tool/skill environment* the protocol requires at run time. This
+follow-through therefore does not treat the plan as an immutable experiment:
+it records decisions against the current proposed state and requires any
+arm change to be a recorded decision, not a silent edit.
 
 ## 1. Where each proposal belongs
 
@@ -83,7 +93,8 @@ Kept here so the decision is reversible with evidence, not re-litigated:
 ## 5. Status ledger
 
 - Controlled comparison arms A–E + Antigravity track: **proposed, not run,
-  not modified by this decision.**
+  not modified by this decision; the protocol is not locked/not
+  preregistered (see §0).**
 - NaFM/NPCLM retrieval arm: **proposed, blocked on artifact verification.**
 - Fine-tuning: **NOT JUSTIFIED (2026-11-09 decision stands)**; NPCLM/NaFM
   citations banked as reopen conditions.
