@@ -44,11 +44,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Secret scan (gitleaks, project allowlist)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
+      - name: Install gitleaks (MIT v8 release line)
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz | tar -xz gitleaks
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Secret scan (tree, project allowlist)
+        run: gitleaks detect --source . --no-git --config .gitleaks.toml
 
       - uses: actions/setup-python@v5
         with:
