@@ -1148,8 +1148,12 @@ def _papers_from_task_outputs(graph: TaskGraph, task: Task) -> list[PaperHit]:
 
 @dataclass
 class EngineResult:
-    """Outcome of one engine pass over a task graph."""
-    status: Literal["complete", "failed", "awaiting_review"]
+    """Outcome of one engine pass over a task graph.
+
+    ``running`` is used only for the durable pre-execution record persisted
+    before the engine starts; the engine itself returns a terminal status.
+    """
+    status: Literal["running", "complete", "failed", "awaiting_review"]
     awaiting_task_id: str | None = None
     failed_task_id: str | None = None
     audit_entries: int = 0

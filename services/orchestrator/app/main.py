@@ -26,6 +26,7 @@ import os
 import tempfile
 import threading
 import uuid
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
@@ -64,7 +65,12 @@ from .onboarding import first_story_summary
 from .planner_agent import EngineResult, PlannerAgent, TaskGraph, TaskStatus, WorkflowEngine
 from .qa_critic_agent import QACriticAgent
 from .rate_limit import DEFAULT_SHARE_RATE_LIMIT, SlidingWindowRateLimiter
-from .run_store import open_run_store
+from .run_store import (
+    SQLiteRunStore,
+    SQLiteShareRegistry,
+    StaleStateError,
+    open_run_store,
+)
 from .tool_registry import DEFAULT_REGISTRY
 from .tool_tiering import ExecutionContext, HumanCheckpoint
 
@@ -112,6 +118,16 @@ class _Runtime:
         # Durable run/task/approval persistence (memory or sqlite; cloud
         # fails closed without sqlite — see run_store.open_run_store).
         self.run_store = open_run_store()
+        # Process-generation identity and lease/heartbeat knobs for stale-work
+        # reconciliation: a run is only ever stale when its lease expired AND
+        # its owning worker is no longer live (or the operator confirms the
+        # system quiesced). See docs/DURABLE-RUN-STORE.md.
+        self.worker_id = uuid.uuid4().hex
+        self.lease_ttl_seconds = int(
+            os.environ.get("PHYTO_RUN_LEASE_SECONDS", "600")
+        )
+        if self.run_store.mode == "sqlite":
+            self.run_store.register_worker(self.worker_id)
         # Serializes review/resume in this process; cross-process safety comes
         # from the durable store's transactional transitions where applicable.
         self.review_lock = threading.RLock()
@@ -119,8 +135,14 @@ class _Runtime:
         # Share tokens: HMAC-signed read-only links (ADR-0044).  The dev
         # HMAC key is fine only in dry-run; from_env refuses to mint with
         # it in production.  The registry is what makes revocation real:
-        # a manager without one can mint and verify but never revoke.
-        self.share_registry = InMemoryShareRegistry()
+        # a manager without one can mint and verify but never revoke.  With
+        # durable run storage the registry is persisted in the same file, so
+        # revocations survive restarts.
+        self.share_registry = (
+            SQLiteShareRegistry(self.run_store)
+            if isinstance(self.run_store, SQLiteRunStore)
+            else InMemoryShareRegistry()
+        )
         self.share_manager = ShareTokenManager.from_env(self.share_registry)
         self.rate_limiter = SlidingWindowRateLimiter(
             max_requests=int(
@@ -144,10 +166,21 @@ class _Runtime:
         entry: dict[str, Any],
         *,
         manifest_id: str,
-        outcome: Literal["executing", "completed", "failed", "uncertain"],
-        response: dict[str, Any] | None = None,
+        outcome: Literal[
+            "admitted", "executing", "awaiting_review", "completed", "failed", "uncertain"
+        ] | None = None,
         create: bool = False,
     ) -> None:
+        """Write an entry to the durable store.
+
+        ``create`` inserts the first (pre-execution) row for a run; later
+        saves only touch the mutable columns (status/outcome/state). The
+        creation response is written separately via
+        :meth:`SQLiteRunStore.record_response` and is never overwritten, so
+        approval/share mutations can no longer erase replay evidence.
+        ``outcome=None`` preserves the row's current durable outcome (used by
+        share mutations, which change nothing about execution).
+        """
         from dataclasses import asdict
 
         from .run_store import RunRecord, _utcnow
@@ -164,7 +197,6 @@ class _Runtime:
             "citation": citation.model_dump(mode="json") if citation else None,
             "share_token": entry.get("share_token"),
             "owner_uid": entry["owner_uid"],
-            "response": response,
         }
         now = _utcnow()
         record = RunRecord(
@@ -172,16 +204,38 @@ class _Runtime:
             owner_uid=persisted_owner,
             workflow=entry["request"].workflow,
             status=entry["result"].status,
-            outcome=outcome,
+            outcome=outcome or "executing",  # placeholder; replaced below when preserving
             manifest_id=manifest_id,
             state=state,
             created_at=now,
             updated_at=now,
         )
         if create:
+            record.outcome = outcome or "admitted"
+            record.worker_id = self.worker_id
+            record.lease_expires_at = (
+                datetime.fromisoformat(now) + timedelta(seconds=self.lease_ttl_seconds)
+            ).isoformat()
             self.run_store.create_run(record)
-        else:
-            self.run_store.save_run(record)
+            entry["_updated_at"] = now
+            entry["_outcome"] = record.outcome
+            return
+        if outcome is None:
+            current = self.run_store.load_run(run_id)
+            if current is not None:
+                record.outcome = current.outcome
+        self.run_store.save_run(
+            record, expected_updated_at=entry.get("_updated_at")
+        )
+        stored = self.run_store.load_run(run_id)
+        if stored is not None:
+            entry["_updated_at"] = stored.updated_at
+            entry["_outcome"] = stored.outcome
+
+    def heartbeat(self) -> None:
+        """Renew this worker's liveness while it serves requests."""
+        if self.run_store.mode == "sqlite":
+            self.run_store.heartbeat(self.worker_id)
 
     def get_entry(self, run_id: str) -> dict[str, Any] | None:
         """Live entry, hydrated from the durable store after a restart."""
@@ -202,6 +256,8 @@ class _Runtime:
             "request": AnalysisRequest.model_validate(state["request"]),
             "citation": CitationRecord.model_validate(citation) if citation else None,
             "share_token": state.get("share_token"),
+            "_updated_at": record.updated_at,
+            "_outcome": record.outcome,
         }
         self.manifests[run_id] = record.manifest_id
         self.runs[run_id] = entry
@@ -244,7 +300,15 @@ class RunStatusResponse(BaseModel):
 
     run_id: str
     workflow: str
-    status: Literal["complete", "failed", "awaiting_review"]
+    status: Literal["running", "complete", "failed", "awaiting_review"]
+    outcome: Literal[
+        "admitted", "executing", "awaiting_review", "completed", "failed", "uncertain"
+    ] = Field(
+        description="Durable run outcome: admitted (recorded, not yet executed), "
+        "executing (continuation running), awaiting_review (waiting for a human "
+        "decision), completed, failed, or uncertain (interrupted; requires "
+        "operator reconciliation — never silently retried)"
+    )
     awaiting_task_id: str | None
     failed_task_id: str | None
     task_counts: dict[str, int]
@@ -302,6 +366,14 @@ class ShareCreateRequest(BaseModel):
     expires_in_days: int = Field(default=30, ge=1, le=365)
 
 
+class ResolveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["abandoned"]
+    reason: str = Field(min_length=1)
+    evidence: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -315,6 +387,7 @@ def _run_status_payload(run_id: str, runtime: _Runtime) -> RunStatusResponse:
         run_id=run_id,
         workflow=graph.workflow,
         status=result.status,
+        outcome=entry.get("_outcome", "uncertain"),
         awaiting_task_id=result.awaiting_task_id,
         failed_task_id=result.failed_task_id,
         task_counts=graph.counts(),
@@ -612,16 +685,19 @@ def _share_view(run_id: str, runtime: _Runtime) -> dict[str, Any]:
     }
 
 
-def _require_admin(request: Request) -> None:
-    user = getattr(request.state, "user", None)
-    if user is None:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-    admin_uids = {
+def _admin_uids() -> set[str]:
+    return {
         uid.strip()
         for uid in os.environ.get("PHYTO_ADMIN_UIDS", "").split(",")
         if uid.strip()
     }
-    if user.claims.get("role") != "admin" and user.uid not in admin_uids:
+
+
+def _require_admin(request: Request) -> None:
+    user = getattr(request.state, "user", None)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    if user.claims.get("role") != "admin" and user.uid not in _admin_uids():
         raise HTTPException(status_code=403, detail="Admin role required.")
 
 
@@ -650,6 +726,7 @@ def capabilities() -> dict[str, Any]:
     runtime = get_runtime()
     health = runtime.executor.health()
     price = cost_for_route("POST", "/analysis")
+    storage = runtime.run_store.mode
     return {
         "schema_version": 1,
         "scientific_execution": runtime.executor.mode,
@@ -659,13 +736,18 @@ def capabilities() -> dict[str, Any]:
         "supported_workflows": sorted(runtime.executor.supported_workflows or []),
         "analysis_tokens": price.tokens if price is not None else None,
         "pricing_provisional": True,
-        "run_storage": runtime.run_store.mode,
+        "run_storage": storage,
         "production_ready": False,
         "limitations": [
             "Reference ranking has not been independently scientifically validated.",
-            "SQLite run storage is durable but single-instance; shares/audit "
-            "revocation registries remain process-local and multi-replica "
-            "routing is unsupported.",
+            (
+                "SQLite run storage is durable but single-instance; the audit "
+                "chain remains an append-only per-process log and multi-replica "
+                "routing is unsupported."
+                if storage == "sqlite"
+                else "Runs, shares and audit state are process-local: restarts "
+                "lose them and multi-replica routing is unsupported."
+            ),
             "Configured libraries do not establish measured-data rights or independent validation.",
         ],
     }
@@ -762,12 +844,124 @@ def _chromatography_layers_status(graph: TaskGraph) -> dict[str, Any]:
     }
 
 
+def _outcome_for_status(
+    status: str,
+) -> Literal["executing", "awaiting_review", "completed", "failed"]:
+    return {
+        "complete": "completed",
+        "failed": "failed",
+        "awaiting_review": "awaiting_review",
+    }.get(status, "executing")
+
+
+def _replay_bound_run(runtime: _Runtime, bound_run: str):
+    """Resolve a duplicate admission against durable state.
+
+    Terminal runs with a stored creation response replay byte-for-byte;
+    everything else gets a stable, documented conflict with actionable
+    recovery guidance. Nothing here executes or charges.
+    """
+    from fastapi.responses import JSONResponse
+
+    record = runtime.run_store.load_run(bound_run)
+    if record is None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "key claims a run that was never persisted; "
+                "operator reconciliation required",
+                "run_id": bound_run,
+                "recovery": "reconcile the original request before resubmitting; "
+                "do not reuse this key",
+            },
+        )
+    if record.outcome in ("admitted", "executing"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "a request with this key is already in flight",
+                "run_id": bound_run,
+                "outcome": record.outcome,
+            },
+        )
+    if record.outcome == "uncertain":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "the original request's outcome is uncertain; "
+                "operator reconciliation required before any resubmission",
+                "run_id": bound_run,
+                "outcome": "uncertain",
+                "recovery": "an operator must determine whether effects occurred "
+                "and record the decision; never retry with a new key until then",
+            },
+        )
+    if record.outcome == "failed":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "the original request failed; this key cannot be reused",
+                "run_id": bound_run,
+                "outcome": "failed",
+                "recovery": "review the recorded failure, then submit new work "
+                "with a new key",
+            },
+        )
+    replayed = record.response
+    if replayed is None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "duplicate key; original response unavailable",
+                "run_id": bound_run,
+                "outcome": record.outcome,
+                "recovery": "operator reconciliation required",
+            },
+        )
+    return JSONResponse(
+        status_code=200,
+        content=replayed,
+        headers={"X-Idempotency-Replay": "true"},
+    )
+
+
+def _resolve_duplicate_request(
+    runtime: _Runtime, *, user_uid: str, idem_key: str, content_hash: str
+):
+    """Middleware passthrough: the accounting claim for this key already
+    exists, so resolve the run-layer binding WITHOUT executing or charging.
+
+    A missing binding means an earlier request claimed the key but never
+    admitted a run (e.g. it was rejected by validation): refuse with
+    reconciliation guidance rather than execute an uncharged run.
+    """
+    binding = runtime.run_store.lookup_admission(user_uid, idem_key)
+    if binding is None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Idempotency-Key was claimed by an earlier request "
+                "that never admitted a run; operator reconciliation required",
+                "recovery": "reconcile the original request before resubmitting; "
+                "do not reuse this key",
+            },
+        )
+    bound_hash, bound_run = binding
+    if bound_hash != content_hash:
+        raise HTTPException(
+            status_code=409,
+            detail="Idempotency-Key already bound to different request content",
+        )
+    return _replay_bound_run(runtime, bound_run)
+
+
 @router.post("/analysis", response_model=AnalysisResponse, status_code=200)
 def submit_analysis(request: AnalysisRequest, http_request: Request) -> AnalysisResponse:
     from .run_store import KeyConflictError, new_run_id, request_content_hash
 
     runtime = get_runtime()
     owner_uid = _run_principal(http_request)
+    user_key = owner_uid or "anonymous-local"
 
     # Content-bound idempotency at the run layer: the same key with the same
     # canonical request replays the stored response; the same key with
@@ -779,56 +973,19 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
             detail="Idempotency-Key must be at least 16 characters",
         )
     content_hash = request_content_hash(request.model_dump(mode="json"))
-    run_id = new_run_id()
-    try:
-        bound_run = runtime.run_store.admit(
-            user_uid=owner_uid or "anonymous-local",
-            idem_key=idem_key,
-            request_hash=content_hash,
-            run_id=run_id,
+
+    # Accounting-layer passthrough: the token ledger already consumed this
+    # key, so the middleware dispatched without a reservation. Resolve the
+    # binding durably — replay or a stable conflict, never fresh execution.
+    if getattr(http_request.state, "idempotency_replay", False):
+        return _resolve_duplicate_request(
+            runtime, user_uid=user_key, idem_key=idem_key, content_hash=content_hash
         )
-    except KeyConflictError as exc:
-        raise HTTPException(
-            status_code=409, detail=str(exc)
-        ) from exc
-    if bound_run != run_id:
-        record = runtime.run_store.load_run(bound_run)
-        if record is None:
-            # The key was claimed but no run was persisted (crash between
-            # admission and persistence). Fail closed: the operator must
-            # reconcile; the key is never silently cleared.
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "message": "key claims a run that was never persisted; "
-                    "operator reconciliation required",
-                    "run_id": bound_run,
-                },
-            )
-        if record.status == "executing":
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "message": "a request with this key is already in flight",
-                    "run_id": bound_run,
-                    "outcome": record.outcome,
-                },
-            )
-        replayed = (record.state or {}).get("response")
-        if replayed is None:
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "message": "duplicate key; original response unavailable",
-                    "run_id": bound_run,
-                    "outcome": record.outcome,
-                },
-            )
-        return AnalysisResponse.model_validate(replayed)
 
-    manifest_id = _build_manifest(run_id, request)
-    runtime.store_manifest(run_id, manifest_id)
-
+    # Validate and plan BEFORE admission so a deterministically invalid
+    # request never consumes a durable idempotency binding (no orphan claim).
+    # Planning is pure in-memory; admission still happens before any execution.
+    run_id = new_run_id()
     try:
         modalities = parse_observation_modalities(request.modalities)
     except InvalidInputError as exc:
@@ -862,6 +1019,24 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
         # supply: refuse rather than return a run that did nothing (ADR-0050).
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    try:
+        bound_run = runtime.run_store.admit(
+            user_uid=user_key,
+            idem_key=idem_key,
+            request_hash=content_hash,
+            run_id=run_id,
+        )
+    except KeyConflictError as exc:
+        raise HTTPException(
+            status_code=409, detail=str(exc)
+        ) from exc
+    if bound_run != run_id:
+        # A concurrent or earlier request with this key already owns the run.
+        return _replay_bound_run(runtime, bound_run)
+
+    manifest_id = _build_manifest(run_id, request)
+    runtime.store_manifest(run_id, manifest_id)
+
     # QA/Critic is registered -> verification capacity is available.  Human
     # approval for Tier 3 starts withheld; checkpoint approvals grant it.
     context = ExecutionContext(
@@ -871,16 +1046,42 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
         human_in_the_loop_approved=False,
         actor="api",
     )
-    result = runtime.engine.run(graph, context)
-    runtime.runs[run_id] = {
+    # Durable admission BEFORE execution: an interruption anywhere after this
+    # point leaves a discoverable run row (outcome=admitted -> reconciled to
+    # uncertain), never a bare idempotency claim with no run.
+    pre_result = EngineResult(
+        status="running", awaiting_task_id=None, failed_task_id=None
+    )
+    entry: dict[str, Any] = {
         "owner_uid": owner_uid,
         "graph": graph,
         "context": context,
-        "result": result,
+        "result": pre_result,
         "request": request,
         "citation": None,
         "share_token": None,
     }
+    runtime.runs[run_id] = entry
+    try:
+        runtime._persist_entry(
+            run_id, entry, manifest_id=manifest_id, outcome="admitted", create=True
+        )
+    except Exception:
+        # Never execute without durable admission; the key stays bound so the
+        # client cannot silently retry into a duplicate execution.
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": "run admission could not be persisted; no execution "
+                "was attempted",
+                "run_id": run_id,
+                "recovery": "operator reconciliation required; do not reuse this key",
+            },
+        )
+    runtime.heartbeat()
+
+    result = runtime.engine.run(graph, context)
+    entry["result"] = result
 
     _record_run_events(runtime, request=http_request, run_id=run_id, analysis=request, result=result)
     if result.status == "complete" and runtime.executor.mode == "mock":
@@ -917,23 +1118,14 @@ def submit_analysis(request: AnalysisRequest, http_request: Request) -> Analysis
             **_chromatography_layers_status(graph),
         },
     )
-    # Persist terminal state (graph/context/result/request + the exact
-    # response payload for idempotent replay). An interruption before this
-    # point leaves the durable record in outcome=executing for operator
-    # reconciliation — it is never automatically re-executed.
-    outcome = (
-        "completed" if result.status == "complete"
-        else "failed" if result.status == "failed"
-        else "executing"  # awaiting_review is not terminal
-    )
-    runtime._persist_entry(
-        run_id,
-        runtime.runs[run_id],
-        manifest_id=manifest_id,
-        outcome=outcome,
-        response=response.model_dump(mode="json"),
-        create=True,
-    )
+    # Terminal persistence: the exact creation response is recorded once
+    # (immutable) and the mutable outcome/state update follows. An
+    # interruption before this point leaves the durable record admitted —
+    # reconciled to uncertain by an operator, never automatically re-executed.
+    outcome = _outcome_for_status(result.status)
+    entry["_outcome"] = outcome
+    runtime.run_store.record_response(run_id, response.model_dump(mode="json"))
+    runtime._persist_entry(run_id, entry, manifest_id=manifest_id, outcome=outcome)
     return response
 
 
@@ -980,27 +1172,63 @@ def _approve_owned_checkpoint(
     # a review to another scientist by supplying a display name or UID.
     principal = _run_principal(http_request)
     attribution = principal if principal is not None else request.actor
-    # Durable approval record: exactly one approval per (run, checkpoint);
-    # a duplicate approval from any process is refused before re-execution.
-    if not runtime.run_store.record_approval(
+    # Durable approval admission BEFORE the continuation executes. The
+    # approval first becomes 'admitted'; it becomes 'executed' only after the
+    # continuation result is persisted. A crash in between leaves an explicit
+    # uncertain window that the operator reconciles — the continuation is
+    # never blindly re-run, and a duplicate approval from any process is
+    # refused.
+    if not runtime.run_store.admit_approval(
         run_id, str(request.checkpoint), attribution
     ):
+        state = runtime.run_store.approval_state(run_id, str(request.checkpoint))
+        if state == "admitted":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "this checkpoint's approval was admitted but "
+                    "its continuation outcome was never persisted",
+                    "run_id": run_id,
+                    "checkpoint": str(request.checkpoint),
+                    "recovery": "operator reconciliation required: determine "
+                    "whether the continuation ran, then resolve the run before "
+                    "any new submission; the continuation is never re-run "
+                    "automatically",
+                },
+            )
         raise HTTPException(
             status_code=409,
             detail=f"checkpoint '{request.checkpoint}' already approved for this run",
         )
     new_context = context.with_approval(request.checkpoint, actor=attribution)
-    new_result = runtime.engine.run(graph, new_context)
-    runtime.runs[run_id] = {
+    entry = {
         "owner_uid": entry["owner_uid"],
         "graph": graph,
         "context": new_context,
-        "result": new_result,
+        "result": result,  # still awaiting_review until the continuation runs
         "request": entry["request"],
         "citation": entry.get("citation"),
         "share_token": entry.get("share_token"),
+        "_updated_at": entry.get("_updated_at"),
+        "_outcome": entry.get("_outcome"),
     }
-    entry = runtime.runs[run_id]
+    runtime.runs[run_id] = entry
+    # Durable pre-continuation state: the run is executing with the approved
+    # context recorded, so an interruption is discoverable and reconcilable.
+    try:
+        runtime._persist_entry(
+            run_id, entry,
+            manifest_id=runtime.manifest_for(run_id) or "",
+            outcome="executing",
+        )
+    except StaleStateError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="run changed since it was loaded; reload and retry",
+        ) from exc
+    runtime.heartbeat()
+    new_result = runtime.engine.run(graph, new_context)
+    entry["result"] = new_result
     citation = None
     if new_result.status == "complete" and runtime.executor.mode == "mock":
         _record_run_events(
@@ -1013,18 +1241,20 @@ def _approve_owned_checkpoint(
         citation = _mint_citation(
             runtime, run_id=run_id, analysis=entry["request"], request=http_request
         )
-    else:
-        citation = None
-    outcome = (
-        "completed" if new_result.status == "complete"
-        else "failed" if new_result.status == "failed"
-        else "executing"
-    )
-    runtime._persist_entry(
-        run_id, entry,
-        manifest_id=runtime.manifest_for(run_id) or "",
-        outcome=outcome,
-    )
+    outcome = _outcome_for_status(new_result.status)
+    entry["_outcome"] = outcome
+    try:
+        runtime._persist_entry(
+            run_id, entry,
+            manifest_id=runtime.manifest_for(run_id) or "",
+            outcome=outcome,
+        )
+    except StaleStateError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="run changed since it was loaded; reload and retry",
+        ) from exc
+    runtime.run_store.complete_approval(run_id, str(request.checkpoint))
     return ApproveResponse(
         run_id=run_id,
         approved=request.checkpoint,
@@ -1046,12 +1276,16 @@ class RunSummaryRow(BaseModel):
 
 
 @router.get("/runs", response_model=list[RunSummaryRow])
-def list_own_runs(http_request: Request, limit: int = 50) -> list[RunSummaryRow]:
-    """Owner-scoped durable run history (newest first)."""
+def list_own_runs(
+    http_request: Request, limit: int = 50, offset: int = 0
+) -> list[RunSummaryRow]:
+    """Owner-scoped durable run history (newest first), bounded and paginated."""
     runtime = get_runtime()
     principal = _run_principal(http_request)
     if principal is None:
         return []
+    limit = max(1, min(limit, 200))
+    offset = max(0, min(offset, 100_000))
     return [
         RunSummaryRow(
             run_id=record.run_id,
@@ -1060,7 +1294,7 @@ def list_own_runs(http_request: Request, limit: int = 50) -> list[RunSummaryRow]
             outcome=record.outcome,
             updated_at=record.updated_at,
         )
-        for record in runtime.run_store.list_runs(principal, limit=min(limit, 200))
+        for record in runtime.run_store.list_runs(principal, limit=limit, offset=offset)
     ]
 
 
@@ -1115,25 +1349,24 @@ def create_share(run_id: str, request: ShareCreateRequest, http_request: Request
         run_id, expires_in_days=request.expires_in_days
     )
     runtime.runs[run_id]["share_token"] = token
-    runtime._persist_entry(
-        run_id, runtime.runs[run_id],
-        manifest_id=runtime.manifest_for(run_id) or "",
-        outcome=_outcome_for_entry(runtime.runs[run_id]),
-    )
+    # Share mutations never touch the execution outcome or the immutable
+    # creation response: outcome=None preserves the durable value.
+    try:
+        runtime._persist_entry(
+            run_id, runtime.runs[run_id],
+            manifest_id=runtime.manifest_for(run_id) or "",
+            outcome=None,
+        )
+    except StaleStateError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="run changed since it was loaded; reload and retry",
+        ) from exc
     return ShareCreateResponse(
         share_url=share_url_for(token),
         expires_at=claims.expires_at.isoformat(),
         scope=claims.scope,
     )
-
-
-def _outcome_for_entry(entry: dict[str, Any]) -> Literal["executing", "completed", "failed", "uncertain"]:
-    status = entry["result"].status
-    if status == "complete":
-        return "completed"
-    if status == "failed":
-        return "failed"
-    return "executing"
 
 
 @router.delete("/runs/{run_id}/share")
@@ -1143,11 +1376,17 @@ def revoke_shares(run_id: str, http_request: Request) -> dict[str, Any]:
     registry = runtime.share_manager.registry
     revoked = registry.revoke_all(run_id) if registry is not None else 0
     runtime.runs[run_id]["share_token"] = None
-    runtime._persist_entry(
-        run_id, runtime.runs[run_id],
-        manifest_id=runtime.manifest_for(run_id) or "",
-        outcome=_outcome_for_entry(runtime.runs[run_id]),
-    )
+    try:
+        runtime._persist_entry(
+            run_id, runtime.runs[run_id],
+            manifest_id=runtime.manifest_for(run_id) or "",
+            outcome=None,
+        )
+    except StaleStateError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="run changed since it was loaded; reload and retry",
+        ) from exc
     return {"run_id": run_id, "revoked": revoked}
 
 
@@ -1167,7 +1406,8 @@ def _verify_share_token(token: str):
         raise HTTPException(status_code=410, detail="share token was revoked") from None
     except InvalidShareTokenError:
         raise HTTPException(status_code=404, detail="unknown share token") from None
-    if claims.run_id not in runtime.runs:
+    # Hydrate from the durable store so shares survive a service restart.
+    if runtime.get_entry(claims.run_id) is None:
         raise HTTPException(status_code=404, detail="unknown share token")
     return claims
 
@@ -1258,6 +1498,36 @@ def admin_cohorts_recompute(request: Request) -> dict[str, Any]:
 # -- audit export (department plan, ADR-0047) ------------------------------------
 
 
+@router.post("/admin/runs/{run_id}/resolve")
+def admin_resolve_run(
+    run_id: str, request: ResolveRequest, http_request: Request
+) -> dict[str, Any]:
+    """Operator resolution of an uncertain/admitted/executing run.
+
+    The only supported decision is ``abandoned``: it records the operator,
+    reason and evidence and marks the run failed. Completion can never be
+    asserted without stored execution evidence, so this path never fabricates
+    a result and never re-executes the run. Only after this recorded decision
+    is a new operation with a new key appropriate.
+    """
+    _require_admin(http_request)
+    runtime = get_runtime()
+    user = getattr(http_request.state, "user", None)
+    operator = user.uid if user is not None else "admin"
+    resolved = runtime.run_store.resolve_run(
+        run_id,
+        operator=operator,
+        reason=request.reason,
+        evidence=request.evidence,
+    )
+    if not resolved:
+        raise HTTPException(
+            status_code=409,
+            detail="run is missing or already terminal; nothing to resolve",
+        )
+    return {"run_id": run_id, "outcome": "failed", "decision": "abandoned"}
+
+
 @router.get("/audit/export")
 def audit_export(request: Request) -> dict[str, Any]:
     _require_plan(request, "department")
@@ -1280,12 +1550,31 @@ def verify_audit() -> dict[str, Any]:
 
 
 @router.get("/audit/records")
-def audit_records(run_id: str | None = None) -> list[dict[str, Any]]:
+def audit_records(http_request: Request, run_id: str | None = None) -> list[dict[str, Any]]:
+    """Audit tail with ownership scoping.
+
+    On the local auth-disabled plane the full in-process log is returned
+    (tests and the offline mock plane only). With auth enforced, a caller
+    may read the records of a run they own (scoped to that run) or, as an
+    admin, the whole chain. Audit records carry identities and run detail,
+    so cross-user reads are denied here exactly like every other run surface.
+    """
     runtime = get_runtime()
-    records = runtime.audit.records()
+    user = _request_user(http_request)
+    if user is None:
+        records = runtime.audit.records()
+        if run_id is not None:
+            records = [r for r in records if r.get("run_id") == run_id]
+        return records
     if run_id is not None:
-        records = [r for r in records if r.get("run_id") == run_id]
-    return records
+        entry = runtime.get_entry(run_id)
+        owner = entry.get("owner_uid") if entry is not None else None
+        is_admin = user.claims.get("role") == "admin" or user.uid in _admin_uids()
+        if owner != user.uid and not is_admin:
+            raise HTTPException(status_code=404, detail=f"unknown run '{run_id}'")
+        return [r for r in runtime.audit.records() if r.get("run_id") == run_id]
+    _require_admin(http_request)
+    return runtime.audit.records()
 
 
 # ---------------------------------------------------------------------------
@@ -1304,7 +1593,11 @@ def create_app(config: AuthConfig | None = None) -> FastAPI:
         version=__version__,
         description="Plans, delegates, verifies, and logs analysis workflows.",
     )
-    cfg = install_auth(application, config)
+    cfg = install_auth(
+        application,
+        config,
+        replay_routes=frozenset({"POST /analysis"}),
+    )
     application.include_router(router)
 
     @application.middleware("http")

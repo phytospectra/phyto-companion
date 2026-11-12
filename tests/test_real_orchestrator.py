@@ -192,7 +192,7 @@ def api(monkeypatch, synthetic_libraries):
             LoggingPublisher(), entitlements=None, workspaces=InMemoryWorkspaceStore(),
         )
         monkeypatch.setattr(
-            main, "install_auth", lambda application, cfg: install_auth(application, cfg, layer=layer)
+            main, "install_auth", lambda application, cfg, **kwargs: install_auth(application, cfg, layer=layer)
         )
         return stack.enter_context(TestClient(main.create_app(config)))
 

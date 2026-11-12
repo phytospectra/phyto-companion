@@ -124,8 +124,15 @@ def install_auth(
     config: AuthConfig | None = None,
     *,
     layer: TokenLayer | None = None,
+    replay_routes: frozenset[str] | None = None,
 ) -> AuthConfig:
-    """Install AuthMiddleware (and CORS) on ``app``; returns the config used."""
+    """Install AuthMiddleware (and CORS) on ``app``; returns the config used.
+
+    ``replay_routes`` (``"METHOD /path"`` strings) names the routes that
+    resolve a consumed idempotency key themselves from durable state. Only
+    those routes are dispatched without a reservation on a duplicate key;
+    every other route keeps the strict 409 (see docs/ACCOUNTING-GUARANTEE.md).
+    """
     cfg = config or AuthConfig.from_env()
     collaborators = layer or build_token_layer(cfg)
 
@@ -138,6 +145,7 @@ def install_auth(
         entitlements=collaborators.entitlements,
         workspaces=collaborators.workspaces,
         analytics_sink=collaborators.analytics_sink,
+        replay_routes=replay_routes,
     )
     app.add_middleware(
         CORSMiddleware,

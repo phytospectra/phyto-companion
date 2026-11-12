@@ -316,3 +316,19 @@ def test_cors_preflight_and_controlled_402_503(harness):
         assert response.headers["access-control-allow-origin"] == ORIGIN
     assert not h.runtime.runs
     assert not h.publisher.events
+
+
+def test_audit_records_are_owner_scoped_or_admin(harness):
+    """Audit records carry identities: with auth enforced, a caller may read
+    a run they own (scoped) or the whole chain as an admin — never another
+    user's records."""
+    h = harness
+    run_id = start(h)
+    owned = h.client.get("/audit/records", headers=headers(), params={"run_id": run_id})
+    assert owned.status_code == 200
+    assert all(record.get("run_id") == run_id for record in owned.json())
+    other = h.client.get("/audit/records", headers=headers("bob"), params={"run_id": run_id})
+    assert other.status_code == 404  # unknown-run semantics, no existence leak
+    # The unfiltered chain requires an admin; neither user here is one.
+    assert h.client.get("/audit/records", headers=headers()).status_code == 403
+    assert h.client.get("/audit/records", headers=headers("bob")).status_code == 403

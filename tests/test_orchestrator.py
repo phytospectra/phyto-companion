@@ -768,7 +768,7 @@ class TestAPI:
 
         config = replace(AuthConfig.from_env(), dry_run=auth_dry_run)
         # Isolate this status contract from external Firebase/ledger clients.
-        monkeypatch.setattr(main, "install_auth", lambda app, cfg: cfg)
+        monkeypatch.setattr(main, "install_auth", lambda app, cfg, **kwargs: cfg)
         main.get_runtime.cache_clear()
         try:
             with TestClient(main.create_app(config)) as client:

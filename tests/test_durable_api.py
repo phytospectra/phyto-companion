@@ -117,20 +117,66 @@ def test_uncertain_reconciliation_marks_stale_executing(sqlite_app):
     client, path = sqlite_app
     created = client.post("/analysis", headers=AUTH, json=WORKFLOW_REQUEST)
     run_id = created.json()["run_id"]
-    # Simulate a crash before terminal persistence: force outcome=executing.
+    # Simulate a legacy (pre-lease) crash window: outcome=executing with no
+    # worker or lease columns, written at the raw row level because the store
+    # keeps those columns immutable once created.
     store = SQLiteRunStore(path)
     record = store.load_run(run_id)
     record.outcome = "executing"
     store.save_run(record)
+    import sqlite3
+
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "UPDATE runs SET worker_id=NULL, lease_expires_at=NULL WHERE run_id=?",
+            (run_id,),
+        )
 
     store = SQLiteRunStore(path)
-    assert store.reconcile_stale_executing(dry_run=True) == [run_id]
+    preview = store.reconcile_stale(dry_run=True)
+    assert [e["run_id"] for e in preview] == [run_id]
     assert store.load_run(run_id).outcome == "executing"
-    assert store.reconcile_stale_executing(dry_run=False) == [run_id]
+    applied = store.reconcile_stale(
+        dry_run=False, operator="ops@example.org", reason="legacy crash window"
+    )
+    assert [e["run_id"] for e in applied] == [run_id]
     reconciled = store.load_run(run_id)
     assert reconciled.outcome == "uncertain"
     # Reconciliation never mutates operational state or re-executes work.
     assert reconciled.status in {"complete", "failed", "awaiting_review"}
+
+
+def test_review_pending_runs_are_never_reconciled(sqlite_app):
+    """A healthy review-pending run must survive even a quiesced-shutdown
+    reconciliation pass (audit finding 2 counterexample)."""
+    client, path = sqlite_app
+    created = client.post("/analysis", headers=AUTH, json=WORKFLOW_REQUEST)
+    run_id = created.json()["run_id"]
+    store = SQLiteRunStore(path)
+    record = store.load_run(run_id)
+    assert record.outcome == "awaiting_review"  # durable state says review-pending
+    assert store.reconcile_stale(dry_run=True, require_quiesced=True) == []
+    assert store.load_run(run_id).outcome == "awaiting_review"
+
+
+def test_share_revocation_survives_restart(sqlite_app):
+    """Revocation is durable: a token revoked after a restart stays revoked
+    across further restarts."""
+    client, path = sqlite_app
+    created = client.post("/analysis", headers=AUTH, json=WORKFLOW_REQUEST)
+    run_id = created.json()["run_id"]
+    share = client.post(f"/runs/{run_id}/share", headers=AUTH, json={})
+    assert share.status_code == 200
+    token = share.json()["share_url"].rsplit("/", 1)[1]
+
+    # Simulated restart, then revoke: the revocation must live in the store.
+    main.get_runtime.cache_clear()
+    assert client.get(f"/share/{token}").status_code == 200
+    revoked = client.delete(f"/runs/{run_id}/share", headers=AUTH)
+    assert revoked.status_code == 200
+    # Another restart: the revocation is still enforced.
+    main.get_runtime.cache_clear()
+    assert client.get(f"/share/{token}").status_code == 410
 
 
 def test_cloud_fails_closed_without_durable_store(monkeypatch, tmp_path):

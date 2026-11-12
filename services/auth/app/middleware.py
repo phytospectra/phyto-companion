@@ -108,6 +108,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         entitlements: EntitlementsClient | None = None,
         workspaces: WorkspaceStore | None = None,
         analytics_sink=None,
+        replay_routes: frozenset[str] | None = None,
     ):
         super().__init__(app)
         self._firebase = firebase_client
@@ -119,6 +120,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self._entitlements = entitlements
         self._workspaces = workspaces
         self._analytics_sink = analytics_sink
+        # Routes that implement the durable replay contract themselves ("POST
+        # /analysis"): when a consumed key arrives there, the middleware
+        # passes the request through WITHOUT a reservation and the handler
+        # resolves replay vs conflict from durable state. No other route may
+        # execute a handler after a consumed key: that would run work nobody
+        # was charged for.
+        self._replay_routes = replay_routes or frozenset()
 
     async def dispatch(self, request: Request, call_next):
         if not self._enabled or self._is_public(request.url.path):
@@ -131,6 +139,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         request.state.reservation_id = None
         request.state.idempotency_reservation_id = None
         request.state.workspace_id = None
+        request.state.idempotency_replay = False
 
         entitlement_status = None
         if self._entitlements is not None:
@@ -181,6 +190,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 operation=operation, tokens=0,
             ))
             if claim.status == "already_exists":
+                if operation in self._replay_routes:
+                    # Durable-replay passthrough: the handler owns the replay
+                    # decision (replay the stored response, or a stable
+                    # documented conflict) and is responsible for refusing
+                    # anything else. Nothing is reserved here, so a replay can
+                    # never reserve or charge a second time.
+                    request.state.idempotency_replay = True
+                    return await call_next(request)
                 return JSONResponse(
                     status_code=status.HTTP_409_CONFLICT,
                     content={"detail": "Idempotency-Key already used; response replay is unavailable."},
@@ -224,7 +241,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         succeeded = 200 <= response.status_code < 400
         cache_hit = response.headers.get("X-Cache") == "HIT"
-        confirmed = succeeded and not cache_hit
+        # A handler-replayed idempotent response is free like a cache hit:
+        # the original request already paid; the replayed copy must never
+        # reserve or charge again.
+        replay_hit = response.headers.get("X-Idempotency-Replay") == "true"
+        confirmed = succeeded and not cache_hit and not replay_hit
         self._settle(
             reservation_id=reservation_id,
             reserved=reserved,
@@ -235,6 +256,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             error=None if succeeded else f"HTTP {response.status_code}",
             workspace_id=workspace_id,
             cache_hit=cache_hit,
+            replay_hit=replay_hit,
         )
         return response
 
@@ -345,6 +367,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         error: str | None,
         workspace_id: str | None = None,
         cache_hit: bool = False,
+        replay_hit: bool = False,
     ) -> None:
         if reservation_id is None or reserved == 0:
             return
@@ -361,7 +384,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if self._entitlements is not None:
                 self._entitlements.consume(user_id, reserved)
         else:
-            reason = "served from query cache" if cache_hit else (error or "endpoint failed")
+            reason = (
+                "served as idempotent replay" if replay_hit
+                else "served from query cache" if cache_hit
+                else (error or "endpoint failed")
+            )
             self._tokens.refund(reservation_id, reason=reason)
             # The allowance is only INCREMENTED on confirm (via ``consume``);
             # ``check_allowance`` merely checks.  Refunding must therefore
