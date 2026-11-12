@@ -22,6 +22,7 @@ from auth.firebase_auth import RealFirebaseAuthClient
 from auth.install import TokenLayer, install_auth
 from auth.token_balance import MockTokenBalanceClient
 from auth.workspaces import InMemoryWorkspaceStore
+from phyto_shared.share import share_url_for
 from phyto_shared.token_pricing import cost_for_route
 
 ORIGIN = "https://staging-ui.invalid"
@@ -332,3 +333,27 @@ def test_audit_records_are_owner_scoped_or_admin(harness):
     # The unfiltered chain requires an admin; neither user here is one.
     assert h.client.get("/audit/records", headers=headers()).status_code == 403
     assert h.client.get("/audit/records", headers=headers("bob")).status_code == 403
+
+
+def test_audit_log_never_carries_credentials(harness):
+    """The durable audit chain must not capture bearer tokens, the share HMAC
+    key, or the share URL credential itself."""
+    import json
+
+    h = harness
+    run_id = start(h)
+    share = h.client.post(f"/runs/{run_id}/share", headers=headers(), json={}).json()
+    share_token = share["share_url"].rsplit("/", 1)[1]
+    h.client.get(f"/share/{share_token}")  # emits run_shared audit events
+    secret = "offline-operational-key-not-a-secret"
+    raw = h.runtime.audit.path.read_text(encoding="utf-8")
+    assert "Bearer" not in raw
+    assert "valid-alice" not in raw  # verifier tokens must never be logged
+    assert secret not in raw  # the share HMAC key must never be logged
+    for record in h.runtime.audit.records():
+        encoded = json.dumps(record)
+        assert "Bearer" not in encoded
+        assert secret not in encoded
+        # The full signed share URL is a credential; only the token id may
+        # appear in the audit tail.
+        assert share_url_for(share_token) not in encoded

@@ -91,3 +91,27 @@ Before any release claim:
 6. Connect authoritative balance/transactions/checkout and mocked/emulator accounting settlement tests before offering real purchase or automatic retries. No billing/identity/secrets change is authorized by this report.
 
 Precise server-side guarantee statement: docs/ACCOUNTING-GUARANTEE.md (at-most-once handler admission, at-most-once terminal settlement (eventual settlement not guaranteed); keys never cleared or expired; uncertain outcomes require operator reconciliation before any new-key submission).
+
+## 2026-11-12 correction (superseding items above)
+
+The frontend work recorded above was later completed and verified in a
+hydrated checkout outside the cloud-managed Documents tree (the recorded
+stalls were the dataless-files hazard, not a code or toolchain defect):
+
+- Vitest 68/68 unit tests, `tsc --noEmit` and the production build all pass
+  on branch `agent/frontend-durability-contract-2026-11-12` (CI run
+  43139847866, then 9c3d9f3).
+- The live workspace contract now accepts `status: running` and the six
+  durable outcomes (`admitted`, `executing`, `awaiting_review`, `completed`,
+  `failed`, `uncertain`) in both the run detail and history schemas; the UI
+  renders each state explicitly and shows the durable outcome on the run
+  detail view.
+- `IdempotencyConflictError` now surfaces structured 409 details
+  (message/run_id/outcome/recovery); the workspace adopts the conflicting
+  run id and stays frozen — mutations are never auto-retried. The backend
+  replay contract this corresponds to is documented in
+  ACCOUNTING-GUARANTEE.md (2026-11-12).
+- Browser acceptance: see `frontend/docs/UI-ACCEPTANCE-2026-11-12.md`
+  (mock-mode desktop/narrow layouts, error announcements, zero unnamed
+  controls after the FileDropZone fix; the authenticated live workspace
+  still requires a Firebase staging project — unchanged external blocker).

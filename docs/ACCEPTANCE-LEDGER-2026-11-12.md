@@ -31,7 +31,8 @@ Work branch: backend `agent/durability-repairs-2026-11-12`.
   `test_crash_during_execution_after_effect`,
   `test_crash_before_final_persistence`,
   `test_orphan_claim_fails_closed_and_is_discoverable`).
-- Result: PENDING (first local run; CI TBD).
+- Result: PASS at f1dd5d9 (local full suite 1918 passed / 4 skipped, ruff
+  clean; GitHub CI run 43139833532 green).
 
 ### B. Selective, safe reconciliation
 - Requirement: distinct waiting-for-review vs executing; lease/heartbeat or
@@ -48,7 +49,7 @@ Work branch: backend `agent/durability-repairs-2026-11-12`.
   `test_interrupted_execution_reconciles_to_uncertain_never_reruns`,
   `test_concurrent_reconciliation_applies_once`,
   `test_resolve_run_records_decision_and_never_reruns`).
-- Result: PENDING.
+- Result: PASS at f1dd5d9 (tests listed).
 
 ### C. Recover interrupted approvals
 - Requirement: approval bound to exact checkpoint + verified principal;
@@ -62,7 +63,7 @@ Work branch: backend `agent/durability-repairs-2026-11-12`.
   (`test_approval_crash_before_admission_is_recoverable`,
   `test_approval_crash_before_continuation_never_blindly_reruns`,
   `test_approval_crash_after_continuation_effect`).
-- Result: PENDING.
+- Result: PASS at f1dd5d9 (7 contract tests through the real middleware).
 
 ### D. Idempotency contract across auth/accounting/runs
 - Requirement: one end-to-end contract; keys scoped to principal +
@@ -90,64 +91,64 @@ Work branch: backend `agent/durability-repairs-2026-11-12`.
   (`test_creation_response_is_immutable`, `test_save_run_cas_refuses_stale_writes`,
   `test_v1_database_migrates_response_out_and_relabels_review_pending`);
   `test_replay_survives_approval_share_and_revocation` (API level).
-- Result: PENDING.
+- Result: PASS at f1dd5d9.
 
 ### F. Correct recovery instructions
 - Requirement: no "retry with a new key" on uncertainty; document the
   resolution procedure; no exactly-once claims beyond evidence.
 - Implementation: rewritten `docs/DURABLE-RUN-STORE.md`,
   `docs/ACCOUNTING-GUARANTEE.md`, `scripts/reconcile_runs.py` help text.
-- Inspection: docs and CLI text reviewed (this ledger's Phase 6 check).
-- Result: PENDING.
+- Inspection: docs/CLI text rewritten and reviewed.
+- Result: PASS at f1dd5d9.
 
 ## Phase 2 — persistence and security boundary
 | Item | Status |
 |---|---|
-| Owner/tenant isolation on every read/mutation | PENDING |
-| Cross-process freshness (CAS, lease/heartbeat) | implemented; tests above |
-| Share-token + revocation persistence | implemented (`SQLiteShareRegistry`); test PENDING |
-| Audit continuity across restart | PENDING review |
-| Artifact ownership/integrity/lifecycle | PENDING review |
-| Run-history pagination and bounds | implemented (`offset`, cap 200); test added |
-| Migration compatibility and failure handling | v1→v2 data migration + test |
-| Backup/restore/rollback behavior | existing API; restore-into-fresh-env exercise PENDING |
-| Single-host boundary documented | DURABLE-RUN-STORE.md updated |
+| Owner/tenant isolation on every read/mutation | PASS — owner-scoped runs/history/audit-records (new test); cross-user denial suite |
+| Cross-process freshness (CAS, lease/heartbeat) | PASS — StaleStateError CAS, worker/lease columns, heartbeat table + tests |
+| Share-token + revocation persistence | PASS — SQLiteShareRegistry + `test_share_revocation_survives_restart` + ops exercise |
+| Audit continuity across restart | Reviewed — audit chain is per-process JSONL (documented boundary), `/audit/records` now owner-scoped or admin |
+| Artifact ownership/integrity/lifecycle | Reviewed — artifacts live in the owner-scoped run state; share artifact views redact |
+| Run-history pagination and bounds | PASS — `offset` + cap 200 (store + API tests, ops bound check 200/100 pages) |
+| Migration compatibility and failure handling | PASS — v1→v2 data migration test (response column, review-pending relabel) |
+| Backup/restore/rollback behavior | PASS — backup API + restore into a separate environment (ops exercise); accounting-interaction note documented |
+| Single-host boundary documented | PASS — DURABLE-RUN-STORE.md + capabilities limitations text |
 
 ## Phase 3 — frontend
 | Item | Status |
 |---|---|
-| Outcome/state contract update (types, fixtures, MSW) | PENDING |
-| Approval 409 structured-detail handling | PENDING |
-| No auto-retry / no fabricated fallback | PENDING inspection |
-| Sign-out/account isolation | PENDING inspection |
-| TypeScript / unit tests / production build | PENDING |
-| Browser interaction with integrated backend | PENDING |
-| Keyboard/labels/focus/error announcements | PENDING |
-| Desktop + narrow layout; loading/empty/failure/recovery | PENDING |
+| Outcome/state contract update (types, fixtures, MSW) | PASS — research.ts schemas accept running + 6 outcomes; 29dc536 |
+| Approval 409 structured-detail handling | PASS — structured message/recovery shown; conflict adopts run id; 29dc536 |
+| No auto-retry / no fabricated fallback | PASS — 409 never unfreezes the form; no demo fallback in live mode (tests pin both) |
+| Sign-out/account isolation | PASS — existing generation/remount tests still green (68/68) |
+| TypeScript / unit tests / production build | PASS — typecheck clean; 68/68 vitest; build clean (CI 43139847866; 9c3d9f3) |
+| Browser interaction with integrated backend | PARTIAL — mock + live-signed-out surfaces verified in-browser; authenticated live workspace blocked on Firebase staging identity |
+| Keyboard/labels/focus/error announcements | PASS — zero unnamed controls after FileDropZone fix; role=alert verified; drop zone keyboard wiring |
+| Desktop + narrow layout; loading/empty/failure/recovery | PASS — 1280px and 390px (no horizontal overflow); screenshots preserved |
 
 ## Phase 4 — operations
 | Item | Status |
 |---|---|
-| Clean-env install + offline quickstart | PENDING (venv rebuilt outside Documents 2026-11-12) |
-| Authenticated API contract checks | PENDING (covered by test suite; live smoke TBD) |
-| Worker interruption / restart exercises | PENDING (fault injection at API boundary; real-process restart TBD) |
-| Backup → restore into separate environment | PENDING |
-| Concurrency + sustained load | 12-writer smoke exists; sustained run PENDING |
-| Resource bounds (request/payload/history/execution) | limit/offset caps exist; audit PENDING |
-| Timeout/cancellation semantics | PENDING |
-| Readiness dependency reporting | existing /health + /capabilities |
-| Correlation logs | existing X-Request-ID echo/mint + test |
-| Secret redaction checks | PENDING |
-| Dependency/secret scanning in CI | PENDING |
+| Clean-env install + offline quickstart | PASS — clean venv outside Documents (Python 3.12.15) with the CI dependency set; suites re-run there |
+| Authenticated API contract checks | PASS — live uvicorn exercise with real middleware (mock verifier): replay/conflict/history/approval/share/revocation; 16/16 checks |
+| Worker interruption / restart exercises | PASS — API-boundary fault injection tests + real-process SIGKILL/restart cycles in the ops exercise |
+| Backup → restore into separate environment | PASS — hot backup API → restore → second server serves history + identical replay |
+| Concurrency + sustained load | PASS (bounded) — 300/300 submissions, 8 workers, ~156 req/s (macOS arm64, single host); not a capacity certification |
+| Resource bounds (request/payload/history/execution) | PASS — history cap 200 + offset verified on 300 rows; per-file/peak bounds client-side; server payload cap not added (documented) |
+| Timeout/cancellation semantics | Reviewed — client 120s timeout + abort wiring; no server-side executor timeout (documented limit) |
+| Readiness dependency reporting | PASS — /health + /capabilities report storage mode + executor health truthfully |
+| Correlation logs | PASS — X-Request-ID echo/mint + test |
+| Secret redaction checks | PASS — new regression test: audit chain never carries bearer tokens/HMAC key/share URL |
+| Dependency/secret scanning in CI | PASS — gitleaks (project allowlist; tree scan clean) + pip-audit (0 findings) blocking in backend CI; frontend npm audit advisory (17 transitive, documented) |
 
 ## Phase 5 — research follow-through
 | Item | Status |
 |---|---|
-| Triage Nov-11 proposals (controlled vs exploratory vs future) | PENDING |
-| NaFM/NPCLM verification (models, licenses, deps, interface) | PENDING (metadata only; no downloads/spend) |
-| No new arms added to the locked comparison | PENDING audit |
-| OpenRouter cap recheck (safe, no secrets) | PENDING |
-| Colab allowance recheck | PENDING |
+| Triage Nov-11 proposals (controlled vs exploratory vs future) | PASS — docs/MODEL-COMPARISON-FOLLOW-THROUGH-2026-11-12.md |
+| NaFM/NPCLM verification (models, licenses, deps, interface) | PASS (bounded) — arXiv metadata verified; weights/license/interface NOT verifiable → retrieval arm BLOCKED, status recorded |
+| No new arms added to the locked comparison | PASS — arms A–E + Antigravity track untouched; retrieval idea kept as a separate exploratory experiment |
+| OpenRouter cap recheck (safe, no secrets) | Result: OPENROUTER_API_KEY absent from environment → live recheck impossible; no paid requests; ceiling unchanged |
+| Colab allowance recheck | Result: 0.00 compute units, 0.00/hr, 0 active assignments (`colab usage`); no allocation, no training |
 
 ## Phase 6 — documentation reconciliation
 | Item | Status |
@@ -155,10 +156,10 @@ Work branch: backend `agent/durability-repairs-2026-11-12`.
 | DURABLE-RUN-STORE.md | rewritten |
 | ACCOUNTING-GUARANTEE.md | rewritten |
 | reconcile_runs.py help | rewritten |
-| STAGING-ACCEPTANCE stale wording | PENDING |
-| FRONTEND-AUTH-ACCOUNTING wording | PENDING |
-| COMPLETION-LEDGER update | PENDING |
-| Readiness split restated | PENDING |
+| STAGING-ACCEPTANCE stale wording | PASS — dated correction added |
+| FRONTEND-AUTH-ACCOUNTING wording | PASS — dated correction section appended |
+| COMPLETION-LEDGER update | PASS — this ledger records the increment; the 2026-11-09 ledger is left as a historical record |
+| Readiness split restated | PASS — see the verdict section below |
 
 ## Environment hazards observed
 - The cloud-managed Documents tree evicted the repo's `.venv` entirely
@@ -172,3 +173,33 @@ Work branch: backend `agent/durability-repairs-2026-11-12`.
 - OpenRouter: PENDING recheck. Colab: PENDING recheck. Inference/compute
   spend this increment: $0 (no paid requests, no training, no downloads).
 - No merge to main, no deployment, no third-party contact.
+
+## Final readiness verdict (2026-11-12)
+
+1. **Software research preview: GO with caveats** — the repaired durability
+   contract, reconciliation procedure and frontend contract are implemented
+   and verified by 1918 backend tests (4 skipped; ruff clean; CI
+   43139833532), 68 frontend unit tests + typecheck + build (CI
+   43139847866), a 16/16 live-process operational exercise, and a browser
+   inspection record. Caveats: single-instance SQLite, per-process audit
+   log, no server-side execution timeout, no payload-size guard.
+2. **Independently scientifically evaluated workflow: NO-GO** — no
+   rights-cleared measured reference/query set, no locked independent
+   evaluation, no expert adjudication. Unchanged; nothing in this increment
+   claims otherwise (all synthetic fixtures remain labelled synthetic).
+3. **Production service: NO-GO** — live Firebase/Stripe/ledger verification,
+   staging identities and multi-instance persistence remain unverified;
+   the supported topology is single-host.
+4. **Manuscript submission: NO-GO** — author approvals and declarations
+   pending; review exports remain NOT AUTHOR APPROVED.
+
+Spending this increment: US$0 inference, US$0 compute, no downloads, no
+training, no deployment, no third-party contact. OpenRouter key absent from
+the environment; Colab reports 0.00 compute units.
+
+## Environment notes
+- The cloud-managed Documents tree evicted the backend `.venv` and frontend
+  `node_modules` mid-session. All verification used clean environments
+  outside Documents (`/tmp/phyto-venv-20261112`, `/tmp/phyto-fe-hydrated`).
+- Ops exercise transcript and browser screenshots:
+  `/tmp/phyto-ops-20261112/` (transcript.json, ui-evidence/).

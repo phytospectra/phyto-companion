@@ -1,0 +1,22 @@
+# Gitleaks configuration for CI secret scanning (extends the default config).
+#
+# Allowlists are documented false positives, reviewed 2026-11-12:
+# - docs/: operator-facing curl examples use placeholder credentials such as
+#   "Authorization: Bearer $TOKEN"; the curl-auth-header rule matches the
+#   header line regardless of the value being a variable.
+# - data/validated_runs/: curated assessment outputs that reference PUBLIC
+#   MassBank accessions (MSBNK-*), which trip the generic-api-key entropy
+#   rule.
+#
+# Real credentials must never be added under these paths: the allowlist is
+# for these documented patterns only, and every other path in the tree
+# (code, tests, configuration, CI) is fully scanned.
+
+[allowlist]
+paths = [
+  '''^docs/''',
+  '''^data/validated_runs/''',
+]
+regexes = [
+  '''MSBNK-[A-Za-z0-9_-]+''',
+]

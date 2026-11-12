@@ -38,8 +38,15 @@ See `test_orchestrator_run_ownership.py` for the ownership contract.
 - Record revisions, image digests, observed responses, and abort criteria.
 
 Live login, revocation, authoritative billing and multi-instance persistence
-remain unverified. Runs/shares are process-local; cloud restart/cross-instance
-persistence and revocation semantics are a separate production design decision.
+remain unverified.
+
+> **2026-11-12 correction (supersedes the sentence below):** runs are now
+> durably persisted before execution (SQLite run store, schema v2) with
+> restart hydration, immutable response replay and durable share revocation —
+> see docs/DURABLE-RUN-STORE.md and docs/ACCEPTANCE-LEDGER-2026-11-12.md.
+> The store is single-instance: multi-replica routing remains unsupported and
+> live-staging verification of these behaviors remains unperformed.
+
 
 See docs/ACCOUNTING-GUARANTEE.md for the precise guarantee (at-most-once admission, at-most-once terminal settlement (eventual settlement not guaranteed)) and failure/recovery matrix.
 
