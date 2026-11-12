@@ -13,7 +13,14 @@ backend `2520ad062d746edcf0e7ef529d214a5ca091a9cf` (branch
 `agent/frontend-auth-accounting-2026-11-09`). Both working trees were clean;
 frontend `origin` is a local bundle, `github` is the hosted remote.
 
-Work branch: backend `agent/durability-repairs-2026-11-12`.
+Work branches and final revisions (2026-11-12):
+- Backend `agent/durability-repairs-2026-11-12` — final commit `9aecd29`
+  (f1dd5d9 durability repair → bd8f4ba security/ops increment →
+  9aecd29 gitleaks CI fix). Final CI run 43218430032: test job + the new
+  security-scan job (gitleaks tree scan + pip-audit) both green.
+- Frontend `agent/frontend-durability-contract-2026-11-12` — final commit
+  `d3c8f38` (29dc536 contract → 9c3d9f3 a11y fix + acceptance record →
+  d3c8f38 CI advisory). Final CI run 43217825626 green.
 
 ## Phase 1 — audit findings
 
@@ -180,7 +187,7 @@ Work branch: backend `agent/durability-repairs-2026-11-12`.
    contract, reconciliation procedure and frontend contract are implemented
    and verified by 1918 backend tests (4 skipped; ruff clean; CI
    43139833532), 68 frontend unit tests + typecheck + build (CI
-   43139847866), a 16/16 live-process operational exercise, and a browser
+   43217825626), a 16/16 live-process operational exercise, and a browser
    inspection record. Caveats: single-instance SQLite, per-process audit
    log, no server-side execution timeout, no payload-size guard.
 2. **Independently scientifically evaluated workflow: NO-GO** — no
